@@ -38,7 +38,7 @@ export default async function Targets() {
           <ActionForm action={setTargetAction} submit="حفظ التارجت" className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="month" value={month} />
             <SelectField label="الموظف" name="employee" required empty="اختر" options={rows.map(({ e }) => ({ value: e.id, label: e.full_name }))} />
-            <SelectField label="المقياس" name="metric" required options={[{ value: "completed_meetings", label: METRIC.completed_meetings }, { value: "deals_won", label: METRIC.deals_won }]} />
+            <SelectField label="المقياس" name="metric" required options={[{ value: "new_leads", label: METRIC.new_leads }, { value: "completed_meetings", label: METRIC.completed_meetings }, { value: "deals_won", label: METRIC.deals_won }]} />
             <Field label="القيمة" name="value" type="number" min="0" step="1" required />
           </ActionForm>
           <p className="mt-3 text-xs text-ink-500">كل تعديل على التارجت يُسجَّل في سجل التدقيق.</p>

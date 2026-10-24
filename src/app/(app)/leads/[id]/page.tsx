@@ -6,9 +6,9 @@ import { allowedMeetingActions } from "@/server/meeting-rules";
 import { Badge, Card, PageHeader, Empty } from "@/components/ui";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
 import { MeetingActions } from "@/components/meeting-actions";
-import { bookMeetingAction, correctAttributionAction, logCallAction, transferLeadAction, updateClientAction, updateContactsAction } from "@/server/actions";
+import { acknowledgeHandoffAction, bookMeetingAction, correctAttributionAction, handoffAction, logCallAction, transferLeadAction, updateClientAction, updateContactsAction } from "@/server/actions";
 import { fmtDateTime, toRiyadhInput } from "@/lib/format";
-import { CALL_STATUSES, FOLLOWUP_STATUS, LEAD_STATUS, MEETING_STATUS, SERVICES, SOURCES } from "@/lib/labels";
+import { CALL_STATUSES, FOLLOWUP_STATUS, HANDOFF_STATUS, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, SOURCES } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const data = await getLead(s.userId, id);
   if (!data) notFound();
-  const { lead, contacts, stores, activities, assignments, meetings, followUps, deal } = data;
+  const { lead, contacts, stores, activities, assignments, meetings, followUps, deal, handoff } = data;
   const canEdit = can(s, "leads.edit");
   const reps = can(s, "meetings.create") || can(s, "meetings.manage") ? await salesReps(s.userId) : [];
   const emps = can(s, "employees.view") ? await employeeList(s.userId) : [];
@@ -31,7 +31,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <PageHeader title={lead.name} sub={lead.business_name ?? undefined}
-        actions={<><Badge tone="brand">{LEAD_STATUS[lead.lead_status]}</Badge>{deal && can(s, "deals.view") && <Link className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream" href={`/deals/${deal.id}`}>فتح الصفقة</Link>}</>} />
+        actions={<><Badge tone={LEAD_STATUS_TONE[lead.lead_status]}>{LEAD_STATUS[lead.lead_status]}</Badge>{deal && can(s, "deals.view") && <Link className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream" href={`/deals/${deal.id}`}>فتح الصفقة</Link>}</>} />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <Card title="الملكية والمصدر">
@@ -44,6 +44,27 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <div><dt className="text-ink-500">آخر تواصل</dt><dd>{fmtDateTime(lead.last_contact_at)}</dd></div>
             </dl>
           </Card>
+
+          {handoff?.status === "assigned" && handoff.to_employee_id === s.userId && (
+            <Card title="عميل بانتظار استلامك" right={<Badge tone="warn">جديد</Badge>}>
+              <p className="mb-3 text-sm text-ink-500">حوّله {handoff.from_name} في {fmtDateTime(handoff.handed_at)}{handoff.note ? ` · ${handoff.note}` : ""}. اطلع على سجل المكالمات ثم أكّد الاستلام.</p>
+              <form action={acknowledgeHandoffAction}><input type="hidden" name="lead_id" value={id} />
+                <button className="rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">تأكيد الاستلام</button></form>
+            </Card>)}
+          {can(s, "leads.handoff") && !lead.handed_off_at && ["Interested", "Qualified Lead"].includes(lead.lead_status) && !handoff?.status?.match(/pending|assigned/) && (
+            <Card title="تحويل العميل إلى Sales">
+              <ActionForm action={handoffAction} submit="تحويل العميل" className="grid gap-4 md:grid-cols-2">
+                <Hidden name="lead_id" value={id} />
+                <SelectField label="المستلم" name="to" required defaultValue="admin" options={[{ value: "admin", label: "إرسال للإدارة لتوزيعه" }, ...reps.map((r) => ({ value: r.id, label: r.full_name }))]} />
+                <TextArea label="ملاحظة للمستلم" name="note" rows={2} placeholder="مثال: العميل مهتم بإدارة السوشيال ميديا ويفضل التواصل مساءً" />
+                <p className="md:col-span-2 text-xs text-ink-500">بعد التحويل ينتقل العميل بكل ملاحظاته وسجل مكالماته لقائمة Sales، وتبقى مسجَّلًا كصاحبة العميل الأصلية، وتتابعين نتيجته من تبويب «تم تحويلها».</p>
+              </ActionForm>
+            </Card>)}
+          {handoff && (
+            <Card title="حالة التحويل إلى Sales">
+              <p className="text-sm"><Badge tone={handoff.status === "received" ? "ok" : handoff.status === "pending_distribution" ? "warn" : "brand"}>{HANDOFF_STATUS[handoff.status]}</Badge>
+                <span className="ms-2 text-ink-500">من {handoff.from_name}{handoff.to_name ? ` إلى ${handoff.to_name}` : ""} · {fmtDateTime(handoff.handed_at)}{handoff.received_at ? ` · استلم ${fmtDateTime(handoff.received_at)}` : ""}</span></p>
+            </Card>)}
 
           {canEdit && (
             <Card title="تسجيل مكالمة / تحديث الحالة">

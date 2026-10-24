@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
 import { logoutAction } from "@/server/actions";
-import { unreadCount } from "@/server/data";
 import { NavLink } from "@/components/nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSession();
-  const unread = await unreadCount(s.userId);
+  const unread = s.unread;
   const items: { href: string; label: string; show: boolean; badge?: number }[] = [
     { href: "/", label: "لوحة التحكم", show: true },
     { href: "/leads", label: "العملاء المحتملون", show: can(s, "leads.view") },
     { href: "/meetings", label: "الاجتماعات", show: can(s, "meetings.view") },
     { href: "/pipeline", label: "خط المبيعات", show: can(s, "deals.view") },
+    { href: "/distribution", label: "توزيع العملاء", show: can(s, "leads.distribute") },
     { href: "/follow-ups", label: "المتابعات", show: can(s, "followups.manage") },
     { href: "/targets", label: "التارجت", show: can(s, "targets.view") },
+    { href: "/archive", label: "الأرشيف الشهري", show: can(s, "leads.view") || can(s, "leads.create") },
     { href: "/duplicates", label: "مراجعة التكرار", show: can(s, "duplicates.review") || can(s, "duplicates.request") },
     { href: "/employees", label: "الموظفون", show: can(s, "employees.view") },
     { href: "/clients/existing", label: "إضافة عميل قائم", show: can(s, "employees.manage") },

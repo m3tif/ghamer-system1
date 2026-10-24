@@ -124,8 +124,11 @@ describe("meetings, targets and attribution", () => {
     expect((await run("sales2", "select * from meetings")).rowCount).toBe(0);
     expect((await run("tele2", "select * from meetings")).rowCount).toBe(0);
   });
-  it("cannot book a second active meeting for the same lead", async () => {
-    await expect(run("tele1", "select app.book_meeting($1,$2,$3,null,null)", [lead, ids.sales1, future(300)])).rejects.toThrow(/already has an active meeting/);
+  it("after hand-off the tele sales employee no longer sees the lead; the sales rep cannot double-book it", async () => {
+    expect((await run("tele1", "select * from leads where id = $1", [lead])).rowCount).toBe(0);
+    expect((await run("tele1", "select * from clients c where c.name = 'عميل الاجتماع'")).rowCount).toBe(0);
+    await expect(run("tele1", "select app.book_meeting($1,$2,$3,null,null)", [lead, ids.sales1, future(300)])).rejects.toThrow(/no access/);
+    await expect(run("sales1", "select app.book_meeting($1,$2,$3,null,null)", [lead, ids.sales1, future(300)])).rejects.toThrow(/already has an active meeting/);
   });
   it("rescheduling edits the same meeting and never creates a second one", async () => {
     await run("tele1", "select app.set_meeting_status($1,'reschedule','العميل طلب',$2,null)", [meeting, future(500)]);
@@ -194,8 +197,10 @@ describe("sales pipeline", () => {
     const d = await admin.query("select id from deals where lead_id = $1", [r.lead_id]);
     await run("sales1", "select app.move_deal_stage($1,'Signed / Finance Pending','تم',null,null)", [d.rows[0].id]);
     const o = await run("tele2", "select * from app.my_lead_outcomes() where lead_id = $1", [r.lead_id]);
-    expect(o.rows[0]).toMatchObject({ meeting_status: "Completed", deal_outcome: "won" });
-    expect(Object.keys(o.rows[0]).sort()).toEqual(["deal_outcome", "lead_id", "meeting_status"]);
+    expect(o.rows[0]).toMatchObject({ meeting_status: "Completed", deal_outcome: "won", handoff_status: "assigned" });
+    expect(Object.keys(o.rows[0]).sort()).toEqual(["business_name", "client_name", "deal_outcome", "handed_off_at", "handoff_status", "lead_id",
+      "lead_status", "meeting_status", "received_at", "to_name"]);
+    expect((await run("tele2", "select * from leads where id = $1", [r.lead_id])).rowCount).toBe(0);
     const st = (await run("tele2", "select * from app.tele_stats($1, date_trunc('month', now())::date)", [ids.tele2])).rows[0];
     expect(st.contracts_generated).toBe(1);
   });

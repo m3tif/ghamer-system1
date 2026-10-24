@@ -58,7 +58,7 @@ export function leadPayload(o: { name?: string; phone?: string; alt?: string; st
     identifiers.push({ kind: "store", value: s.key, label: "store" });
     stores.push({ url_raw: s.raw, url_key: s.key });
   }
-  return { name: o.name ?? "عميل تجريبي", source: "cold_call", lead_status: o.status ?? "New",
+  return { name: o.name ?? "عميل تجريبي", source: "cold_call", lead_status: o.status ?? "New Lead",
            required_services: o.services ?? ["seo"], identifiers, contacts, stores };
 }
 

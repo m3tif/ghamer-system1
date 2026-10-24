@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
-import { companyOverview, employeeList, listFollowUps, listMeetings, myOutcomes, listLeads, salesStats, teleStats } from "@/server/data";
+import { companyOverview, employeeList, incomingHandoffs, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
+import { acknowledgeHandoffAction } from "@/server/actions";
 import { Badge, Card, Empty, PageHeader, Progress, Stat, Table, td } from "@/components/ui";
 import { fmtDateTime, fmtNum, fmtPct, fmtMoney, monthStart } from "@/lib/format";
-import { LEAD_STATUS, MEETING_STATUS, SOURCES } from "@/lib/labels";
+import { ACHIEVEMENT, HANDOFF_STATUS, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, SOURCES, nextMilestone } from "@/lib/labels";
 
 export const metadata = { title: "لوحة التحكم" };
 export const dynamic = "force-dynamic";
@@ -31,6 +32,22 @@ export default async function Dashboard() {
   );
 }
 
+async function ProgressCard({ uid, month, title = "إنجازك هذا الشهر" }: { uid: string; month: string; title?: string }) {
+  const pr = await myProgress(uid, uid, month);
+  const goal = pr.goal == null ? null : Number(pr.goal);
+  const target = goal ?? nextMilestone(pr.month_count);
+  return (
+    <Card title={title}>
+      <div className="flex items-baseline justify-between"><span className="text-3xl font-extrabold tabular-nums">{pr.month_count} <span className="text-base font-medium text-ink-500">عميل أضفته من {target}</span></span>
+        <span className="text-sm text-ink-500">{goal ? "هدفك الشهري" : "الإنجاز القادم"}</span></div>
+      <div className="mt-2"><Progress value={pr.month_count} max={target} /></div>
+      {pr.month_count >= (goal ?? Infinity) && <p className="mt-2 text-sm font-semibold text-ok">أحسنت! وصلت إلى هدفك الشهري.</p>}
+      {pr.achievements.length > 0 && (
+        <p className="mt-3 flex flex-wrap gap-1.5">{pr.achievements.map((a) => <span key={a.code} className="rounded-full bg-burgundy-100 px-2.5 py-0.5 text-xs font-bold text-burgundy-800">★ {ACHIEVEMENT[a.code] ?? a.code}</span>)}</p>)}
+    </Card>
+  );
+}
+
 async function TeleHome({ uid, month }: { uid: string; month: string }) {
   const [st, upcoming, overdue, recent, outcomes] = await Promise.all([
     teleStats(uid, uid, month), listMeetings(uid, "upcoming"), listFollowUps(uid, "open"), listLeads(uid, {}), myOutcomes(uid),
@@ -38,15 +55,15 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
   const target = st.target == null ? null : Number(st.target);
   return (
     <div className="space-y-6">
-      <Card title="التارجت الشهري — الاجتماعات المنعقدة">
-        {target == null ? <p className="text-sm text-ink-500">لم يحدد المدير تارجت لهذا الشهر بعد.</p> : (
+      <ProgressCard uid={uid} month={month} />
+      {target != null && (
+        <Card title="التارجت الشهري — الاجتماعات المنعقدة">
           <div className="space-y-2">
             <div className="flex items-baseline justify-between"><span className="text-3xl font-extrabold tabular-nums">{fmtNum(st.meetings_completed)} <span className="text-base font-medium text-ink-500">من {fmtNum(target)}</span></span></div>
             <Progress value={st.meetings_completed} max={target} />
             <p className="text-xs text-ink-500">يُحتسب الاجتماع فقط بعد انعقاده فعليًا. الاجتماعات الملغاة وإعادة الجدولة لا تُحتسب.</p>
           </div>
-        )}
-      </Card>
+        </Card>)}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="عملاء جدد" value={st.new_leads} />
         <Stat label="مهتمون" value={st.interested_leads} />
@@ -75,16 +92,23 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
               </li>))}</ul>)}
         </Card>
       </div>
-      <Card title="آخر عملائك ونتائجهم" right={<Link className="text-sm text-burgundy-600 underline" href="/leads">الكل</Link>}>
-        {recent.rows.length === 0 ? <Empty title="لم تسجل أي عميل بعد" hint="ابدأ بتسجيل أول عميل من صفحة العملاء." /> : (
-          <Table head={["العميل", "الحالة", "الاجتماع", "نتيجة الصفقة"]}>
-            {recent.rows.slice(0, 8).map((l: any) => { const o = outcomes.get(l.id); return (
-              <tr key={l.id}>
-                <td className={td}><Link className="font-medium hover:underline" href={`/leads/${l.id}`}>{l.name}</Link></td>
-                <td className={td}><Badge>{LEAD_STATUS[l.lead_status]}</Badge></td>
-                <td className={td}>{o?.meeting_status ? MEETING_STATUS[o.meeting_status] : "—"}</td>
-                <td className={td}>{o?.deal_outcome === "won" ? <Badge tone="ok">تم التعاقد</Badge> : o?.deal_outcome === "lost" ? <Badge tone="bad">خسرناه</Badge> : o?.deal_outcome === "open" ? <Badge tone="warn">قيد التفاوض</Badge> : "—"}</td>
-              </tr>); })}
+      <Card title="آخر عملائك" right={<Link className="text-sm text-burgundy-600 underline" href="/leads">الكل</Link>}>
+        {recent.rows.length === 0 ? <Empty title="لا يوجد عملاء حاليًا" hint="ابدأ بتسجيل عميل. العملاء المحوّلون إلى Sales يظهرون في الجدول التالي." /> : (
+          <Table head={["العميل", "الحالة", "المتابعة القادمة"]}>
+            {recent.rows.slice(0, 6).map((l: any) => (
+              <tr key={l.id}><td className={td}><Link className="font-medium hover:underline" href={`/leads/${l.id}`}>{l.name}</Link></td>
+                <td className={td}><Badge tone={LEAD_STATUS_TONE[l.lead_status]}>{LEAD_STATUS[l.lead_status]}</Badge></td>
+                <td className={td + " text-ink-500"}>{fmtDateTime(l.next_followup_at)}</td></tr>))}
+          </Table>)}
+      </Card>
+      <Card title="العملاء الذين حوّلتهم إلى Sales ونتائجهم" right={<Link className="text-sm text-burgundy-600 underline" href="/leads?tab=handed">الكل</Link>}>
+        {outcomes.length === 0 ? <p className="text-sm text-ink-500">لم تحوّل أي عميل بعد.</p> : (
+          <Table head={["العميل", "التحويل", "المستلم", "الاجتماع", "نتيجة الصفقة"]}>
+            {outcomes.slice(0, 8).map((o: any) => (
+              <tr key={o.lead_id}><td className={td + " font-medium"}>{o.client_name}</td>
+                <td className={td}><Badge tone={o.handoff_status === "received" ? "ok" : o.handoff_status === "pending_distribution" ? "warn" : "brand"}>{HANDOFF_STATUS[o.handoff_status] ?? "—"}</Badge></td>
+                <td className={td}>{o.to_name ?? "—"}</td><td className={td}>{o.meeting_status ? MEETING_STATUS[o.meeting_status] : "—"}</td>
+                <td className={td}>{o.deal_outcome === "won" ? <Badge tone="ok">تم التعاقد</Badge> : o.deal_outcome === "lost" ? <Badge tone="bad">خسرناه</Badge> : o.deal_outcome === "open" ? <Badge tone="warn">قيد التفاوض</Badge> : "—"}</td></tr>))}
           </Table>)}
       </Card>
     </div>
@@ -92,9 +116,20 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
 }
 
 async function SalesHome({ uid, month }: { uid: string; month: string }) {
-  const [st, upcoming, fups] = await Promise.all([salesStats(uid, uid, month), listMeetings(uid, "upcoming"), listFollowUps(uid, "open")]);
+  const [st, upcoming, fups, incoming] = await Promise.all([salesStats(uid, uid, month), listMeetings(uid, "upcoming"), listFollowUps(uid, "open"), incomingHandoffs(uid)]);
   return (
     <div className="space-y-6">
+      {incoming.length > 0 && (
+        <Card title={`عملاء بانتظار استلامك (${incoming.length})`} right={<Badge tone="warn">جديد</Badge>}>
+          <ul className="divide-y divide-line">{incoming.map((h: any) => (
+            <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <div><Link href={`/leads/${h.lead_id}`} className="font-semibold hover:underline">{h.client_name}</Link>
+                <div className="text-xs text-ink-500">حوّله {h.from_name} · {fmtDateTime(h.handed_at)}{h.note ? ` · ${h.note}` : ""}</div></div>
+              <form action={acknowledgeHandoffAction}><input type="hidden" name="lead_id" value={h.lead_id} />
+                <button className="rounded-md bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700">تأكيد الاستلام</button></form>
+            </li>))}</ul>
+        </Card>)}
+      <ProgressCard uid={uid} month={month} title="العملاء الذين أضفتهم هذا الشهر" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="عملائي" value={st.my_leads} />
         <Stat label="اجتماعات قادمة" value={st.upcoming_meetings} />
@@ -160,19 +195,39 @@ async function Company({ uid, month }: { uid: string; month: string }) {
   const o = await companyOverview(uid, month);
   return (
     <section className="mb-8">
-      <h2 className="mb-3 text-lg font-bold">الشركة — هذا الشهر</h2>
+      <h2 className="mb-3 text-lg font-bold">الشركة — المرحلة الأولى</h2>
+      {o.pendingDistribution > 0 && (
+        <Link href="/distribution" className="mb-3 flex items-center justify-between rounded-lg border border-warn/40 bg-warn/5 px-4 py-3 text-sm font-semibold text-warn hover:bg-warn/10">
+          <span>{o.pendingDistribution} عميل بانتظار التوزيع على Sales</span><span>توزيع الآن ←</span></Link>)}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="عملاء جدد" value={o.leads} /><Stat label="اجتماعات منعقدة" value={o.meetingsDone} /><Stat label="اجتماعات قادمة" value={o.meetingsUpcoming} />
-        <Stat label="صفقات مفتوحة" value={o.openDeals} /><Stat label="صفقات موقعة" value={o.won} tone="ok" /><Stat label="صفقات خسرناها" value={o.lost} />
-        <Stat label="متابعات متأخرة" value={o.overdue} tone={o.overdue ? "bad" : undefined} /><Stat label="طلبات مراجعة ملكية" value={o.openReviews} />
+        <Stat label="إجمالي العملاء" value={fmtNum(o.totalLeads)} /><Stat label="عملاء جدد هذا الشهر" value={fmtNum(o.leads)} />
+        <Stat label="تحويلات إلى Sales هذا الشهر" value={o.handoffs} /><Stat label="اجتماعات هذا الشهر" value={o.meetingsMonth} />
+        <Stat label="اجتماعات منعقدة" value={o.meetingsDone} tone="ok" /><Stat label="اجتماعات قادمة" value={o.meetingsUpcoming} />
+        <Stat label="متابعات مفتوحة" value={o.followUpsOpen} /><Stat label="متابعات متأخرة" value={o.overdue} tone={o.overdue ? "bad" : undefined} />
       </div>
-      <div className="mt-4"><Card title="العملاء الجدد حسب المصدر">
-        {o.bySource.length === 0 ? <p className="text-sm text-ink-500">لا بيانات هذا الشهر.</p> : (
-          <ul className="space-y-2">{o.bySource.map((r: any) => (
-            <li key={r.src} className="flex items-center gap-3 text-sm"><span className="w-32 shrink-0">{SOURCES[r.src] ?? r.src}</span>
-              <div className="flex-1"><Progress value={r.n} max={o.bySource[0].n} /></div><span className="w-8 tabular-nums">{r.n}</span></li>))}</ul>)}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card title="العملاء حسب الحالة">
+          {o.byStatus.length === 0 ? <p className="text-sm text-ink-500">لا بيانات.</p> : (
+            <ul className="space-y-2">{o.byStatus.map((r: any) => (
+              <li key={r.s} className="flex items-center gap-3 text-sm"><span className="w-36 shrink-0"><Badge tone={LEAD_STATUS_TONE[r.s]}>{LEAD_STATUS[r.s] ?? r.s}</Badge></span>
+                <div className="flex-1"><Progress value={r.n} max={o.byStatus[0].n} /></div><span className="w-10 tabular-nums">{r.n}</span></li>))}</ul>)}
+        </Card>
+        <Card title="العملاء الجدد حسب المصدر (هذا الشهر)">
+          {o.bySource.length === 0 ? <p className="text-sm text-ink-500">لا بيانات هذا الشهر.</p> : (
+            <ul className="space-y-2">{o.bySource.map((r: any) => (
+              <li key={r.src} className="flex items-center gap-3 text-sm"><span className="w-32 shrink-0">{SOURCES[r.src] ?? r.src}</span>
+                <div className="flex-1"><Progress value={r.n} max={o.bySource[0].n} /></div><span className="w-8 tabular-nums">{r.n}</span></li>))}</ul>)}
+        </Card>
+      </div>
+      <div className="mt-4"><Card title="توزيع العملاء وأداء كل موظف مقابل هدفه الشهري" right={<Link className="text-sm text-burgundy-600 underline" href="/archive">الأرشيف الشهري</Link>}>
+        {o.perEmployee.length === 0 ? <p className="text-sm text-ink-500">لا يوجد موظفون.</p> : (
+          <Table head={["الموظف", "الدور", "أضاف هذا الشهر", "عملاء نشطون حاليًا", "الهدف الشهري", "التقدم"]}>
+            {o.perEmployee.map((e: any) => (
+              <tr key={e.id}><td className={td + " font-medium"}>{e.full_name}</td><td className={td}>{e.role}</td><td className={td}>{e.added}</td><td className={td}>{e.active_owned}</td>
+                <td className={td}>{e.goal == null ? <span className="text-ink-500">غير محدد</span> : fmtNum(e.goal)}</td>
+                <td className={td + " min-w-36"}>{e.goal ? <Progress value={e.added} max={Number(e.goal)} /> : "—"}</td></tr>))}
+          </Table>)}
       </Card></div>
-      <p className="mt-3 text-xs text-ink-500">مؤشرات المالية والتحصيل والربحية تُضاف في المرحلتين 2 و4.</p>
     </section>
   );
 }

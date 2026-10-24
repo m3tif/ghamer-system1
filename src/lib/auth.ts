@@ -12,7 +12,7 @@ const TTL_HOURS = Number(process.env.SESSION_TTL_HOURS ?? 12);
 
 export type Session = {
   userId: string; fullName: string; email: string; role: string; roleNameAr: string;
-  mfaVerified: boolean; mfaRequired: boolean; mfaEnabled: boolean; mustChangePassword: boolean; perms: Set<string>;
+  mfaVerified: boolean; mfaRequired: boolean; mfaEnabled: boolean; mustChangePassword: boolean; unread: number; perms: Set<string>;
 };
 
 const ARGON = { memoryCost: 19456, timeCost: 2, parallelism: 1, outputLen: 32 };
@@ -33,7 +33,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
   if (!s) return null;
   return {
     userId: s.user_id, fullName: s.full_name, email: s.email, role: s.role_code, roleNameAr: s.role_name_ar,
-    mfaVerified: s.mfa_verified, mfaRequired: s.mfa_required, mfaEnabled: s.mfa_enabled, mustChangePassword: s.must_change_password, perms: new Set<string>(s.perms),
+    mfaVerified: s.mfa_verified, mfaRequired: s.mfa_required, mfaEnabled: s.mfa_enabled, mustChangePassword: s.must_change_password, unread: s.unread, perms: new Set<string>(s.perms),
   };
 });
 

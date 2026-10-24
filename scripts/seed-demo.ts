@@ -57,7 +57,7 @@ const iso = (h: number) => new Date(Date.now() + h * 3600000).toISOString();
   for (let i = 0; i < names.length; i++) {
     const who = i % 2 === 0 ? "tele1" : "tele2";
     const r = await reg(who, payload(names[i], mk(i + 1), `https://www.${["rose", "oud", "sanabel", "najd", "ofoq", "dirah", "lamsa", "furn", "mazaj", "elec"][i]}-store.com.sa/?utm_source=ig`,
-      { lead_status: ["Interested", "Call Back", "Not Answered", "Interested", "Follow-up Later", "Interested", "Not Interested", "Interested", "New", "Interested"][i],
+      { lead_status: ["Interested", "Follow-up Required", "No Answer", "Interested", "Follow-up Required", "Interested", "Not Interested", "Interested", "New Lead", "Interested"][i],
         source: ["cold_call", "meta_ads", "website", "referral", "cold_call", "whatsapp", "social", "meta_ads", "cold_call", "referral"][i],
         next_followup_at: i % 3 === 1 ? iso(-5) : null, followup_reason: "اتصال متابعة", call_notes: "تم الاتصال وشرح الخدمات" }));
     L[names[i]] = r.lead_id;
@@ -89,12 +89,16 @@ const iso = (h: number) => new Date(Date.now() + h * 3600000).toISOString();
     await c.query("select app.move_deal_stage($1,'Signed / Finance Pending','تم توقيع العقد',null,null)", [d2]);
   });
   // a direct sales lead, a duplicate attempt and an ownership-review request
-  await reg("sales2", payload("شركة البناء الحديث", mk(40), "https://modern-build.com", { source: "referral", lead_status: "New" }));
+  await reg("sales2", payload("شركة البناء الحديث", mk(40), "https://modern-build.com", { source: "referral", lead_status: "New Lead" }));
   const dup = await reg("tele2", payload("نفس متجر الورد", mk(1)));
   if (dup.status === "duplicate") await as("tele2", () => c.query("select app.request_ownership_review($1,$2,'{}')", [dup.existing_client_id, "تواصلت مع صاحب المتجر قبل أسبوع عبر واتساب"]));
+  // a lead sent to the admin for distribution (Tele Sales has no more access to it)
+  const pend = await reg("tele1", payload("مؤسسة الريان للتجهيزات", mk(50), "https://rayan-supplies.sa", { lead_status: "Qualified Lead" }));
+  await as("tele1", () => c.query("select app.handoff_lead($1,null,'عميل مؤهل، يفضل التواصل صباحًا')", [pend.lead_id]));
   // targets for the current month
   const month = new Date().toISOString().slice(0, 7) + "-01";
   await as("telemgr", async () => { for (const k of ["tele1", "tele2"]) await c.query("insert into targets(employee_id, period_month, metric, target_value, set_by) values ($1,$2,'completed_meetings',12,$3)", [ids[k], month, ids.telemgr]); });
+  await as("telemgr", async () => { for (const k of ["tele1", "tele2"]) await c.query("insert into targets(employee_id, period_month, metric, target_value, set_by) values ($1,$2,'new_leads',100,$3)", [ids[k], month, ids.telemgr]); });
   await as("salesmgr", async () => { for (const k of ["sales1", "sales2"]) await c.query("insert into targets(employee_id, period_month, metric, target_value, set_by) values ($1,$2,'deals_won',4,$3)", [ids[k], month, ids.salesmgr]); });
   console.log("✓ Demo data created. Sign in with any of:\n  tele1@ghamer.demo  tele2@ghamer.demo  sales1@ghamer.demo  sales2@ghamer.demo\n  telemgr@ghamer.demo salesmgr@ghamer.demo gm@ghamer.demo admin@ghamer.demo (these need two-factor setup)\n  password:", PASSWORD);
   await c.end();

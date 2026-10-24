@@ -9,6 +9,7 @@ import { mapError } from "@/lib/errors";
 import { normalizePhone, normalizeStoreUrl } from "@/lib/normalize";
 import { parseRiyadh } from "@/lib/format";
 import type { FormState } from "@/lib/form";
+import { ACHIEVEMENT, NEEDS_FOLLOWUP, encourage, nextMilestone } from "@/lib/labels";
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const vals = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string").map(([k, v]) => [k, String(v)]));
@@ -81,12 +82,14 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
   if (!s(fd, "phone")) return { error: "رقم الجوال مطلوب", values: vals(fd) };
   const cp = buildContactPayload(fd);
   if (cp.error) return { error: cp.error, values: vals(fd) };
-  const status = s(fd, "lead_status") || "New";
+  const status = s(fd, "lead_status") || "New Lead";
   const next = parseRiyadh(s(fd, "next_followup"));
-  if (["Call Back", "Follow-up Later"].includes(status) && (!next || !s(fd, "followup_reason")))
+  if (NEEDS_FOLLOWUP.includes(status) && (!next || !s(fd, "followup_reason")))
     return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
+  const rid = s(fd, "request_id");
   const payload = {
-    mode: legacy ? "existing" : "lead", name: s(fd, "name"), business_name: s(fd, "business_name"), industry: s(fd, "industry"),
+    mode: legacy ? "existing" : "lead", request_id: /^[0-9a-f-]{36}$/i.test(rid) ? rid : null,
+    name: s(fd, "name"), business_name: s(fd, "business_name"), industry: s(fd, "industry"),
     country: s(fd, "country") || "SA", city: s(fd, "city"), contact_person: s(fd, "contact_person"), source: s(fd, "source"),
     required_services: fd.getAll("services").map(String), lead_status: status, call_notes: s(fd, "call_notes"),
     next_followup_at: next, followup_reason: s(fd, "followup_reason"), ...cp.payload,
@@ -99,7 +102,11 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
       attempted: { name: s(fd, "name"), business_name: s(fd, "business_name"), phone: s(fd, "phone"), store: s(fd, "store_url") } } };
   }
   revalidatePath("/leads");
-  redirect(legacy ? "/" : `/leads/${res.lead_id}`);
+  if (legacy) redirect("/");
+  if (s(fd, "intent") === "open") redirect(`/leads/${res.lead_id}`);
+  const count: number = res.month_count ?? 0, goal: number | null = res.goal == null ? null : Number(res.goal), ach: string[] = res.new_achievements ?? [];
+  const e = encourage(count, goal, ach);
+  return { ok: `تم حفظ «${s(fd, "name")}»`, toast: { ...e, count, goal, next: nextMilestone(count), achievements: ach.map((c) => ACHIEVEMENT[c] ?? c) } };
 }
 
 export async function requestReviewAction(_: FormState, fd: FormData): Promise<FormState> {
@@ -116,7 +123,7 @@ export async function logCallAction(_: FormState, fd: FormData): Promise<FormSta
   const id = s(fd, "lead_id"), status = s(fd, "status"), note = s(fd, "note");
   const next = parseRiyadh(s(fd, "next_followup")), why = s(fd, "followup_reason");
   if (!note) return { error: "اكتب ملاحظات المكالمة", values: vals(fd) };
-  if (["Call Back", "Follow-up Later"].includes(status) && (!next || !why)) return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
+  if (NEEDS_FOLLOWUP.includes(status) && (!next || !why)) return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
   if (next && !why) return { error: "اكتب سبب المتابعة", values: vals(fd) };
   try {
     await tx(sess.userId, async (c) => {
@@ -305,4 +312,26 @@ export async function setManagerAction(_: FormState, fd: FormData): Promise<Form
   catch (e) { return fail(e); }
   revalidatePath("/employees");
   return { ok: "تم تحديث الفريق" };
+}
+
+// ───────── hand-off to Sales ─────────
+export async function handoffAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const to = s(fd, "to");
+  try { await tx(sess.userId, (c) => c.query("select app.handoff_lead($1,$2,$3)", [s(fd, "lead_id"), to === "" || to === "admin" ? null : to, s(fd, "note") || null])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads"); revalidatePath("/");
+  redirect("/leads?handed=1");
+}
+export async function assignHandoffAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  try { await tx(sess.userId, (c) => c.query("select app.assign_handoff($1,$2)", [s(fd, "id"), s(fd, "to")])); }
+  catch (e) { return fail(e); }
+  revalidatePath("/distribution");
+  return { ok: "تم توزيع العميل وإشعار الموظف المستلم" };
+}
+export async function acknowledgeHandoffAction(fd: FormData) {
+  const sess = await requireSession();
+  await tx(sess.userId, (c) => c.query("select app.acknowledge_handoff($1)", [s(fd, "lead_id")]));
+  revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/");
 }
