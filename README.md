@@ -14,7 +14,7 @@ npm run db:migrate                  # ينشئ الجداول والصلاحيا
 npm run admin:create                # أول Super Admin
 npm run db:seed                     # (اختياري) بيانات تجريبية
 npm run dev                         # http://localhost:3000
-npm test                            # 46 اختبارًا (يحتاج PostgreSQL محلي، انظر docs/TESTING.md)
+npm test                            # 61 اختبارًا (يحتاج PostgreSQL محلي، انظر docs/TESTING.md)
 ```
 الدليل الكامل للإعداد والنشر بالعربية: [`docs/SETUP-AR.md`](docs/SETUP-AR.md)
 
