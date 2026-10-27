@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo Variable", "Cairo", system-ui, sans-serif;
+  --color-burgundy-50: #fbf2f4;
+  --color-burgundy-100: #f4dde2;
+  --color-burgundy-200: #e6b4be;
+  --color-burgundy-500: #a8334c;
+  --color-burgundy-600: #8b1e34;
+  --color-burgundy-700: #70172a;
+  --color-burgundy-800: #561220;
+  --color-cream: #f6f1e8;
+  --color-cream-dark: #ebe4d6;
+  --color-charcoal: #26201f;
+  --color-ink-500: #6b625f;
+  --color-ink-300: #b9b0ab;
+  --color-line: #e2dacb;
+  --color-ok: #2f7d4f;
+  --color-warn: #b7791f;
+  --color-bad: #b42318;
+}
+
+html { background: var(--color-cream); color: var(--color-charcoal); }
+body { font-family: var(--font-sans); font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-burgundy-600); outline-offset: 2px; border-radius: 4px; }
+input, select, textarea { font: inherit; }
+::selection { background: var(--color-burgundy-100); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
