@@ -4,29 +4,32 @@ import { normalizePhone, toLatinDigits } from "@/lib/normalize";
 const esc = (s: string) => s.replace(/[\\%_]/g, "\\$&");
 export const PAGE_SIZE = 20;
 
-export async function listLeads(uid: string, o: { q?: string; status?: string; page?: number; month?: string; creator?: string }) {
+type LeadFilter = { q?: string; status?: string; page?: number; month?: string; creator?: string; temp?: string };
+export async function listLeads(uid: string, o: LeadFilter) {
   const page = Math.max(1, o.page ?? 1);
   const q = o.q?.trim() || null;
   // a query is treated as a phone number only when it is made of digits/separators (not when a name contains digits)
   const asDigits = q ? toLatinDigits(q) : "";
   const phone = q && /^[+\d\s().-]{5,}$/.test(asDigits) ? (normalizePhone(q) ?? asDigits.replace(/\D/g, "")) : null;
-  const filters = `($1::text is null or l.lead_status = $1) and ($2::date is null or l.created_month = $2) and ($3::uuid is null or l.original_creator_id = $3)`;
-  const base = [o.status || null, o.month || null, o.creator || null];
+  const flt = (a: string) => `($1::text is null or ${a}.lead_status = $1) and ($2::date is null or ${a}.created_month = $2) and ($3::uuid is null or ${a}.original_creator_id = $3) and ($4::text is null or ${a}.lead_temperature = $4)`;
+  const base = [o.status || null, o.month || null, o.creator || null, o.temp || null];
   const decorate = `select p.*, c.name, c.business_name,
             app.emp_name(p.original_creator_id) creator, app.emp_name(p.current_owner_id) owner, app.emp_name(p.assigned_sales_id) sales,
             (select cc.phone from client_contacts cc where cc.client_id = p.client_id and cc.phone is not null order by cc.is_primary desc, cc.created_at limit 1) phone
      from page p join clients c on c.id = p.client_id order by p.created_at desc`;
-  const cols = `l.id, l.client_id, l.lead_status, l.next_followup_at, l.created_at, l.last_contact_at, l.original_creator_id, l.current_owner_id, l.assigned_sales_id`;
+  const cols = `l.id, l.client_id, l.lead_status, l.lead_temperature, l.next_followup_at, l.created_at, l.last_contact_at, l.original_creator_id, l.current_owner_id, l.assigned_sales_id`;
   const r = await tx(uid, (c) => q
-    // text search: definer function (can use the trigram indexes, applies the visibility rules), then decorate the 20 rows
-    ? c.query(`with page as (select * from app.search_leads($4, $5, $1, $2, $3, ${PAGE_SIZE}, $6))
-       ${decorate}`, [...base, q, phone, (page - 1) * PAGE_SIZE])
-    // no text search: page the leads first (index order), join clients for only those rows, count once
+    ? c.query(`with page as (select * from app.search_leads($5, $6, $1, $2, $3, $4, ${PAGE_SIZE}, $7)) ${decorate}`, [...base, q, phone, (page - 1) * PAGE_SIZE])
     : c.query(`with page as (
-         select ${cols}, (select count(*)::int from leads l2 where ($1::text is null or l2.lead_status = $1) and ($2::date is null or l2.created_month = $2) and ($3::uuid is null or l2.original_creator_id = $3)) total
-         from leads l where ${filters} order by l.created_at desc limit ${PAGE_SIZE} offset $4)
-       ${decorate}`, [...base, (page - 1) * PAGE_SIZE]));
+         select ${cols}, (select count(*)::int from leads l2 where ${flt("l2")}) total
+         from leads l where ${flt("l")} order by l.created_at desc limit ${PAGE_SIZE} offset $5) ${decorate}`, [...base, (page - 1) * PAGE_SIZE]));
   return { rows: r.rows, total: r.rows[0]?.total ?? 0, page };
+}
+
+/** How many leads a person added (all time / this month / handed to Sales / accepted / rejected). Counts the real records, not what is visible. */
+export async function addedCounts(uid: string, emp?: string | null) {
+  return (await tx(uid, (c) => c.query("select * from app.added_counts($1)", [emp ?? null]))).rows[0] as
+    { total: number; this_month: number; handed_off: number; accepted: number; rejected: number };
 }
 
 export async function getLead(uid: string, id: string) {
@@ -39,10 +42,10 @@ export async function getLead(uid: string, id: string) {
         (select coalesce(json_agg(x), '[]') from (select a.*, app.emp_name(a.created_by) by_name from lead_activities a where lead_id = l.id order by created_at desc limit 200) x) activities,
         (select coalesce(json_agg(x), '[]') from (select a.*, app.emp_name(a.from_employee_id) from_name, app.emp_name(a.to_employee_id) to_name, app.emp_name(a.assigned_by) by_name
             from lead_assignments a where lead_id = l.id order by created_at desc) x) assignments,
-        (select coalesce(json_agg(x), '[]') from (select m.*, app.emp_name(m.sales_rep_id) rep_name, app.emp_name(m.tele_sales_id) tele_name from meetings m where lead_id = l.id order by created_at desc) x) meetings,
+        (select coalesce(json_agg(x), '[]') from (select ${MCOLS}, app.meeting_link(m.id) meeting_url, app.emp_name(m.sales_rep_id) rep_name, app.emp_name(m.tele_sales_id) tele_name from meetings m where lead_id = l.id order by created_at desc) x) meetings,
         (select coalesce(json_agg(x), '[]') from (select f.*, app.emp_name(f.owner_id) owner_name from follow_ups f where lead_id = l.id order by due_at desc) x) follow_ups,
         (select row_to_json(x) from (select id, stage from deals where lead_id = l.id order by created_at desc limit 1) x) deal,
-        (select row_to_json(x) from (select h.id, h.status, h.note, h.handed_at, h.assigned_at, h.received_at, app.emp_name(h.from_employee_id) from_name, app.emp_name(h.to_employee_id) to_name, h.to_employee_id
+        (select row_to_json(x) from (select h.id, h.status, h.note, h.handed_at, h.assigned_at, h.decided_at, h.reject_reason, h.reject_note, app.emp_name(h.from_employee_id) from_name, app.emp_name(h.to_employee_id) to_name, app.emp_name(h.decided_by) decided_by_name, h.to_employee_id
             from lead_handoffs h where h.lead_id = l.id order by h.handed_at desc limit 1) x) handoff
        from leads l join clients c on c.id = l.client_id where l.id = $1`, [id])).rows[0];
     if (!r) return null;
@@ -54,14 +57,49 @@ export async function getLead(uid: string, id: string) {
 export const salesReps = (uid: string) => tx(uid, (c) => c.query("select * from app.sales_reps()")).then((r) => r.rows as { id: string; full_name: string }[]);
 export const assignable = (uid: string) => tx(uid, (c) => c.query("select * from app.assignable_employees()")).then((r) => r.rows as { id: string; full_name: string; role_code: string }[]);
 
-export async function listMeetings(uid: string, scope: "upcoming" | "past" | "all") {
-  const where = scope === "upcoming" ? "m.status in ('Scheduled','Confirmed','Rescheduled')" : scope === "past" ? "m.status in ('Completed','Cancelled','No Show')" : "true";
-  const r = await tx(uid, (c) => c.query(
-    `select m.*, c.name client_name, c.business_name, app.emp_name(m.sales_rep_id) rep_name, app.emp_name(m.tele_sales_id) tele_name,
-            (select count(*) from meetings x where x.id = m.id)::int one
-     from meetings m join leads l on l.id = m.lead_id join clients c on c.id = l.client_id
-     where ${where} order by case when m.status in ('Scheduled','Confirmed','Rescheduled') then m.scheduled_at end asc nulls last, m.scheduled_at desc limit 200`));
-  return r.rows;
+export const MCOLS = `m.id, m.lead_id, m.tele_sales_id, m.sales_rep_id, m.scheduled_at, m.booking_notes, m.status, m.reschedule_count, m.confirmed_at,
+  m.completed_at, m.created_at, m.updated_at, m.title, m.meeting_type, m.outcome, m.result_notes, m.next_step, m.next_step_at, m.outcome_at`;
+export type MeetingTab = "upcoming" | "awaiting" | "done" | "cancelled";
+const ACTIVE = "m.status in ('Scheduled','Confirmed','Rescheduled')";
+/** upcoming = active AND still in the future. awaiting = active but its time has passed (needs a result). */
+const TAB_SQL: Record<MeetingTab, string> = {
+  upcoming: `${ACTIVE} and m.scheduled_at >= now()`,
+  awaiting: `${ACTIVE} and m.scheduled_at < now()`,
+  done: "m.status in ('Completed','No Show')",
+  cancelled: "m.status = 'Cancelled'",
+};
+export async function listMeetings(uid: string, tab: MeetingTab, limit = 200) {
+  return (await tx(uid, (c) => c.query("select * from app.list_meetings($1,$2)", [tab, limit]))).rows;
+}
+export async function meetingCounts(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.meeting_counts()"))).rows[0] as Record<MeetingTab, number>;
+}
+export async function meetingEvents(uid: string, meetingId: string) {
+  return (await tx(uid, (c) => c.query("select e.*, app.emp_name(e.by_employee) by_name from meeting_events e where meeting_id = $1 order by at desc", [meetingId]))).rows as any[];
+}
+
+/** Leads assigned to this Sales person: waiting for his decision, accepted, rejected (history). */
+export async function assignedLeads(uid: string, tab: "pending" | "accepted" | "rejected") {
+  return tx(uid, async (c) => {
+    if (tab === "pending") {
+      return (await c.query(
+        `select h.id handoff_id, l.id lead_id, c.name, c.business_name, l.lead_temperature, l.required_services, l.call_notes, l.lead_status, h.note, h.handed_at,
+                app.emp_name(h.from_employee_id) from_name, c.original_source,
+                (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc limit 1) phone
+         from lead_handoffs h join leads l on l.id = h.lead_id join clients c on c.id = l.client_id
+         where h.to_employee_id = $1 and h.status = 'pending_review' order by h.handed_at`, [uid])).rows as any[];
+    }
+    if (tab === "accepted") {
+      return (await c.query(
+        `select l.id lead_id, c.name, c.business_name, l.lead_temperature, l.lead_status, l.next_followup_at,
+                (select h.decided_at from lead_handoffs h where h.lead_id = l.id and h.status = 'accepted' order by h.decided_at desc limit 1) decided_at,
+                app.emp_name(l.original_creator_id) from_name,
+                (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc limit 1) phone
+         from leads l join clients c on c.id = l.client_id
+         where l.assigned_sales_id = $1 and l.lead_status <> 'Pending Sales Review' order by l.updated_at desc limit 300`, [uid])).rows as any[];
+    }
+    return (await c.query("select * from app.my_handoff_decisions() where status = 'rejected'")).rows as any[];
+  });
 }
 
 export async function listDeals(uid: string) {
@@ -177,6 +215,9 @@ export async function companyOverview(uid: string, month: string) {
       overdue: await one(`select count(*)::int n from follow_ups where status='open' and due_at < now()`),
       openReviews: await one(`select count(*)::int n from duplicate_reviews where status='open'`),
       byStatus: await q(`select lead_status s, count(*)::int n from leads group by 1 order by 2 desc`),
+      byTemperature: await q(`select coalesce(lead_temperature, 'none') t, count(*)::int n from leads group by 1 order by 2 desc`),
+      handoffMonth: await q(`select status s, count(*)::int n from lead_handoffs where handed_at >= ${win} and handed_at < ${end} group by 1`),
+      rejectedWaiting: await one(`select count(*)::int n from leads where lead_status = 'Rejected by Sales'`),
       bySource: await q(`select cl.original_source src, count(*)::int n from leads l join clients cl on cl.id = l.client_id where l.created_month = ${win} group by 1 order by 2 desc`),
       perEmployee: await q(`select e.id, e.full_name, e.role_name_ar role,
           (select count(*)::int from leads l where l.original_creator_id = e.id and l.created_month = ${win}) added,

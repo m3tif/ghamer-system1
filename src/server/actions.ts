@@ -7,18 +7,19 @@ import { tx } from "@/lib/db";
 import { can, currentTokenHash, ensureEnrollment, hashPassword, login, logout, requireSession, validatePasswordStrength, verifyMfa, verifyPassword, getSession } from "@/lib/auth";
 import { mapError } from "@/lib/errors";
 import { normalizePhone, normalizeStoreUrl } from "@/lib/normalize";
-import { parseRiyadh } from "@/lib/format";
+import { parseLocal } from "@/lib/format";
 import type { FormState } from "@/lib/form";
 import { ACHIEVEMENT, NEEDS_FOLLOWUP, encourage, nextMilestone } from "@/lib/labels";
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
-const vals = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string").map(([k, v]) => [k, String(v)]));
+const SECRET = /^(password|old|new|confirm)$/;
+const vals = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([k, v]) => typeof v === "string" && !SECRET.test(k)).map(([k, v]) => [k, String(v)]));
 const fail = (e: unknown, fd?: FormData): FormState => ({ error: mapError(e), values: fd ? vals(fd) : undefined });
 
 // ───────── session ─────────
 export async function loginAction(_: FormState, fd: FormData): Promise<FormState> {
   const email = s(fd, "email"), password = String(fd.get("password") ?? "");
-  if (!email || !password) return { error: "أدخل البريد الإلكتروني وكلمة المرور" };
+  if (!email || !password) return { values: vals(fd), error: "أدخل البريد الإلكتروني وكلمة المرور" };
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
   const r = await login(email, password, ip, h.get("user-agent") ?? "");
@@ -31,7 +32,7 @@ export async function mfaAction(_: FormState, fd: FormData): Promise<FormState> 
   const sess = await getSession();
   if (!sess) redirect("/login");
   const ok = await verifyMfa(sess, s(fd, "code"));
-  if (!ok) return { error: "الرمز غير صحيح أو منتهي" };
+  if (!ok) return { values: vals(fd), error: "الرمز غير صحيح أو منتهي" };
   redirect("/");
 }
 export async function mfaEnroll() { const sess = await getSession(); if (!sess) redirect("/login"); return ensureEnrollment(sess); }
@@ -39,11 +40,11 @@ export async function mfaEnroll() { const sess = await getSession(); if (!sess) 
 export async function changePasswordAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession({ allowPasswordChange: true });
   const oldPw = String(fd.get("old") ?? ""), n1 = String(fd.get("new") ?? ""), n2 = String(fd.get("confirm") ?? "");
-  if (n1 !== n2) return { error: "كلمتا المرور غير متطابقتين" };
-  const weak = validatePasswordStrength(n1); if (weak) return { error: weak };
-  if (n1 === oldPw) return { error: "اختر كلمة مرور مختلفة عن الحالية" };
+  if (n1 !== n2) return { values: vals(fd), error: "كلمتا المرور غير متطابقتين" };
+  const weak = validatePasswordStrength(n1); if (weak) return { values: vals(fd), error: weak };
+  if (n1 === oldPw) return { values: vals(fd), error: "اختر كلمة مرور مختلفة عن الحالية" };
   const cur = (await tx(sess.userId, (c) => c.query("select app.own_password_hash() h"))).rows[0].h;
-  if (!(await verifyPassword(cur, oldPw))) return { error: "كلمة المرور الحالية غير صحيحة" };
+  if (!(await verifyPassword(cur, oldPw))) return { values: vals(fd), error: "كلمة المرور الحالية غير صحيحة" };
   const newHash = await hashPassword(n1), keep = await currentTokenHash();
   await tx(sess.userId, (c) => c.query("select app.set_own_password($1,$2)", [newHash, keep]));
   redirect("/");
@@ -83,12 +84,12 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
   const cp = buildContactPayload(fd);
   if (cp.error) return { error: cp.error, values: vals(fd) };
   const status = s(fd, "lead_status") || "New Lead";
-  const next = parseRiyadh(s(fd, "next_followup"));
+  const next = parseLocal(s(fd, "next_followup"));
   if (NEEDS_FOLLOWUP.includes(status) && (!next || !s(fd, "followup_reason")))
     return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
   const rid = s(fd, "request_id");
   const payload = {
-    mode: legacy ? "existing" : "lead", request_id: /^[0-9a-f-]{36}$/i.test(rid) ? rid : null,
+    mode: legacy ? "existing" : "lead", lead_temperature: ["cold", "warm", "hot"].includes(s(fd, "lead_temperature")) ? s(fd, "lead_temperature") : null, request_id: /^[0-9a-f-]{36}$/i.test(rid) ? rid : null,
     name: s(fd, "name"), business_name: s(fd, "business_name"), industry: s(fd, "industry"),
     country: s(fd, "country") || "SA", city: s(fd, "city"), contact_person: s(fd, "contact_person"), source: s(fd, "source"),
     required_services: fd.getAll("services").map(String), lead_status: status, call_notes: s(fd, "call_notes"),
@@ -114,14 +115,14 @@ export async function requestReviewAction(_: FormState, fd: FormData): Promise<F
   try {
     await tx(sess.userId, (c) => c.query("select app.request_ownership_review($1,$2,$3::jsonb)",
       [s(fd, "existing_client_id"), s(fd, "reason"), s(fd, "attempted") || "{}"]));
-  } catch (e) { return fail(e); }
+  } catch (e) { return fail(e, fd); }
   return { ok: "تم إرسال طلب مراجعة الملكية للمدير" };
 }
 
 export async function logCallAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const id = s(fd, "lead_id"), status = s(fd, "status"), note = s(fd, "note");
-  const next = parseRiyadh(s(fd, "next_followup")), why = s(fd, "followup_reason");
+  const next = parseLocal(s(fd, "next_followup")), why = s(fd, "followup_reason");
   if (!note) return { error: "اكتب ملاحظات المكالمة", values: vals(fd) };
   if (NEEDS_FOLLOWUP.includes(status) && (!next || !why)) return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
   if (next && !why) return { error: "اكتب سبب المتابعة", values: vals(fd) };
@@ -147,21 +148,21 @@ export async function updateClientAction(_: FormState, fd: FormData): Promise<Fo
     const r = await tx(sess.userId, (c) => c.query(
       "update clients set name=$2, business_name=$3, industry=$4, city=$5, contact_person=$6 where id=$1",
       [s(fd, "client_id"), s(fd, "name"), s(fd, "business_name") || null, s(fd, "industry") || null, s(fd, "city") || null, s(fd, "contact_person") || null]));
-    if (!r.rowCount) return { error: "غير مصرح لك بتعديل هذا العميل" };
-  } catch (e) { return fail(e); }
+    if (!r.rowCount) return { values: vals(fd), error: "غير مصرح لك بتعديل هذا العميل" };
+  } catch (e) { return fail(e, fd); }
   revalidatePath(`/leads/${s(fd, "lead_id")}`);
   return { ok: "تم حفظ البيانات" };
 }
 
 export async function updateContactsAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  if (!s(fd, "phone")) return { error: "رقم الجوال مطلوب" };
+  if (!s(fd, "phone")) return { values: vals(fd), error: "رقم الجوال مطلوب" };
   const cp = buildContactPayload(fd);
-  if (cp.error) return { error: cp.error };
+  if (cp.error) return { values: vals(fd), error: cp.error };
   try {
     const r = (await tx(sess.userId, (c) => c.query("select app.update_client_contacts($1,$2::jsonb) r", [s(fd, "client_id"), JSON.stringify(cp.payload)]))).rows[0].r;
-    if (r.status === "duplicate") return { error: `أحد الأرقام أو الروابط مسجل لدى ${r.owner_name ?? "موظف آخر"}. لم يتم الحفظ.` };
-  } catch (e) { return fail(e); }
+    if (r.status === "duplicate") return { values: vals(fd), error: `أحد الأرقام أو الروابط مسجل لدى ${r.owner_name ?? "موظف آخر"}. لم يتم الحفظ.` };
+  } catch (e) { return fail(e, fd); }
   revalidatePath(`/leads/${s(fd, "lead_id")}`);
   return { ok: "تم حفظ بيانات التواصل" };
 }
@@ -169,7 +170,7 @@ export async function updateContactsAction(_: FormState, fd: FormData): Promise<
 export async function transferLeadAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.transfer_lead($1,$2,$3,$4)", [s(fd, "lead_id"), s(fd, "to"), s(fd, "kind"), s(fd, "reason")])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath(`/leads/${s(fd, "lead_id")}`);
   return { ok: "تم نقل الملكية وتسجيلها في السجل" };
 }
@@ -177,7 +178,7 @@ export async function transferLeadAction(_: FormState, fd: FormData): Promise<Fo
 export async function resolveReviewAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.resolve_duplicate_review($1,$2,$3)", [s(fd, "id"), s(fd, "decision"), s(fd, "note")])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath("/duplicates");
   return { ok: "تم تسجيل القرار" };
 }
@@ -186,41 +187,79 @@ export async function correctAttributionAction(_: FormState, fd: FormData): Prom
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.correct_attribution($1,$2,$3,$4)",
     [s(fd, "client_id"), s(fd, "source") || null, s(fd, "creator") || null, s(fd, "reason")])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath(`/leads/${s(fd, "lead_id")}`);
   return { ok: "تم تصحيح المصدر وتسجيله في سجل التدقيق" };
 }
 
-// ───────── meetings ─────────
+// ───────── meetings (managed by Sales) ─────────
+/** After a successful meeting action: go back to where the user was, with a confirmation banner (the dialog may have disappeared). */
+function flashBack(fd: FormData, key: string, fallback: string): never {
+  const back = s(fd, "return_to");
+  const target = back.startsWith("/") && !back.startsWith("//") ? back : fallback;
+  redirect(`${target}${target.includes("?") ? "&" : "?"}ok=${key}`);
+}
+const LINK_RE = /^https?:\/\/[^\s]+\.[^\s]+$/i;
+const linkError = (u: string) => (u && (u.length > 500 || !LINK_RE.test(u)) ? "رابط الاجتماع غير صالح. يجب أن يبدأ بـ https:// ويكون رابطًا كاملًا" : null);
+
 export async function bookMeetingAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  const at = parseRiyadh(s(fd, "at"));
-  if (!at) return { error: "حدد تاريخ ووقت الاجتماع", values: vals(fd) };
-  const url = s(fd, "url");
-  if (url && !/^https?:\/\//i.test(url)) return { error: "رابط الاجتماع يجب أن يبدأ بـ https://", values: vals(fd) };
-  try { await tx(sess.userId, (c) => c.query("select app.book_meeting($1,$2,$3,$4,$5)", [s(fd, "lead_id"), s(fd, "rep"), at, url || null, s(fd, "notes") || null])); }
-  catch (e) { return fail(e, fd); }
-  revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/meetings");
-  return { ok: "تم حجز الاجتماع" };
+  const at = parseLocal(s(fd, "at"));
+  if (!at) return { error: "حدد تاريخ ووقت الاجتماع بشكل صحيح", values: vals(fd) };
+  if (new Date(at).getTime() <= Date.now()) return { error: "يجب أن يكون موعد الاجتماع في المستقبل", values: vals(fd) };
+  const url = s(fd, "url"), le = linkError(url);
+  if (le) return { error: le, values: vals(fd) };
+  const rid = s(fd, "request_id");
+  try {
+    await tx(sess.userId, (c) => c.query("select app.book_meeting($1,$2,$3,$4,$5,$6,$7)",
+      [s(fd, "lead_id"), at, s(fd, "title") || null, s(fd, "type") || "online", url || null, s(fd, "notes") || null, /^[0-9a-f-]{36}$/i.test(rid) ? rid : null]));
+  } catch (e) { return fail(e, fd); }
+  revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/meetings"); revalidatePath("/");
+  flashBack(fd, "meeting_booked", `/leads/${s(fd, "lead_id")}`);
 }
 
+export async function updateMeetingAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const at = parseLocal(s(fd, "at"));
+  if (!at) return { values: vals(fd), error: "حدد تاريخ ووقت الاجتماع بشكل صحيح" };
+  const url = s(fd, "url"), le = linkError(url);
+  if (le) return { values: vals(fd), error: le };
+  try {
+    await tx(sess.userId, (c) => c.query("select app.update_meeting($1,$2,$3,$4,$5,$6,$7)",
+      [s(fd, "meeting_id"), s(fd, "title") || null, at, s(fd, "type") || null, url || null, s(fd, "notes") || null, s(fd, "reason") || null]));
+  } catch (e) { return fail(e, fd); }
+  revalidatePath("/meetings"); revalidatePath("/");
+  flashBack(fd, "meeting_updated", "/meetings");
+}
+
+export async function completeMeetingAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const next = parseLocal(s(fd, "next_at"));
+  if (s(fd, "next_at") && !next) return { values: vals(fd), error: "موعد الخطوة التالية غير صحيح" };
+  try {
+    await tx(sess.userId, (c) => c.query("select app.complete_meeting($1,$2,$3,$4,$5)",
+      [s(fd, "meeting_id"), s(fd, "outcome") || null, s(fd, "notes") || null, s(fd, "next_step") || null, next]));
+  } catch (e) { return fail(e, fd); }
+  revalidatePath("/meetings"); revalidatePath("/"); revalidatePath("/follow-ups");
+  flashBack(fd, "meeting_result", "/meetings?tab=done");
+}
+
+/** confirm / cancel (reason required) / no_show / reassign */
 export async function meetingAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  const action = s(fd, "action");
-  const when = action === "reschedule" ? parseRiyadh(s(fd, "at")) : null;
-  if (action === "reschedule" && !when) return { error: "حدد الموعد الجديد" };
-  try { await tx(sess.userId, (c) => c.query("select app.set_meeting_status($1,$2,$3,$4,$5)",
-    [s(fd, "meeting_id"), action, s(fd, "reason") || null, when, s(fd, "rep") || null])); }
-  catch (e) { return fail(e); }
+  try {
+    await tx(sess.userId, (c) => c.query("select app.set_meeting_status($1,$2,$3,null,$4)",
+      [s(fd, "meeting_id"), s(fd, "action"), s(fd, "reason") || null, s(fd, "rep") || null]));
+  } catch (e) { return fail(e, fd); }
   revalidatePath("/meetings"); revalidatePath("/");
-  return { ok: "تم التحديث" };
+  flashBack(fd, ({ confirm: "meeting_confirmed", cancel: "meeting_cancelled", no_show: "meeting_noshow", reassign: "meeting_reassigned" } as Record<string, string>)[s(fd, "action")] ?? "meeting_updated", "/meetings");
 }
 
 // ───────── deals ─────────
 export async function moveDealAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.move_deal_stage($1,$2,$3,$4,$5)",
-    [s(fd, "deal_id"), s(fd, "to"), s(fd, "reason") || null, parseRiyadh(s(fd, "followup_at")), s(fd, "followup_reason") || null])); }
+    [s(fd, "deal_id"), s(fd, "to"), s(fd, "reason") || null, parseLocal(s(fd, "followup_at")), s(fd, "followup_reason") || null])); }
   catch (e) { return fail(e, fd); }
   revalidatePath(`/deals/${s(fd, "deal_id")}`); revalidatePath("/pipeline");
   return { ok: "تم تحديث مرحلة الصفقة" };
@@ -230,7 +269,7 @@ export async function saveBriefAction(_: FormState, fd: FormData): Promise<FormS
   const sess = await requireSession();
   const id = s(fd, "deal_id");
   const budget = s(fd, "expected_budget"), prob = s(fd, "win_probability"), val = s(fd, "expected_value");
-  if (prob && (Number(prob) < 0 || Number(prob) > 100 || isNaN(Number(prob)))) return { error: "نسبة الاحتمال بين 0 و100" };
+  if (prob && (Number(prob) < 0 || Number(prob) > 100 || isNaN(Number(prob)))) return { values: vals(fd), error: "نسبة الاحتمال بين 0 و100" };
   try {
     await tx(sess.userId, async (c) => {
       const r = await c.query(
@@ -242,7 +281,7 @@ export async function saveBriefAction(_: FormState, fd: FormData): Promise<FormS
       if (!r.rowCount) throw new Error("no access");
       await c.query("update deals set win_probability=$2, expected_value=$3 where id=$1", [id, prob ? Number(prob) : null, val ? Number(val) : null]);
     });
-  } catch (e) { return fail(e); }
+  } catch (e) { return fail(e, fd); }
   revalidatePath(`/deals/${id}`);
   return { ok: "تم حفظ البريف" };
 }
@@ -257,13 +296,13 @@ export async function completeFollowUpAction(fd: FormData) {
 export async function setTargetAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const v = Number(s(fd, "value"));
-  if (!(v >= 0)) return { error: "قيمة التارجت غير صالحة" };
+  if (!(v >= 0)) return { values: vals(fd), error: "قيمة التارجت غير صالحة" };
   try {
     await tx(sess.userId, (c) => c.query(
       `insert into targets(employee_id, period_month, metric, target_value, set_by) values ($1,$2,$3,$4,$5)
        on conflict (employee_id, period_month, metric) do update set target_value = excluded.target_value`,
       [s(fd, "employee"), s(fd, "month"), s(fd, "metric"), v, sess.userId]));
-  } catch (e) { return fail(e); }
+  } catch (e) { return fail(e, fd); }
   revalidatePath("/targets");
   return { ok: "تم حفظ التارجت" };
 }
@@ -277,7 +316,7 @@ export async function markNotificationsReadAction() {
 // ───────── employees (Super Admin) ─────────
 export async function createEmployeeAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  if (!can(sess, "employees.manage")) return { error: "غير مصرح" };
+  if (!can(sess, "employees.manage")) return { values: vals(fd), error: "غير مصرح" };
   const email = z.string().email().safeParse(s(fd, "email"));
   if (!email.success) return { error: "بريد إلكتروني غير صالح", values: vals(fd) };
   if (!s(fd, "full_name")) return { error: "اسم الموظف مطلوب", values: vals(fd) };
@@ -294,22 +333,22 @@ export async function createEmployeeAction(_: FormState, fd: FormData): Promise<
 export async function setActiveAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.set_employee_active($1,$2,$3)", [s(fd, "id"), s(fd, "active") === "1", s(fd, "reason")])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath("/employees");
   return { ok: "تم التحديث" };
 }
 export async function resetPasswordAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const pw = String(fd.get("password") ?? "");
-  const weak = validatePasswordStrength(pw); if (weak) return { error: weak };
+  const weak = validatePasswordStrength(pw); if (weak) return { values: vals(fd), error: weak };
   try { const h = await hashPassword(pw); await tx(sess.userId, (c) => c.query("select app.admin_set_password($1,$2)", [s(fd, "id"), h])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   return { ok: "تم تعيين كلمة مرور جديدة وإغلاق جلسات الموظف" };
 }
 export async function setManagerAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.set_manager($1,$2)", [s(fd, "id"), s(fd, "manager") || null])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath("/employees");
   return { ok: "تم تحديث الفريق" };
 }
@@ -326,12 +365,35 @@ export async function handoffAction(_: FormState, fd: FormData): Promise<FormSta
 export async function assignHandoffAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.assign_handoff($1,$2)", [s(fd, "id"), s(fd, "to")])); }
-  catch (e) { return fail(e); }
+  catch (e) { return fail(e, fd); }
   revalidatePath("/distribution");
   return { ok: "تم توزيع العميل وإشعار الموظف المستلم" };
 }
-export async function acknowledgeHandoffAction(fd: FormData) {
+export async function acceptHandoffAction(fd: FormData) {
   const sess = await requireSession();
-  await tx(sess.userId, (c) => c.query("select app.acknowledge_handoff($1)", [s(fd, "lead_id")]));
-  revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/");
+  try { await tx(sess.userId, (c) => c.query("select app.accept_handoff($1)", [s(fd, "lead_id")])); }
+  catch (e) { redirect(`/assigned?error=${encodeURIComponent(mapError(e))}`); }
+  revalidatePath("/assigned"); revalidatePath("/"); revalidatePath(`/leads/${s(fd, "lead_id")}`);
+  redirect("/assigned?tab=accepted&ok=accepted");
+}
+export async function rejectHandoffAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const reason = s(fd, "reason"), note = s(fd, "note");
+  if (!reason && !note) return { values: vals(fd), error: "اختر سببًا للرفض أو اكتب ملاحظة" };
+  if (reason === "other" && !note) return { values: vals(fd), error: "اكتب ملاحظة توضح سبب الرفض" };
+  try { await tx(sess.userId, (c) => c.query("select app.reject_handoff($1,$2,$3)", [s(fd, "lead_id"), reason || null, note || null])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/assigned"); revalidatePath("/");
+  redirect("/assigned?tab=rejected&ok=rejected");
+}
+export async function setTemperatureAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const t = s(fd, "temperature");
+  if (t && !["cold", "warm", "hot"].includes(t)) return { values: vals(fd), error: "قيمة غير صالحة" };
+  try {
+    const r = await tx(sess.userId, (c) => c.query("update leads set lead_temperature = $2, updated_by = $3 where id = $1", [s(fd, "lead_id"), t || null, sess.userId]));
+    if (!r.rowCount) return { values: vals(fd), error: "غير مصرح لك بتعديل هذا العميل" };
+  } catch (e) { return fail(e, fd); }
+  revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/leads");
+  return { ok: "تم حفظ درجة التواصل" };
 }

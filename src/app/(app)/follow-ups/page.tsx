@@ -3,12 +3,12 @@ import { requirePerm, requireSession } from "@/lib/auth";
 import { listFollowUps } from "@/server/data";
 import { completeFollowUpAction } from "@/server/actions";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtDay } from "@/lib/format";
 
 export const metadata = { title: "المتابعات" };
 export const dynamic = "force-dynamic";
 
-const dayKey = (v: string) => new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", weekday: "long", day: "numeric", month: "long" }).format(new Date(v));
+const dayKey = (v: string) => fmtDay(v);
 
 export default async function FollowUps() {
   const s = await requireSession(); await requirePerm(s, "followups.manage");

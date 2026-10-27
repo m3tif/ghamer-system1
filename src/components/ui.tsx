@@ -56,7 +56,7 @@ export function ButtonLink({ href, children, quiet }: { href: string; children: 
 export function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-line bg-white">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[720px] text-sm">
         <thead className="border-b border-line bg-cream/60 text-start text-xs text-ink-500">
           <tr>{head.map((h) => <th key={h} className="px-4 py-2.5 text-start font-semibold">{h}</th>)}</tr>
         </thead>
@@ -65,7 +65,7 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
     </div>
   );
 }
-export const td = "px-4 py-3 align-top";
+export const td = "px-4 py-3.5 align-top";
 export function Pager({ base, page, total, size = 20 }: { base: string; page: number; total: number; size?: number }) {
   const pages = Math.max(1, Math.ceil(total / size));
   if (pages <= 1) return null;

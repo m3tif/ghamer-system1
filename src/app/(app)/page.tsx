@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
-import { companyOverview, employeeList, incomingHandoffs, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
-import { acknowledgeHandoffAction } from "@/server/actions";
+import { addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
 import { Badge, Card, Empty, PageHeader, Progress, Stat, Table, td } from "@/components/ui";
 import { fmtDateTime, fmtNum, fmtPct, fmtMoney, monthStart } from "@/lib/format";
-import { ACHIEVEMENT, HANDOFF_STATUS, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, SOURCES, nextMilestone } from "@/lib/labels";
+import { ACHIEVEMENT, HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, SOURCES, TEMPERATURE, nextMilestone } from "@/lib/labels";
 
 export const metadata = { title: "لوحة التحكم" };
 export const dynamic = "force-dynamic";
@@ -50,7 +49,7 @@ async function ProgressCard({ uid, month, title = "إنجازك هذا الشه�
 
 async function TeleHome({ uid, month }: { uid: string; month: string }) {
   const [st, upcoming, overdue, recent, outcomes] = await Promise.all([
-    teleStats(uid, uid, month), listMeetings(uid, "upcoming"), listFollowUps(uid, "open"), listLeads(uid, {}), myOutcomes(uid),
+    teleStats(uid, uid, month), listMeetings(uid, "upcoming", 8), listFollowUps(uid, "open"), listLeads(uid, { creator: uid }), myOutcomes(uid),
   ]);
   const target = st.target == null ? null : Number(st.target);
   return (
@@ -106,7 +105,7 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
           <Table head={["العميل", "التحويل", "المستلم", "الاجتماع", "نتيجة الصفقة"]}>
             {outcomes.slice(0, 8).map((o: any) => (
               <tr key={o.lead_id}><td className={td + " font-medium"}>{o.client_name}</td>
-                <td className={td}><Badge tone={o.handoff_status === "received" ? "ok" : o.handoff_status === "pending_distribution" ? "warn" : "brand"}>{HANDOFF_STATUS[o.handoff_status] ?? "—"}</Badge></td>
+                <td className={td}><Badge tone={HANDOFF_TONE[o.handoff_status] ?? "neutral"}>{HANDOFF_STATUS[o.handoff_status] ?? "—"}</Badge></td>
                 <td className={td}>{o.to_name ?? "—"}</td><td className={td}>{o.meeting_status ? MEETING_STATUS[o.meeting_status] : "—"}</td>
                 <td className={td}>{o.deal_outcome === "won" ? <Badge tone="ok">تم التعاقد</Badge> : o.deal_outcome === "lost" ? <Badge tone="bad">خسرناه</Badge> : o.deal_outcome === "open" ? <Badge tone="warn">قيد التفاوض</Badge> : "—"}</td></tr>))}
           </Table>)}
@@ -116,19 +115,14 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
 }
 
 async function SalesHome({ uid, month }: { uid: string; month: string }) {
-  const [st, upcoming, fups, incoming] = await Promise.all([salesStats(uid, uid, month), listMeetings(uid, "upcoming"), listFollowUps(uid, "open"), incomingHandoffs(uid)]);
+  const [st, upcoming, fups, incoming] = await Promise.all([salesStats(uid, uid, month), listMeetings(uid, "upcoming", 8), listFollowUps(uid, "open"), assignedLeads(uid, "pending")]);
   return (
     <div className="space-y-6">
       {incoming.length > 0 && (
-        <Card title={`عملاء بانتظار استلامك (${incoming.length})`} right={<Badge tone="warn">جديد</Badge>}>
-          <ul className="divide-y divide-line">{incoming.map((h: any) => (
-            <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-              <div><Link href={`/leads/${h.lead_id}`} className="font-semibold hover:underline">{h.client_name}</Link>
-                <div className="text-xs text-ink-500">حوّله {h.from_name} · {fmtDateTime(h.handed_at)}{h.note ? ` · ${h.note}` : ""}</div></div>
-              <form action={acknowledgeHandoffAction}><input type="hidden" name="lead_id" value={h.lead_id} />
-                <button className="rounded-md bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700">تأكيد الاستلام</button></form>
-            </li>))}</ul>
-        </Card>)}
+        <Link href="/assigned" className="flex items-center justify-between rounded-lg border-2 border-warn/50 bg-warn/5 px-4 py-3 hover:bg-warn/10">
+          <span><b>{incoming.length}</b> {incoming.length === 1 ? "عميل بانتظار قرارك" : "عملاء بانتظار قرارك"} <span className="text-sm text-ink-500">— لا يُعتبرون مقبولين حتى تقرر</span></span>
+          <span className="rounded-md bg-burgundy-600 px-3 py-1.5 text-sm font-semibold text-white">مراجعة وقبول أو رفض</span>
+        </Link>)}
       <ProgressCard uid={uid} month={month} title="العملاء الذين أضفتهم هذا الشهر" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="عملائي" value={st.my_leads} />
@@ -181,8 +175,8 @@ async function SalesTeam({ uid, month, team }: { uid: string; month: string; tea
   return (
     <section className="mb-8">
       <h2 className="mb-3 text-lg font-bold">أداء فريق المبيعات</h2>
-      {rows.length === 0 ? <Empty title="لا يوجد مندوبو مبيعات في فريقك" /> : (
-        <Table head={["المندوب", "عملاء", "اجتماعات منعقدة", "صفقات مفتوحة", "مغلقة", "خسرناها", "معدل الإغلاق", "قيمة الخط"]}>
+      {rows.length === 0 ? <Empty title="لا يوجد موظفو السيلز في فريقك" /> : (
+        <Table head={["السيلز", "عملاء", "اجتماعات منعقدة", "صفقات مفتوحة", "مغلقة", "خسرناها", "معدل الإغلاق", "قيمة الخط"]}>
           {rows.map(({ e, st }) => (
             <tr key={e.id}><td className={td + " font-medium"}>{e.full_name}</td><td className={td}>{st.my_leads}</td><td className={td}>{st.completed_meetings}</td>
               <td className={td}>{st.open_deals}</td><td className={td}>{st.deals_won}</td><td className={td}>{st.deals_lost}</td>
@@ -217,6 +211,19 @@ async function Company({ uid, month }: { uid: string; month: string }) {
             <ul className="space-y-2">{o.bySource.map((r: any) => (
               <li key={r.src} className="flex items-center gap-3 text-sm"><span className="w-32 shrink-0">{SOURCES[r.src] ?? r.src}</span>
                 <div className="flex-1"><Progress value={r.n} max={o.bySource[0].n} /></div><span className="w-8 tabular-nums">{r.n}</span></li>))}</ul>)}
+        </Card>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card title="العملاء حسب درجة التواصل">
+          <ul className="space-y-2">{o.byTemperature.map((r: any) => (
+            <li key={r.t} className="flex items-center gap-3 text-sm"><span className="w-28 shrink-0">{r.t === "none" ? "غير مصنّف" : TEMPERATURE[r.t]}</span>
+              <div className="flex-1"><Progress value={r.n} max={Math.max(...o.byTemperature.map((x: any) => x.n))} /></div><span className="w-10 tabular-nums">{r.n}</span></li>))}</ul>
+        </Card>
+        <Card title="التحويلات إلى السيلز هذا الشهر">
+          {o.handoffMonth.length === 0 ? <p className="text-sm text-ink-500">لا توجد تحويلات هذا الشهر.</p> : (
+            <ul className="space-y-2">{o.handoffMonth.map((r: any) => (
+              <li key={r.s} className="flex items-center justify-between text-sm"><Badge tone={HANDOFF_TONE[r.s]}>{HANDOFF_STATUS[r.s]}</Badge><span className="tabular-nums font-bold">{r.n}</span></li>))}</ul>)}
+          {o.rejectedWaiting > 0 && <Link href="/leads?status=Rejected%20by%20Sales" className="mt-3 block rounded-md border border-bad/40 bg-bad/5 px-3 py-2 text-sm font-semibold text-bad hover:bg-bad/10">{o.rejectedWaiting} عميل مرفوض من السيلز بانتظار قرار ←</Link>}
         </Card>
       </div>
       <div className="mt-4"><Card title="توزيع العملاء وأداء كل موظف مقابل هدفه الشهري" right={<Link className="text-sm text-burgundy-600 underline" href="/archive">الأرشيف الشهري</Link>}>

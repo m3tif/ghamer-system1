@@ -1,16 +1,32 @@
 export const LEAD_STATUS: Record<string, string> = {
   "New Lead": "عميل جديد", "Contacted": "تم التواصل", "No Answer": "لم يرد", "Interested": "مهتم",
   "Not Interested": "غير مهتم", "Follow-up Required": "يحتاج متابعة", "Qualified Lead": "عميل مؤهل",
+  "Pending Sales Review": "بانتظار قرار السيلز", "Accepted by Sales": "مقبول من السيلز", "Rejected by Sales": "مرفوض من السيلز",
   "Meeting Scheduled": "تم حجز اجتماع", "Meeting Completed": "تم الاجتماع", "Invalid Contact": "بيانات غير صالحة",
 };
 export const LEAD_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = {
   "New Lead": "neutral", "Contacted": "brand", "No Answer": "warn", "Interested": "ok", "Not Interested": "bad",
-  "Follow-up Required": "warn", "Qualified Lead": "ok", "Meeting Scheduled": "brand", "Meeting Completed": "ok", "Invalid Contact": "bad",
+  "Follow-up Required": "warn", "Qualified Lead": "ok", "Pending Sales Review": "warn", "Accepted by Sales": "ok", "Rejected by Sales": "bad", "Meeting Scheduled": "brand", "Meeting Completed": "ok", "Invalid Contact": "bad",
 };
 /** Statuses a person can choose when logging a call. Meeting statuses are set by the meeting workflow only. */
 export const CALL_STATUSES = ["Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
 export const NEEDS_FOLLOWUP = ["Follow-up Required"];
-export const HANDOFF_STATUS: Record<string, string> = { pending_distribution: "بانتظار التوزيع", assigned: "تم الإسناد", received: "تم الاستلام", cancelled: "ملغي" };
+export const HANDOFF_STATUS: Record<string, string> = {
+  pending_distribution: "بانتظار توزيع الإدارة", pending_review: "بانتظار قرار السيلز", accepted: "قبله السيلز", rejected: "رفضه السيلز", cancelled: "ملغي",
+};
+export const HANDOFF_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = {
+  pending_distribution: "warn", pending_review: "warn", accepted: "ok", rejected: "bad", cancelled: "neutral",
+};
+export const TEMPERATURE: Record<string, string> = { cold: "Cold", warm: "Warm", hot: "Hot" };
+export const TEMPERATURE_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { cold: "brand", warm: "warn", hot: "bad" };
+export const REJECT_REASON: Record<string, string> = {
+  incomplete_info: "بيانات ناقصة أو غير كافية", not_qualified: "العميل غير مؤهل", out_of_scope: "الخدمة المطلوبة خارج نطاقنا",
+  unreachable: "لا يمكن التواصل مع العميل", duplicate: "عميل مكرر", other: "سبب آخر (اكتب ملاحظة)",
+};
+export const MEETING_TYPE: Record<string, string> = { online: "أونلاين", in_person: "حضوري", phone: "مكالمة هاتفية" };
+export const OUTCOME: Record<string, string> = {
+  positive: "إيجابي، نتقدم للخطوة التالية", needs_followup: "يحتاج متابعة", undecided: "لم يحسم قراره", not_interested: "غير مهتم",
+};
 export const ACHIEVEMENT: Record<string, string> = {
   leads_10: "10 عملاء هذا الشهر", leads_25: "25 عميلًا هذا الشهر", leads_50: "50 عميلًا هذا الشهر", leads_100: "100 عميل هذا الشهر",
   goal_new_leads: "حققت هدف العملاء الشهري", meetings_1: "أول اجتماع منعقد", meetings_5: "5 اجتماعات منعقدة", meetings_10: "10 اجتماعات منعقدة",

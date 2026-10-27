@@ -3,7 +3,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { createLeadAction, requestReviewAction } from "@/server/actions";
 import { ActionForm, Alert, CheckGroup, Field, Hidden, SelectField, TextArea, inputCls } from "./forms";
 import { Progress } from "./ui";
-import { CALL_STATUSES, LEAD_STATUS, NEEDS_FOLLOWUP, SERVICES, SOURCES } from "@/lib/labels";
+import { CALL_STATUSES, LEAD_STATUS, NEEDS_FOLLOWUP, SERVICES, SOURCES, TEMPERATURE } from "@/lib/labels";
 import type { FormState } from "@/lib/form";
 
 const KIND_AR: Record<string, string> = { phone: "رقم الجوال", store: "المتجر" };
@@ -23,7 +23,7 @@ function Toast({ t }: { t: NonNullable<FormState["toast"]> }) {
   );
 }
 
-export function LeadForm({ legacy = false }: { legacy?: boolean }) {
+export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: string }) {
   const [state, action, pending] = useActionState(createLeadAction, {} as FormState);
   const [rid, setRid] = useState(uuid);
   const [status, setStatus] = useState("New Lead");
@@ -63,7 +63,7 @@ export function LeadForm({ legacy = false }: { legacy?: boolean }) {
         {state.error && <Alert kind="error">{state.error}</Alert>}
         <input type="hidden" name="request_id" value={rid} suppressHydrationWarning />
         {legacy && <input type="hidden" name="mode" value="existing" />}
-        <section className="grid gap-4 rounded-lg border border-line bg-white p-5 md:grid-cols-2">
+        <section className="grid gap-4 rounded-lg border border-line bg-white p-5 md:grid-cols-2 xl:grid-cols-3">
           <label className="block">
             <span className="mb-1 block text-sm font-medium">اسم العميل <span className="text-burgundy-600">*</span></span>
             <input ref={nameRef} name="name" required autoFocus autoComplete="off" defaultValue={d("name")} className={inputCls} />
@@ -85,19 +85,26 @@ export function LeadForm({ legacy = false }: { legacy?: boolean }) {
                 {["New Lead", ...CALL_STATUSES].map((k) => <option key={k} value={k}>{LEAD_STATUS[k]}</option>)}
               </select>
             </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium">درجة التواصل</span>
+              <select name="lead_temperature" defaultValue={d("lead_temperature")} className={inputCls}>
+                <option value="">غير مصنّف</option>
+                {Object.entries(TEMPERATURE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </label>
             {needsFollow && (<>
-              <label className="block"><span className="mb-1 block text-sm font-medium">موعد المتابعة <span className="text-burgundy-600">*</span></span>
+              <label className="block"><span className="mb-1 block text-sm font-medium">موعد المتابعة {tz && `— ${tz}`} <span className="text-burgundy-600">*</span></span>
                 <input type="datetime-local" name="next_followup" required defaultValue={d("next_followup")} className={inputCls} /></label>
               <label className="block"><span className="mb-1 block text-sm font-medium">سبب المتابعة <span className="text-burgundy-600">*</span></span>
                 <input name="followup_reason" required defaultValue={d("followup_reason")} className={inputCls} /></label>
             </>)}
-            <div className="md:col-span-2"><label className="mb-1 block text-sm font-medium" htmlFor="call_notes">ملاحظة سريعة</label>
+            <div className="md:col-span-2 xl:col-span-3"><label className="mb-1 block text-sm font-medium" htmlFor="call_notes">ملاحظة سريعة</label>
               <input id="call_notes" name="call_notes" autoComplete="off" defaultValue={d("call_notes")} className={inputCls} /></div>
           </>)}
         </section>
         <details className="rounded-lg border border-line bg-white" open={Boolean(d("store_url") || d("business_name") || d("alt_phone"))}>
           <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">تفاصيل إضافية (اختياري، يمكن استكمالها لاحقًا)</summary>
-          <div className="grid gap-4 border-t border-line p-5 md:grid-cols-2">
+          <div className="grid gap-4 border-t border-line p-5 md:grid-cols-2 xl:grid-cols-3">
             <Field label="اسم النشاط التجاري" name="business_name" defaultValue={d("business_name")} />
             <Field label="رابط المتجر" name="store_url" dir="ltr" placeholder="https://" defaultValue={d("store_url")} hint="يمكن إدخال أكثر من رابط. تُفحص الروابط لمنع التكرار." />
             <Field label="رقم بديل" name="alt_phone" dir="ltr" defaultValue={d("alt_phone")} />
@@ -106,9 +113,9 @@ export function LeadForm({ legacy = false }: { legacy?: boolean }) {
             <Field label="الشخص المسؤول" name="contact_person" defaultValue={d("contact_person")} />
             <Field label="المدينة" name="city" defaultValue={d("city")} />
             <Field label="الدولة" name="country" defaultValue={d("country") || "SA"} dir="ltr" />
-            {!legacy && <div className="md:col-span-2"><CheckGroup label="الخدمات المطلوبة" name="services" options={Object.entries(SERVICES).map(([value, label]) => ({ value, label }))} /></div>}
+            {!legacy && <div className="md:col-span-2 xl:col-span-3"><CheckGroup label="الخدمات المطلوبة" name="services" options={Object.entries(SERVICES).map(([value, label]) => ({ value, label }))} /></div>}
             {!needsFollow && !legacy && (<>
-              <Field label="موعد المتابعة" name="next_followup" type="datetime-local" defaultValue={d("next_followup")} />
+              <Field label={`موعد المتابعة${tz ? ` — ${tz}` : ""} — اختياري`} name="next_followup" type="datetime-local" defaultValue={d("next_followup")} />
               <Field label="سبب المتابعة" name="followup_reason" defaultValue={d("followup_reason")} />
             </>)}
           </div>
