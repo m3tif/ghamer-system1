@@ -67,3 +67,17 @@ export async function register(who: string, payload: any) {
   return r.rows[0].r as any;
 }
 export const future = (mins = 120) => new Date(Date.now() + mins * 60000).toISOString();
+
+/** Tele Sales registers an Interested lead, sends it to a Sales person, who accepts it. Returns the lead id. */
+export async function sendAccepted(tele: string, sales: string, payload: any) {
+  const r = await register(tele, payload);
+  await run(tele, "select app.handoff_lead($1,$2,'ملاحظة')", [r.lead_id, ids[sales]]);
+  await run(sales, "select app.accept_handoff($1)", [r.lead_id]);
+  return r.lead_id as string;
+}
+/** Sales books an online meeting for an accepted lead. */
+export async function bookAs(sales: string, lead: string, minutes = 120, url: string | null = null, request: string | null = null) {
+  const r = await run(sales, "select app.book_meeting($1,$2,'اجتماع','online',$3,null,$4) id", [lead, future(minutes), url, request]);
+  return r.rows[0].id as string;
+}
+export const pastMeeting = (id: string) => admin.query("update meetings set scheduled_at = now() - interval '1 hour' where id = $1", [id]);

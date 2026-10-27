@@ -72,58 +72,140 @@ describe("achievements (computed in the database, kept per month)", () => {
   });
 });
 
-describe("hand-off from Tele Sales to Sales", () => {
-  let leadA: string, leadB: string;
-  it("only Interested / Qualified leads can be handed off", async () => {
+describe("hand-off: Tele Sales sends, Sales decides", () => {
+  let leadA: string, leadB: string, leadC: string;
+  it("only Interested / Qualified leads can be sent", async () => {
     const r = await register("tele1", rawPayload(400, { lead_status: "No Answer" }));
     await expect(run("tele1", "select app.handoff_lead($1,$2,'x')", [r.lead_id, ids.sales1])).rejects.toThrow(/Interested or Qualified/);
     leadA = (await register("tele1", rawPayload(401))).lead_id;
     leadB = (await register("tele1", rawPayload(402, { lead_status: "Qualified Lead" }))).lead_id;
+    leadC = (await register("tele2", rawPayload(403))).lead_id;
   });
-  it("direct hand-off: sales receives the lead with history, tele keeps outcome-only view, double hand-off is blocked", async () => {
+  it("sending is NOT acceptance: the lead waits for review, no deal and no meeting yet", async () => {
     await run("tele1", "select app.handoff_lead($1,$2,'جاهز للاجتماع')", [leadA, ids.sales1]);
-    expect((await run("sales1", "select * from leads where id = $1", [leadA])).rowCount).toBe(1);
-    expect((await run("sales2", "select * from leads where id = $1", [leadA])).rowCount).toBe(0);
-    expect((await run("tele1", "select * from leads where id = $1", [leadA])).rowCount).toBe(0);
-    expect((await run("sales1", "select * from deals where lead_id = $1", [leadA])).rows[0].stage).toBe("Qualified");
-    const acts = await run("sales1", "select count(*)::int n from lead_activities where lead_id = $1", [leadA]);
-    expect(acts.rows[0].n).toBeGreaterThanOrEqual(2); // earlier history kept
-    const o = await run("tele1", "select * from app.my_lead_outcomes() where lead_id = $1", [leadA]);
-    expect(o.rows[0]).toMatchObject({ handoff_status: "assigned", to_name: "خالد" });
-    await expect(run("tele1", "select app.handoff_lead($1,$2,'x')", [leadA, ids.sales2])).rejects.toThrow(/no access/);
-    expect((await run("sales1", "select * from notifications where kind = 'lead_assigned'")).rowCount).toBeGreaterThan(0);
-    await run("sales1", "select app.acknowledge_handoff($1)", [leadA]);
-    const h = await admin.query("select status, received_at, assigned_at, handed_at from lead_handoffs where lead_id = $1", [leadA]);
-    expect(h.rows[0].status).toBe("received");
-    expect(h.rows[0].received_at).not.toBeNull();
-    await expect(run("sales2", "select app.acknowledge_handoff($1)", [leadA])).rejects.toThrow(/no pending handoff/);
-    expect((await run("tele1", "select * from notifications where kind = 'handoff_received'")).rowCount).toBe(1);
+    const l = (await admin.query("select lead_status, assigned_sales_id from leads where id = $1", [leadA])).rows[0];
+    expect(l).toEqual({ lead_status: "Pending Sales Review", assigned_sales_id: ids.sales1 });
+    expect((await run("sales1", "select id from leads where id = $1", [leadA])).rowCount).toBe(1);
+    expect((await run("sales2", "select id from leads where id = $1", [leadA])).rowCount).toBe(0);
+    expect((await run("tele1", "select id from leads where id = $1", [leadA])).rowCount).toBe(0);
+    expect((await run("sales1", "select id from deals where lead_id = $1", [leadA])).rowCount).toBe(0);
+    expect((await run("sales1", "select * from notifications where kind = 'lead_pending_review'")).rowCount).toBeGreaterThan(0);
+    await expect(run("sales1", "select app.book_meeting($1,$2,'x','online',null,null,null)", [leadA, future()])).rejects.toThrow(/not accepted by sales yet/);
+    await expect(run("tele1", "select app.handoff_lead($1,$2,'again')", [leadA, ids.sales2])).rejects.toThrow(/no access/);
   });
-  it("hand-off to admin for distribution: only the admin can distribute", async () => {
-    await run("tele1", "select app.handoff_lead($1,null,'وزّعه على من تراه')", [leadB]);
+  it("only the assigned Sales can decide; accept records who and when, creates the deal, and cannot be repeated", async () => {
+    await expect(run("sales2", "select app.accept_handoff($1)", [leadA])).rejects.toThrow(/not allowed/);
+    await expect(run("tele1", "select app.accept_handoff($1)", [leadA])).rejects.toThrow(/not allowed/);
+    await expect(run("sales2", "select app.reject_handoff($1,'duplicate',null)", [leadA])).rejects.toThrow(/not allowed/);
+    await run("sales1", "select app.accept_handoff($1)", [leadA]);
+    const h = (await admin.query("select status, decided_by, decided_at from lead_handoffs where lead_id = $1", [leadA])).rows[0];
+    expect(h.status).toBe("accepted"); expect(h.decided_by).toBe(ids.sales1); expect(h.decided_at).not.toBeNull();
+    expect((await admin.query("select lead_status from leads where id = $1", [leadA])).rows[0].lead_status).toBe("Accepted by Sales");
+    expect((await run("sales1", "select stage from deals where lead_id = $1", [leadA])).rows[0].stage).toBe("Qualified");
+    await expect(run("sales1", "select app.accept_handoff($1)", [leadA])).rejects.toThrow(/already decided/);
+    await expect(run("sales1", "select app.reject_handoff($1,'duplicate',null)", [leadA])).rejects.toThrow(/already decided/);
+    expect((await admin.query("select count(*)::int n from deals where lead_id = $1", [leadA])).rows[0].n).toBe(1);
+    expect((await run("tele1", "select * from notifications where kind = 'handoff_accepted'")).rowCount).toBe(1);
+    const o = await run("tele1", "select * from app.my_lead_outcomes() where lead_id = $1", [leadA]);
+    expect(o.rows[0]).toMatchObject({ handoff_status: "accepted", to_name: "خالد" });
+  });
+  it("race: two simultaneous decisions on the same lead leave exactly one decision", async () => {
+    const lead = (await register("tele1", rawPayload(410))).lead_id;
+    await run("tele1", "select app.handoff_lead($1,$2,'x')", [lead, ids.sales1]);
+    const res = await Promise.allSettled([
+      run("sales1", "select app.accept_handoff($1)", [lead]), run("sales1", "select app.reject_handoff($1,'duplicate',null)", [lead]),
+      run("sales1", "select app.accept_handoff($1)", [lead]), run("sales1", "select app.reject_handoff($1,'other','ملاحظة')", [lead]),
+    ]);
+    expect(res.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rows = await admin.query("select status from lead_handoffs where lead_id = $1 and status in ('accepted','rejected')", [lead]);
+    expect(rows.rowCount).toBe(1);
+  });
+  it("reject needs a reason (or note), 'other' needs a note, records who/when/why, and returns the lead to the sender", async () => {
+    await run("tele1", "select app.handoff_lead($1,$2,'تجربة')", [leadB, ids.sales1]);
+    await expect(run("sales1", "select app.reject_handoff($1,null,null)", [leadB])).rejects.toThrow(/reason required/);
+    await expect(run("sales1", "select app.reject_handoff($1,'other',null)", [leadB])).rejects.toThrow(/note required/);
+    await expect(run("sales1", "select app.reject_handoff($1,'made_up',null)", [leadB])).rejects.toThrow(/invalid reject reason/);
+    await run("sales1", "select app.reject_handoff($1,'not_qualified','الميزانية أقل من الحد الأدنى')", [leadB]);
+    const h = (await admin.query("select status, decided_by, decided_at, reject_reason, reject_note from lead_handoffs where lead_id = $1 order by handed_at desc limit 1", [leadB])).rows[0];
+    expect(h).toMatchObject({ status: "rejected", decided_by: ids.sales1, reject_reason: "not_qualified", reject_note: "الميزانية أقل من الحد الأدنى" });
+    expect(h.decided_at).not.toBeNull();
+    const l = (await admin.query("select lead_status, assigned_sales_id, current_owner_id, original_creator_id, handed_off_at from leads where id = $1", [leadB])).rows[0];
+    expect(l).toEqual({ lead_status: "Rejected by Sales", assigned_sales_id: null, current_owner_id: ids.tele1, original_creator_id: ids.tele1, handed_off_at: null });
+    expect((await run("tele1", "select id from leads where id = $1", [leadB])).rowCount).toBe(1); // visible to the sender again
+    expect((await run("sales1", "select id from leads where id = $1", [leadB])).rowCount).toBe(0);
+    expect((await run("tele1", "select * from notifications where kind = 'handoff_rejected' and link = '/leads/' || $1::text", [leadB])).rowCount).toBe(1);
+    expect((await run("super", "select * from notifications where kind = 'handoff_rejected' and link = '/leads/' || $1::text", [leadB])).rowCount).toBe(1);
+    expect((await run("sales1", "select * from app.my_handoff_decisions() where status = 'rejected'")).rowCount).toBe(1);
+    expect((await admin.query("select count(*)::int n from lead_handoffs where lead_id = $1", [leadB])).rows[0].n).toBe(1); // history kept
+    expect((await admin.query("select count(*)::int n from lead_activities where lead_id = $1 and status_to = 'Rejected by Sales'", [leadB])).rows[0].n).toBe(1);
+  });
+  it("after a rejection the sender can send again (to someone else), and the old decision stays in the history", async () => {
+    await run("tele1", "select app.handoff_lead($1,$2,'محاولة ثانية')", [leadB, ids.sales2]);
+    await run("sales2", "select app.accept_handoff($1)", [leadB]);
+    const hs = await admin.query("select status from lead_handoffs where lead_id = $1 order by handed_at", [leadB]);
+    expect(hs.rows.map((r) => r.status)).toEqual(["rejected", "accepted"]);
+    expect((await admin.query("select count(*)::int n from deals where lead_id = $1", [leadB])).rows[0].n).toBe(1);
+  });
+  it("send to admin for distribution: only the Super Admin distributes, then Sales still has to accept", async () => {
+    await run("tele2", "select app.handoff_lead($1,null,'وزّعه على من تراه')", [leadC]);
     expect((await run("super", "select * from app.pending_handoffs()")).rowCount).toBe(1);
-    expect((await run("super", "select * from notifications where kind = 'lead_pending_distribution'")).rowCount).toBe(1);
-    expect((await run("sales1", "select * from leads where id = $1", [leadB])).rowCount).toBe(0);
-    expect((await run("tele1", "select * from leads where id = $1", [leadB])).rowCount).toBe(0); // creator/owner no longer sees it while pending
-    expect((await run("super", "select * from leads where id = $1", [leadB])).rowCount).toBe(1);
+    expect((await run("tele2", "select id from leads where id = $1", [leadC])).rowCount).toBe(0);
     expect((await run("salesmgr", "select * from app.pending_handoffs()")).rowCount).toBe(0);
-    const ho = (await admin.query("select id from lead_handoffs where lead_id = $1", [leadB])).rows[0].id;
+    const ho = (await admin.query("select id from lead_handoffs where lead_id = $1", [leadC])).rows[0].id;
     await expect(run("salesmgr", "select app.assign_handoff($1,$2)", [ho, ids.sales2])).rejects.toThrow(/not allowed/);
     await run("super", "select app.assign_handoff($1,$2)", [ho, ids.sales2]);
-    expect((await run("sales2", "select * from leads where id = $1", [leadB])).rowCount).toBe(1);
+    expect((await admin.query("select status from lead_handoffs where id = $1", [ho])).rows[0].status).toBe("pending_review");
+    await expect(run("sales2", "select app.book_meeting($1,$2,'x','online',null,null,null)", [leadC, future()])).rejects.toThrow(/not accepted by sales yet/);
+    await run("sales2", "select app.accept_handoff($1)", [leadC]);
     await expect(run("super", "select app.assign_handoff($1,$2)", [ho, ids.sales1])).rejects.toThrow(/not pending/);
-    const l = await admin.query("select original_creator_id, current_owner_id, assigned_sales_id from leads where id = $1", [leadB]);
-    expect(l.rows[0]).toEqual({ original_creator_id: ids.tele1, current_owner_id: ids.sales2, assigned_sales_id: ids.sales2 });
+    const l = await admin.query("select original_creator_id, current_owner_id, assigned_sales_id from leads where id = $1", [leadC]);
+    expect(l.rows[0]).toEqual({ original_creator_id: ids.tele2, current_owner_id: ids.sales2, assigned_sales_id: ids.sales2 });
   });
-  it("the handed-off lead stays in the Tele Sales monthly archive but cannot be opened", async () => {
+  it("the sent lead stays in the Tele Sales archive but cannot be opened", async () => {
     const a = await run("tele1", "select * from app.archive_leads(null, null, null, 100, 0) where lead_id = $1", [leadA]);
     expect(a.rows[0].can_open).toBe(false);
-    expect(a.rows[0].handoff_status).toBe("received");
+    expect(a.rows[0].handoff_status).toBe("accepted");
     await expect(run("tele1", "select * from app.archive_leads($1, null, null, 10, 0)", [ids.tele2])).rejects.toThrow(/no access/);
     const adm = await run("super", "select count(*)::int n from app.archive_leads(null, $1, null, 100, 0)", [month]);
-    expect(adm.rows[0].n).toBe(100);
-    const filtered = await run("super", "select count(*)::int n from app.archive_leads($1, $2, 'Interested', 100, 0)", [ids.tele1, month]);
-    expect(filtered.rows[0].n).toBeGreaterThan(0);
+    expect(adm.rows[0].n).toBeGreaterThanOrEqual(100);
+  });
+  it("'leads I added' counts the real records, including the ones already sent", async () => {
+    const c = (await run("tele1", "select * from app.added_counts(null)")).rows[0];
+    const real = (await admin.query("select count(*)::int n from leads where original_creator_id = $1", [ids.tele1])).rows[0].n;
+    expect(c.total).toBe(real);
+    expect(c.handed_off).toBeGreaterThanOrEqual(2);
+    expect(c.accepted).toBeGreaterThanOrEqual(2);
+    const rej = (await admin.query("select count(distinct lead_id)::int n from lead_handoffs where from_employee_id = $1 and status = 'rejected'", [ids.tele1])).rows[0].n;
+    expect(c.rejected).toBe(rej);
+    await expect(run("tele2", "select * from app.added_counts($1)", [ids.tele1])).rejects.toThrow(/no access/);
+  });
+});
+
+describe("terminology, lead temperature and company time zone", () => {
+  it("the role is called السيلز", async () => {
+    expect((await admin.query("select name_ar from roles where code = 'sales_rep'")).rows[0].name_ar).toBe("السيلز");
+  });
+  it("Cold / Warm / Hot is a separate field from the source; saved, filtered and never required", async () => {
+    const hot = await register("tele1", rawPayload(500, { lead_temperature: "hot", source: "meta_ads" }));
+    const none = await register("tele1", rawPayload(501));
+    const r = (await admin.query("select l.lead_temperature, c.original_source from leads l join clients c on c.id = l.client_id where l.id = $1", [hot.lead_id])).rows[0];
+    expect(r).toEqual({ lead_temperature: "hot", original_source: "meta_ads" });
+    expect((await admin.query("select lead_temperature from leads where id = $1", [none.lead_id])).rows[0].lead_temperature).toBeNull();
+    await run("tele1", "update leads set lead_temperature = 'warm' where id = $1", [none.lead_id]);
+    await expect(run("tele1", "update leads set lead_temperature = 'lukewarm' where id = $1", [none.lead_id])).rejects.toThrow(/check constraint/);
+    const { listLeads } = await import("../src/server/data");
+    const warm = await listLeads(ids.tele1, { temp: "warm", creator: ids.tele1 });
+    expect(warm.rows.every((x: any) => x.lead_temperature === "warm")).toBe(true);
+    expect(warm.rows.map((x: any) => x.id)).toContain(none.lead_id);
+    const searched = await listLeads(ids.tele1, { q: "عميل 501", temp: "warm" });
+    expect(searched.rows.map((x: any) => x.id)).toContain(none.lead_id);
+    expect((await admin.query("select count(*)::int n from audit_logs where entity_type = 'leads' and new_value ? 'lead_temperature'")).rows[0].n).toBeGreaterThan(0);
+  });
+  it("the company time zone comes from settings and the database follows it", async () => {
+    expect((await admin.query("select app.company_tz() tz")).rows[0].tz).toBe("Asia/Riyadh");
+    await admin.query("update settings set value = '\"Africa/Cairo\"' where key = 'timezone'");
+    expect((await admin.query("select app.company_tz() tz")).rows[0].tz).toBe("Africa/Cairo");
+    await admin.query("update settings set value = '\"Asia/Riyadh\"' where key = 'timezone'");
   });
 });
 
