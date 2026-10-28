@@ -1,76 +1,102 @@
 import Link from "next/link";
 import { can, requirePerm, requireSession } from "@/lib/auth";
-import { addedCounts, employeeList, listLeads, myOutcomes } from "@/server/data";
+import { addedCounts, employeeList, listLeads, myOutcomes, PAGE_SIZES, salesReps } from "@/server/data";
 import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/components/ui";
+import { LeadsTable } from "@/components/leads-table";
+import { HideMonth } from "@/components/leads-cells";
 import { inputCls } from "@/components/forms";
-import { fmtDateTime } from "@/lib/format";
-import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
+import { fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
+import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, MEETING_STATUS, TEMPERATURE } from "@/lib/labels";
 
 export const metadata = { title: "العملاء اللي ضفتهم" };
 export const dynamic = "force-dynamic";
 
-type SP = { q?: string; status?: string; page?: string; month?: string; creator?: string; tab?: string; handed?: string; temp?: string };
+type SP = { q?: string; status?: string; page?: string; month?: string; creator?: string; sales?: string; tab?: string; handed?: string; temp?: string; sort?: string; dir?: string; size?: string; hidden?: string };
+const UUID = /^[0-9a-f-]{36}$/;
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const s = await requireSession(); await requirePerm(s, "leads.view");
   const sp = await searchParams;
-  // employees see the leads THEY added; managers/admin see everything in their scope and can filter by employee
+  // employees see only the leads THEY work on; managers / admin see their whole scope and can filter by employee
   const employee = ["tele_sales", "sales_rep"].includes(s.role);
   const tab = sp.tab === "handed" && can(s, "leads.handoff") ? "handed" : "mine";
-  const emps = !employee && can(s, "employees.view") ? (await employeeList(s.userId)).filter((e: any) => ["tele_sales", "sales_rep"].includes(e.role_code)) : [];
+  const wide = !employee && can(s, "employees.view");
+  const emps = wide ? (await employeeList(s.userId)).filter((e: any) => ["tele_sales", "sales_rep", "tele_sales_manager", "sales_manager"].includes(e.role_code)) : [];
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? `${sp.month}-01` : undefined;
-  const creator = employee ? s.userId : sp.creator || undefined;
+  const creator = wide && UUID.test(sp.creator ?? "") ? sp.creator : undefined;
+  const salesF = wide && UUID.test(sp.sales ?? "") ? sp.sales : undefined;
   const temp = ["cold", "warm", "hot"].includes(sp.temp ?? "") ? sp.temp : undefined;
-  const [list, counts, outcomes] = await Promise.all([
-    tab === "mine" ? listLeads(s.userId, { q: sp.q, status: sp.status, page: Number(sp.page) || 1, month, creator, temp }) : { rows: [] as any[], total: 0, page: 1 },
-    employee || can(s, "leads.create") ? addedCounts(s.userId, s.userId) : null,
+  const status = sp.status && LEAD_STATUS[sp.status] ? sp.status : undefined;
+  const sort = ["name", "created", "status", "temperature", "followup"].includes(sp.sort ?? "") ? sp.sort! : "created";
+  const dir = sp.dir === "asc" ? "asc" : "desc";
+  const size = PAGE_SIZES.includes(Number(sp.size)) ? Number(sp.size) : PAGE_SIZES[0];
+  const canHand = can(s, "leads.handoff");
+  const canHide = ["super_admin", "general_manager", "tele_sales_manager", "sales_manager"].includes(s.role);
+  const hiddenF = canHide && ["hidden", "all"].includes(sp.hidden ?? "") ? sp.hidden : undefined;
+  const [list, counts, outcomes, reps] = await Promise.all([
+    tab === "mine" ? listLeads(s.userId, { q: sp.q, status, page: Number(sp.page) || 1, size, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF }) : { rows: [], total: 0, page: 1, size },
+    employee ? addedCounts(s.userId, s.userId) : null,
     tab === "handed" ? myOutcomes(s.userId) : [],
+    canHand ? salesReps(s.userId) : [],
   ]);
   const { rows, total, page } = list;
-  const title = employee ? "العملاء اللي ضفتهم" : "العملاء";
-  const base = `/leads?${new URLSearchParams(Object.fromEntries(Object.entries({ q: sp.q, status: sp.status, month: sp.month, creator: sp.creator, temp }).filter(([, v]) => v)) as Record<string, string>)}`;
+  const tz = tzLabel(getTimezone());
+  const q = { q: sp.q, status, month: sp.month, creator, sales: salesF, temp, sort: sp.sort ? sort : undefined, dir: sp.dir ? dir : undefined, size: sp.size ? String(size) : undefined, hidden: hiddenF };
+  const qs = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1])).toString();
+  const base = qs ? `/leads?${qs}` : "/leads";
+  const filtered = !!(sp.q || status || sp.month || temp || creator || salesF || hiddenF);
+  const followLabels = Object.fromEntries(rows.filter((r) => r.next_followup_at).map((r) => [r.id, toLocalInput(r.next_followup_at!).replace("T", " ")]));
   const tabCls = (on: boolean) => `rounded-md px-3.5 py-2 text-sm ${on ? "bg-burgundy-600 font-semibold text-white" : "border border-line bg-white hover:bg-cream"}`;
   return (
     <>
-      <PageHeader title={title}
+      <PageHeader title={employee ? "العملاء اللي ضفتهم" : "العملاء"}
         sub={counts && employee ? `أضفت ${counts.total} عميل · ${counts.this_month} هذا الشهر · حوّلت ${counts.handed_off} (قُبل ${counts.accepted}، رُفض ${counts.rejected})` : tab === "mine" ? `${total} سجل ضمن صلاحياتك` : undefined}
-        actions={can(s, "leads.create") ? <ButtonLink href="/leads/new">تسجيل عميل جديد</ButtonLink> : null} />
+        actions={can(s, "leads.create") ? <ButtonLink href="/leads/new">+ تسجيل عميل جديد</ButtonLink> : null} />
       {sp.handed && <p role="status" className="mb-4 rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">تم إرسال العميل إلى السيلز. لا يُعتبر مقبولًا حتى يقرر السيلز، وستصلك نتيجة القرار في الإشعارات.</p>}
-      {can(s, "leads.handoff") && (
+      {canHand && (
         <div className="mb-4 flex gap-2" role="tablist">
           <Link href="/leads" role="tab" aria-selected={tab === "mine"} className={tabCls(tab === "mine")}>عملائي الحاليون</Link>
           <Link href="/leads?tab=handed" role="tab" aria-selected={tab === "handed"} className={tabCls(tab === "handed")}>تم تحويلها إلى السيلز</Link>
         </div>)}
       {tab === "mine" ? (<>
-        <form className="mb-4 flex flex-wrap gap-2" role="search">
-          <input name="q" defaultValue={sp.q} placeholder="بحث بالاسم أو النشاط أو رقم الجوال" className={inputCls + " min-w-64 max-w-md flex-1"} aria-label="بحث" />
-          <select name="status" defaultValue={sp.status ?? ""} className={inputCls + " w-auto"} aria-label="الحالة">
+        <form className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" role="search">
+          <input name="q" defaultValue={sp.q} placeholder="ابحث بالاسم أو رقم الهاتف أو رابط المتجر" className={inputCls + " col-span-2 sm:min-w-64 sm:max-w-md sm:flex-1"} aria-label="بحث" />
+          <select name="status" defaultValue={status ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الحالة">
             <option value="">كل الحالات</option>{Object.entries(LEAD_STATUS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <select name="temp" defaultValue={temp ?? ""} className={inputCls + " w-auto"} aria-label="درجة التواصل">
+          <select name="temp" defaultValue={temp ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="درجة العميل">
             <option value="">كل الدرجات</option>{Object.entries(TEMPERATURE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <input type="month" name="month" defaultValue={sp.month} className={inputCls + " w-auto"} aria-label="الشهر" />
-          {emps.length > 0 && (
-            <select name="creator" defaultValue={sp.creator ?? ""} className={inputCls + " w-auto"} aria-label="الموظف">
-              <option value="">كل الموظفين</option>{emps.map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+          <input type="month" name="month" defaultValue={sp.month} className={inputCls + " w-full sm:w-auto"} aria-label="الشهر والسنة" />
+          {wide && emps.length > 0 && (
+            <select name="creator" defaultValue={creator ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الموظف الذي أضاف">
+              <option value="">كل الموظفين (Hunter)</option>{emps.map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
             </select>)}
-          <button className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:bg-cream">تصفية</button>
+          {wide && emps.length > 0 && (
+            <select name="sales" defaultValue={salesF ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="السيلز المسؤول">
+              <option value="">كل السيلز</option>{emps.filter((e: any) => ["sales_rep", "sales_manager"].includes(e.role_code)).map((e: any) => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            </select>)}
+          {canHide && (
+            <select name="hidden" defaultValue={hiddenF ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الإخفاء">
+              <option value="">العملاء الظاهرون</option><option value="hidden">المخفيون فقط</option><option value="all">الظاهرون + المخفيون</option>
+            </select>)}
+          <select name="size" defaultValue={String(size)} className={inputCls + " w-full sm:w-auto"} aria-label="عدد الصفوف">
+            {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} صف</option>)}
+          </select>
+          <input type="hidden" name="sort" value={sort} /><input type="hidden" name="dir" value={dir} />
+          <button className="rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">تصفية</button>
+          {filtered && <Link href="/leads" className="text-sm text-burgundy-600 underline">مسح الفلاتر</Link>}
         </form>
-        {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={sp.q || sp.status || sp.month || temp ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
-          <Table head={["العميل", "الجوال", "الحالة", "الدرجة", "أضافه", "المسؤول", "السيلز", "المتابعة القادمة"]}>
-            {rows.map((l: any) => (
-              <tr key={l.id} className="hover:bg-cream/40">
-                <td className={td}><Link href={`/leads/${l.id}`} className="font-semibold hover:underline">{l.name}</Link>{l.business_name && <div className="text-xs text-ink-500">{l.business_name}</div>}</td>
-                <td className={td} dir="ltr">{l.phone ?? "—"}</td>
-                <td className={td}><Badge tone={LEAD_STATUS_TONE[l.lead_status]}>{LEAD_STATUS[l.lead_status]}</Badge></td>
-                <td className={td}>{l.lead_temperature ? <Badge tone={TEMPERATURE_TONE[l.lead_temperature]}>{TEMPERATURE[l.lead_temperature]}</Badge> : <span className="text-ink-300">—</span>}</td>
-                <td className={td}>{l.creator}</td><td className={td}>{l.owner}</td><td className={td}>{l.sales ?? "—"}</td>
-                <td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(l.next_followup_at)}</td>
-              </tr>))}
-          </Table>)}
-        <Pager base={base} page={page} total={total} />
-      </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="حوّل العملاء المهتمين من صفحة العميل بعد تغيير حالته إلى «مهتم» أو «مؤهل»." /> : (
+        <p className="mb-2 text-xs text-ink-500">{total} نتيجة · التواريخ بـ{tz} · اضغط على اسم العميل لفتحه، وعلى الحالة أو الدرجة أو الشهر لتصفية الجدول، وعلى الملاحظات لتعديلها.</p>
+        {canHide && creator && month && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+            <span className="text-ink-500">إجراء جماعي لهذا الموظف والشهر:</span>
+            <HideMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} hide={hiddenF !== "hidden"} count={total} />
+          </div>)}
+        {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
+          <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide} followLabels={followLabels} />)}
+        <Pager base={base} page={page} total={total} size={size} />
+      </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (
             <tr key={o.lead_id}><td className={td + " font-medium"}>{o.client_name}</td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.handed_off_at)}</td>
