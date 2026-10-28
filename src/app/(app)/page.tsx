@@ -64,11 +64,11 @@ async function TeleHome({ uid, month }: { uid: string; month: string }) {
           </div>
         </Card>)}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="عملاء جدد" value={st.new_leads} />
-        <Stat label="مهتمون" value={st.interested_leads} />
-        <Stat label="اجتماعات محجوزة" value={st.meetings_scheduled} />
-        <Stat label="اجتماعات مؤكدة" value={st.meetings_confirmed} />
-        <Stat label="اجتماعات منعقدة" value={st.meetings_completed} tone="ok" />
+        <Stat href="/leads?status=New%20Lead" label="عملاء جدد" value={st.new_leads} />
+        <Stat href="/leads?status=Interested" label="مهتمون" value={st.interested_leads} />
+        <Stat href="/meetings" label="اجتماعات محجوزة" value={st.meetings_scheduled} />
+        <Stat href="/meetings" label="اجتماعات مؤكدة" value={st.meetings_confirmed} />
+        <Stat href="/meetings?tab=done" label="اجتماعات منعقدة" value={st.meetings_completed} tone="ok" />
         <Stat label="ملغاة / لم يحضر" value={`${st.meetings_cancelled} / ${st.meetings_no_show}`} />
         <Stat label="التحويل من عميل لاجتماع" value={fmtPct(st.lead_to_meeting_pct)} />
         <Stat label="عقود نتجت عن عملائك" value={st.contracts_generated} tone="ok" />
@@ -125,14 +125,14 @@ async function SalesHome({ uid, month }: { uid: string; month: string }) {
         </Link>)}
       <ProgressCard uid={uid} month={month} title="العملاء الذين أضفتهم هذا الشهر" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="عملائي" value={st.my_leads} />
-        <Stat label="اجتماعات قادمة" value={st.upcoming_meetings} />
-        <Stat label="اجتماعات منعقدة" value={st.completed_meetings} />
-        <Stat label="صفقات مفتوحة" value={st.open_deals} />
-        <Stat label="صفقات مغلقة بالتوقيع" value={st.deals_won} tone="ok" sub={st.target ? `التارجت ${fmtNum(st.target)}` : undefined} />
-        <Stat label="صفقات خسرناها" value={st.deals_lost} />
+        <Stat href="/leads" label="عملائي" value={st.my_leads} />
+        <Stat href="/meetings" label="اجتماعات قادمة" value={st.upcoming_meetings} />
+        <Stat href="/meetings?tab=done" label="اجتماعات منعقدة" value={st.completed_meetings} />
+        <Stat href="/pipeline" label="صفقات مفتوحة" value={st.open_deals} />
+        <Stat href="/pipeline?stage=Financially%20Approved" label="صفقات مغلقة بالتوقيع" value={st.deals_won} tone="ok" sub={st.target ? `التارجت ${fmtNum(st.target)}` : undefined} />
+        <Stat href="/pipeline?stage=Lost" label="صفقات خسرناها" value={st.deals_lost} />
         <Stat label="معدل الإغلاق" value={fmtPct(st.win_rate_pct)} />
-        <Stat label="قيمة خط المبيعات" value={fmtMoney(st.pipeline_value)} />
+        <Stat href="/pipeline" label="قيمة خط المبيعات" value={fmtMoney(st.pipeline_value)} />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="اجتماعاتك القادمة" right={<Link className="text-sm text-burgundy-600 underline" href="/meetings">الكل</Link>}>
@@ -194,10 +194,10 @@ async function Company({ uid, month }: { uid: string; month: string }) {
         <Link href="/distribution" className="mb-3 flex items-center justify-between rounded-lg border border-warn/40 bg-warn/5 px-4 py-3 text-sm font-semibold text-warn hover:bg-warn/10">
           <span>{o.pendingDistribution} عميل بانتظار التوزيع على Sales</span><span>توزيع الآن ←</span></Link>)}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="إجمالي العملاء" value={fmtNum(o.totalLeads)} /><Stat label="عملاء جدد هذا الشهر" value={fmtNum(o.leads)} />
-        <Stat label="تحويلات إلى Sales هذا الشهر" value={o.handoffs} /><Stat label="اجتماعات هذا الشهر" value={o.meetingsMonth} />
-        <Stat label="اجتماعات منعقدة" value={o.meetingsDone} tone="ok" /><Stat label="اجتماعات قادمة" value={o.meetingsUpcoming} />
-        <Stat label="متابعات مفتوحة" value={o.followUpsOpen} /><Stat label="متابعات متأخرة" value={o.overdue} tone={o.overdue ? "bad" : undefined} />
+        <Stat href="/leads" label="إجمالي العملاء" value={fmtNum(o.totalLeads)} /><Stat href="/leads" label="عملاء جدد هذا الشهر" value={fmtNum(o.leads)} />
+        <Stat label="تحويلات إلى Sales هذا الشهر" value={o.handoffs} /><Stat href="/meetings" label="اجتماعات هذا الشهر" value={o.meetingsMonth} />
+        <Stat href="/meetings?tab=done" label="اجتماعات منعقدة" value={o.meetingsDone} tone="ok" /><Stat href="/meetings" label="اجتماعات قادمة" value={o.meetingsUpcoming} />
+        <Stat href="/follow-ups" label="متابعات مفتوحة" value={o.followUpsOpen} /><Stat href="/follow-ups" label="متابعات متأخرة" value={o.overdue} tone={o.overdue ? "bad" : undefined} />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card title="العملاء حسب الحالة">
