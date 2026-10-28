@@ -4,26 +4,26 @@ import { normalizePhone, toLatinDigits } from "@/lib/normalize";
 const esc = (s: string) => s.replace(/[\\%_]/g, "\\$&");
 export const PAGE_SIZE = 20;
 
-type LeadFilter = { q?: string; status?: string; page?: number; month?: string; creator?: string; temp?: string };
+export const PAGE_SIZES = [25, 50, 100];
+export type LeadFilter = { q?: string; status?: string; page?: number; size?: number; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
+export type LeadRow = {
+  id: string; client_id: string; name: string; business_name: string | null; phone: string | null; store_url: string | null;
+  lead_status: string; lead_temperature: string | null; call_notes: string | null; next_followup_at: string | null; created_at: string;
+  last_contact_at: string | null; original_creator_id: string; creator_name: string | null; assigned_sales_id: string | null; sales_name: string | null;
+  handed_off: boolean; dup_attempts: number; total: number; hidden_at: string | null; hidden_by_name: string | null; hidden_reason: string | null;
+};
 export async function listLeads(uid: string, o: LeadFilter) {
+  const size = PAGE_SIZES.includes(o.size ?? 0) ? o.size! : PAGE_SIZES[0];
   const page = Math.max(1, o.page ?? 1);
   const q = o.q?.trim() || null;
   // a query is treated as a phone number only when it is made of digits/separators (not when a name contains digits)
   const asDigits = q ? toLatinDigits(q) : "";
   const phone = q && /^[+\d\s().-]{5,}$/.test(asDigits) ? (normalizePhone(q) ?? asDigits.replace(/\D/g, "")) : null;
-  const flt = (a: string) => `($1::text is null or ${a}.lead_status = $1) and ($2::date is null or ${a}.created_month = $2) and ($3::uuid is null or ${a}.original_creator_id = $3) and ($4::text is null or ${a}.lead_temperature = $4)`;
-  const base = [o.status || null, o.month || null, o.creator || null, o.temp || null];
-  const decorate = `select p.*, c.name, c.business_name,
-            app.emp_name(p.original_creator_id) creator, app.emp_name(p.current_owner_id) owner, app.emp_name(p.assigned_sales_id) sales,
-            (select cc.phone from client_contacts cc where cc.client_id = p.client_id and cc.phone is not null order by cc.is_primary desc, cc.created_at limit 1) phone
-     from page p join clients c on c.id = p.client_id order by p.created_at desc`;
-  const cols = `l.id, l.client_id, l.lead_status, l.lead_temperature, l.next_followup_at, l.created_at, l.last_contact_at, l.original_creator_id, l.current_owner_id, l.assigned_sales_id`;
-  const r = await tx(uid, (c) => q
-    ? c.query(`with page as (select * from app.search_leads($5, $6, $1, $2, $3, $4, ${PAGE_SIZE}, $7)) ${decorate}`, [...base, q, phone, (page - 1) * PAGE_SIZE])
-    : c.query(`with page as (
-         select ${cols}, (select count(*)::int from leads l2 where ${flt("l2")}) total
-         from leads l where ${flt("l")} order by l.created_at desc limit ${PAGE_SIZE} offset $5) ${decorate}`, [...base, (page - 1) * PAGE_SIZE]));
-  return { rows: r.rows, total: r.rows[0]?.total ?? 0, page };
+  const r = await tx(uid, (c) => c.query(
+    "select * from app.list_leads($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+    [phone ? null : q, phone, o.status || null, o.month || null, o.creator || null, o.sales || null, o.temp || null, o.sort || null, o.dir || null, size, (page - 1) * size, o.hidden || null]));
+  const rows = r.rows as LeadRow[];
+  return { rows, total: rows[0]?.total ?? 0, page, size };
 }
 
 /** How many leads a person added (all time / this month / handed to Sales / accepted / rejected). Counts the real records, not what is visible. */
@@ -104,10 +104,12 @@ export async function assignedLeads(uid: string, tab: "pending" | "accepted" | "
 
 export async function listDeals(uid: string) {
   const r = await tx(uid, (c) => c.query(
-    `select d.id, d.stage, d.win_probability, d.expected_value, d.updated_at, c.name client_name, c.business_name,
-            app.emp_name(d.owner_sales_id) owner_name, d.owner_sales_id,
+    `select d.id, d.stage, d.win_probability, d.expected_value, d.updated_at, d.created_at, d.lead_id, c.name client_name, c.business_name,
+            app.emp_name(d.owner_sales_id) owner_name, d.owner_sales_id, l.lead_temperature,
+            (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc, cc.created_at limit 1) phone,
+            (select min(f.due_at) from follow_ups f where f.deal_id = d.id and f.status = 'open') followup_at,
             (select count(*) from follow_ups f where f.deal_id = d.id and f.status = 'open' and f.due_at < now())::int overdue
-     from deals d join clients c on c.id = d.client_id where d.archived_at is null order by d.updated_at desc limit 500`));
+     from deals d join clients c on c.id = d.client_id join leads l on l.id = d.lead_id where d.archived_at is null order by d.updated_at desc limit 500`));
   return r.rows;
 }
 

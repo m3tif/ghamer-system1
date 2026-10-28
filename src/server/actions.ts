@@ -357,7 +357,7 @@ export async function setManagerAction(_: FormState, fd: FormData): Promise<Form
 export async function handoffAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const to = s(fd, "to");
-  try { await tx(sess.userId, (c) => c.query("select app.handoff_lead($1,$2,$3)", [s(fd, "lead_id"), to === "" || to === "admin" ? null : to, s(fd, "note") || null])); }
+  try { await tx(sess.userId, (c) => c.query("select app.handoff_lead($1,$2,$3,$4)", [s(fd, "lead_id"), to === "" || to === "admin" ? null : to, s(fd, "note") || null, s(fd, "status") || null])); }
   catch (e) { return fail(e, fd); }
   revalidatePath("/leads"); revalidatePath("/");
   redirect("/leads?handed=1");
@@ -396,4 +396,63 @@ export async function setTemperatureAction(_: FormState, fd: FormData): Promise<
   } catch (e) { return fail(e, fd); }
   revalidatePath(`/leads/${s(fd, "lead_id")}`); revalidatePath("/leads");
   return { ok: "تم حفظ درجة التواصل" };
+}
+
+/** Quick edit from the leads table: status, temperature, notes and (optionally) the next follow-up. Permissions are enforced by the database. */
+const EDITABLE_STATUS = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
+export async function quickEditAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "lead_id"), status = s(fd, "status"), temp = s(fd, "temperature"), notes = s(fd, "notes");
+  const next = parseLocal(s(fd, "next_followup")), why = s(fd, "followup_reason");
+  if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "عميل غير صالح", values: vals(fd) };
+  if (status && !EDITABLE_STATUS.includes(status)) return { error: "لا يمكن اختيار هذه الحالة من هنا", values: vals(fd) };
+  if (temp && !["cold", "warm", "hot"].includes(temp)) return { error: "درجة غير صالحة", values: vals(fd) };
+  if (notes.length > 4000) return { error: "الملاحظات طويلة جدًا (الحد 4000 حرف)", values: vals(fd) };
+  if (s(fd, "next_followup") && !next) return { error: "موعد المتابعة غير صالح", values: vals(fd) };
+  if (NEEDS_FOLLOWUP.includes(status) && (!next || !why)) return { error: "حدد موعد المتابعة وسببها لهذه الحالة", values: vals(fd) };
+  if (next && !why) return { error: "اكتب سبب المتابعة", values: vals(fd) };
+  try {
+    await tx(sess.userId, async (c) => {
+      const cur = (await c.query("select lead_status, lead_temperature, call_notes, handed_off_at from leads where id = $1", [id])).rows[0];
+      if (!cur) throw new Error("no access");
+      if (["Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"].includes(cur.lead_status) && status && status !== cur.lead_status)
+        throw new Error("status is managed by the Sales workflow");
+      const newStatus = status || cur.lead_status;
+      const r = await c.query("update leads set lead_status = $2, lead_temperature = $3, call_notes = $4, updated_by = $5 where id = $1",
+        [id, newStatus, temp || null, notes || null, sess.userId]);
+      if (!r.rowCount) throw new Error("no access");
+      if (newStatus !== cur.lead_status)
+        await c.query("insert into lead_activities(lead_id, kind, status_from, status_to, note, created_by) values ($1,'status_change',$2,$3,'تعديل من جدول العملاء',$4)", [id, cur.lead_status, newStatus, sess.userId]);
+      if (notes && notes !== (cur.call_notes ?? ""))
+        await c.query("insert into lead_activities(lead_id, kind, note, created_by) values ($1,'note',$2,$3)", [id, notes, sess.userId]);
+      if (next) {
+        await c.query("update follow_ups set status = 'cancelled' where lead_id = $1 and status = 'open' and owner_id = $2 and deal_id is null", [id, sess.userId]);
+        await c.query("update leads set next_followup_at = $2 where id = $1", [id, next]);
+        await c.query("insert into follow_ups(lead_id, owner_id, due_at, reason, created_by) values ($1,$2,$3,$4,$2)", [id, sess.userId, next, why]);
+      }
+    });
+  } catch (e) { return fail(e, fd); }
+  revalidatePath("/leads"); revalidatePath(`/leads/${id}`);
+  return { ok: "تم حفظ التعديلات" };
+}
+
+// ───────── hide / show leads (managers + admin only; enforced by the database) ─────────
+export async function hideLeadAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "lead_id"), hide = s(fd, "hide") === "1", why = s(fd, "reason");
+  if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "عميل غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.set_lead_hidden($1,$2,$3)", [id, hide, why || null])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads"); revalidatePath(`/leads/${id}`);
+  flashBack(fd, hide ? "lead_hidden" : "lead_shown", "/leads");
+}
+export async function hideMonthAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const emp = s(fd, "emp"), month = s(fd, "month"), hide = s(fd, "hide") === "1", why = s(fd, "reason");
+  if (!/^[0-9a-f-]{36}$/.test(emp) || !/^\d{4}-\d{2}$/.test(month)) return { error: "اختر موظفًا وشهرًا" };
+  let n = 0;
+  try { n = (await tx(sess.userId, (c) => c.query("select app.hide_leads_month($1,$2,$3,$4) n", [emp, `${month}-01`, hide, why || null]))).rows[0].n; }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads");
+  return { ok: n ? `${hide ? "تم إخفاء" : "تم إظهار"} ${n} عميل` : "لا توجد عملاء لتغييرهم" };
 }
