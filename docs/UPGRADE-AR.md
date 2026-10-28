@@ -1,19 +1,19 @@
-# ترقية نظام يعمل بالفعل (Migration 009)
+# ترقية نظام يعمل بالفعل (Migration 010)
 
 ## متى تستخدم هذا الدليل؟
 لو قاعدة بياناتك **فيها بيانات وتعمل بالفعل** وتريد أحدث نسخة (قبول/رفض السيلز، Cold/Warm/Hot، الاجتماعات الجديدة، التوقيت).
-لو القاعدة **فاضية** استخدم الملف `01-fresh-install.sql` (يشمل كل شيء حتى 009) ثم `02-create-admin.sql`.
+لو القاعدة **فاضية** استخدم الملف `01-fresh-install.sql` (يشمل كل شيء حتى 010) ثم `02-create-admin.sql`.
 
 التحديث **لا يحذف أي بيانات**، ويمكن تشغيله أكثر من مرة بأمان.
 
 ## الخطوات
 1. **نسخة احتياطية:** Supabase ← Database ← Backups.
-2. افتح **SQL Editor** والصق محتوى `009_phase1_workflow.sql` كاملًا واضغط Run.
+2. افتح **SQL Editor** والصق محتوى `009_phase1_workflow.sql` كاملًا واضغط Run (لو شغّلته قبل كده تخطّاه)، ثم الصق محتوى `010_leads_table.sql` كاملًا واضغط Run.
 3. تأكد: `select count(*) from achievements;` و `select column_name from information_schema.columns where table_name='leads' and column_name='lead_temperature';` يعطيان نتيجة.
 4. ارفع الكود الجديد إلى GitHub (انسخ الملفات فوق القديمة) وانتظر أن يصبح نشر Vercel **Ready**.
 5. افتح `/api/health` ويجب أن ترى `{"ok":true,"role":"restricted"}`.
 
-> إن كنت تستخدم `npm run db:migrate` فالأمر نفسه يطبّق 009 تلقائيًا.
+> إن كنت تستخدم `npm run db:migrate` فالأمر نفسه يطبّق 009 و010 تلقائيًا.
 
 ## ما الذي تغيّر
 - **السيلز:** يتغير اسم الدور إلى «السيلز» (وتبقى أسماء الجداول والأكواد كما هي).
