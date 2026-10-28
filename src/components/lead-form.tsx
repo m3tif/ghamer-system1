@@ -9,7 +9,7 @@ import type { FormState } from "@/lib/form";
 const KIND_AR: Record<string, string> = { phone: "رقم الجوال", store: "المتجر" };
 const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "00000000-0000-4000-8000-000000000000");
 
-function Toast({ t }: { t: NonNullable<FormState["toast"]> }) {
+export function Toast({ t }: { t: NonNullable<FormState["toast"]> }) {
   const tone = t.level === "great" ? "border-burgundy-600 bg-burgundy-600 text-white" : t.level === "good" ? "border-ok/40 bg-ok/10" : "border-line bg-white";
   const target = t.goal ?? t.next;
   return (
