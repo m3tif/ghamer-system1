@@ -5,7 +5,7 @@ beforeAll(async () => { await setupDb("ghamer_leadstable_test"); });
 afterAll(async () => { await teardown(); });
 
 const list = (who: string, o: Partial<{ q: string; phone: string; status: string; creator: string; sales: string; temp: string; sort: string; dir: string; limit: number; offset: number }> = {}) =>
-  run(who, "select * from app.list_leads($1,$2,$3,null,$4,$5,$6,$7,$8,$9,$10)",
+  run(who, "select * from app.list_leads($1,$2,$3,null,$4,$5,$6,$7,$8,$9,$10,'visible')",
     [o.q ?? null, o.phone ?? null, o.status ?? null, o.creator ?? null, o.sales ?? null, o.temp ?? null, o.sort ?? null, o.dir ?? null, o.limit ?? 25, o.offset ?? 0]).then((r) => r.rows);
 
 describe("leads table", () => {
