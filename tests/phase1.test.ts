@@ -135,7 +135,7 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
     expect((await run("sales1", "select id from leads where id = $1", [leadB])).rowCount).toBe(0);
     expect((await run("tele1", "select * from notifications where kind = 'handoff_rejected' and link = '/leads/' || $1::text", [leadB])).rowCount).toBe(1);
     expect((await run("super", "select * from notifications where kind = 'handoff_rejected' and link = '/leads/' || $1::text", [leadB])).rowCount).toBe(1);
-    expect((await run("sales1", "select * from app.my_handoff_decisions() where status = 'rejected'")).rowCount).toBe(1);
+    expect((await run("sales1", "select * from app.my_handoff_decisions() where status = 'rejected' and lead_id = $1", [leadB])).rowCount).toBe(1);
     expect((await admin.query("select count(*)::int n from lead_handoffs where lead_id = $1", [leadB])).rows[0].n).toBe(1); // history kept
     expect((await admin.query("select count(*)::int n from lead_activities where lead_id = $1 and status_to = 'Rejected by Sales'", [leadB])).rows[0].n).toBe(1);
   });
@@ -236,13 +236,14 @@ describe("performance with many clients", () => {
     const { listLeads } = await import("../src/server/data");
     const t = async (o: any) => { const s = performance.now(); const r = await listLeads(ids.tele1, o); return [performance.now() - s, r] as const; };
     const [tPage, page] = await t({ page: 1 });
-    expect(page.rows.length).toBe(20); expect(page.total).toBeGreaterThan(20000);
+    expect(page.rows.length).toBe(25); expect(page.total).toBeGreaterThan(20000);
     const [tDeep] = await t({ page: 500 });
     const [tName] = await t({ q: "عميل تجريبي 1234" });
     const [tPhone] = await t({ q: "+96650000123" });
     const [tStatus] = await t({ status: "Interested", page: 3 });
-    console.log(`timings ms → first page ${tPage.toFixed(0)}, deep page ${tDeep.toFixed(0)}, name search ${tName.toFixed(0)}, phone search ${tPhone.toFixed(0)}, status filter ${tStatus.toFixed(0)}`);
-    for (const x of [tPage, tDeep, tName, tPhone, tStatus]) expect(x).toBeLessThan(1500);
+    const [tStore] = await t({ q: "shop-123.example.com" });
+    console.log(`timings ms → first page ${tPage.toFixed(0)}, deep page ${tDeep.toFixed(0)}, name search ${tName.toFixed(0)}, phone search ${tPhone.toFixed(0)}, status filter ${tStatus.toFixed(0)}, store search ${tStore.toFixed(0)}`);
+    for (const x of [tPage, tDeep, tName, tPhone, tStatus, tStore]) expect(x).toBeLessThan(1500);
   });
   it("duplicate check stays fast with 20,000 identifiers (unique index lookup)", async () => {
     const s = performance.now();
