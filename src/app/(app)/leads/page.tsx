@@ -2,10 +2,11 @@ import Link from "next/link";
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { addedCounts, employeeList, listLeads, myOutcomes, PAGE_SIZES, salesReps } from "@/server/data";
 import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/components/ui";
+import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
 import { HideMonth } from "@/components/leads-cells";
 import { inputCls } from "@/components/forms";
-import { fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
+import { fmtDate, fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
 import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, MEETING_STATUS, TEMPERATURE } from "@/lib/labels";
 
 export const metadata = { title: "العملاء اللي ضفتهم" };
@@ -59,6 +60,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <Link href="/leads?tab=handed" role="tab" aria-selected={tab === "handed"} className={tabCls(tab === "handed")}>تم تحويلها إلى السيلز</Link>
         </div>)}
       {tab === "mine" ? (<>
+        {can(s, "leads.create") && <QuickAdd today={fmtDate(new Date())} />}
         <form className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" role="search">
           <input name="q" defaultValue={sp.q} placeholder="ابحث بالاسم أو رقم الهاتف أو رابط المتجر" className={inputCls + " col-span-2 sm:min-w-64 sm:max-w-md sm:flex-1"} aria-label="بحث" />
           <select name="status" defaultValue={status ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الحالة">
