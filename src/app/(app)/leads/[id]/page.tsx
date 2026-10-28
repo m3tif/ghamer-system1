@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
+import { HideLead } from "@/components/leads-cells";
 import { assignable, employeeList, getLead, salesReps } from "@/server/data";
 import { meetingFlags } from "@/server/meeting-rules";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -34,7 +35,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const accepted = handoff?.status === "accepted" || (!handoff && lead.original_creator_id === lead.assigned_sales_id);
   const salesActor = can(s, "meetings.create") && lead.assigned_sales_id && (lead.assigned_sales_id === s.userId || s.role === "super_admin" || (s.role === "sales_manager" && managed.has(lead.assigned_sales_id)));
   const pendingForMe = handoff?.status === "pending_review" && handoff.to_employee_id === s.userId;
-  const canSend = can(s, "leads.handoff") && !lead.handed_off_at && ["Interested", "Qualified Lead", "Rejected by Sales"].includes(lead.lead_status) && !handoff?.status?.startsWith("pending");
+  const canSend = can(s, "leads.handoff") && !lead.handed_off_at && !["Not Interested", "Invalid Contact", "Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"].includes(lead.lead_status) && !handoff?.status?.startsWith("pending");
+  const needsStatus = !["Interested", "Qualified Lead", "Rejected by Sales"].includes(lead.lead_status);
   const rejected = lead.lead_status === "Rejected by Sales" && handoff?.status === "rejected";
 
   return (
@@ -43,6 +45,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         actions={<>
           <Badge tone={LEAD_STATUS_TONE[lead.lead_status]}>{LEAD_STATUS[lead.lead_status]}</Badge>
           {lead.lead_temperature && <Badge tone={TEMPERATURE_TONE[lead.lead_temperature]}>{TEMPERATURE[lead.lead_temperature]}</Badge>}
+          {lead.hidden_at && <Badge tone="bad">مخفي عن الموظفين</Badge>}
+          {["super_admin", "general_manager", "tele_sales_manager", "sales_manager"].includes(s.role) && <HideLead leadId={id} name={lead.name} hidden={!!lead.hidden_at} />}
           {deal && can(s, "deals.view") && <Link className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream" href={`/deals/${deal.id}`}>فتح الصفقة</Link>}
         </>} />
 
@@ -89,6 +93,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <Card title={rejected ? "إرسال العميل من جديد إلى السيلز" : "إرسال العميل إلى السيلز"}>
               <ActionForm action={handoffAction} submit="إرسال العميل" className="grid gap-4 md:grid-cols-2">
                 <Hidden name="lead_id" value={id} />
+                {needsStatus && <SelectField label="تقييم العميل قبل الإرسال" name="status" required defaultValue="Interested" options={[{ value: "Interested", label: LEAD_STATUS["Interested"] }, { value: "Qualified Lead", label: LEAD_STATUS["Qualified Lead"] }]} hint={`الحالة الحالية: ${LEAD_STATUS[lead.lead_status]}. ستُحدَّث وتُسجَّل في سجل العميل.`} />}
                 <SelectField label="المستلم" name="to" required defaultValue="admin" options={[{ value: "admin", label: "إرسال للإدارة لتوزيعه" }, ...reps.map((r) => ({ value: r.id, label: r.full_name }))]} />
                 <TextArea label="ملاحظة للسيلز" name="note" rows={2} placeholder="مثال: العميل مهتم بإدارة السوشيال ميديا ويفضل التواصل مساءً" />
                 <p className="md:col-span-2 text-xs text-ink-500">لا يُعتبر العميل مقبولًا بمجرد الإرسال. القرار النهائي (قبول أو رفض) عند السيلز، وتتابعين النتيجة من «تم تحويلها».</p>
