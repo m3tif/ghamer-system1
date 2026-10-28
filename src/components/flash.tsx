@@ -9,6 +9,8 @@ export const FLASH: Record<string, string> = {
   meeting_result: "تم تسجيل نتيجة الاجتماع",
   meeting_confirmed: "تم تأكيد الاجتماع",
   meeting_noshow: "تم تسجيل عدم حضور العميل",
+  lead_hidden: "تم إخفاء العميل عن الموظفين. يظهر لك أنت والإدارة فقط من فلتر «المخفيون»",
+  lead_shown: "تم إظهار العميل للموظفين من جديد",
   meeting_reassigned: "تم إعادة إسناد الاجتماع",
 };
 

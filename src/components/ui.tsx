@@ -24,13 +24,16 @@ export function Card({ title, children, className = "", right }: { title?: strin
     </section>
   );
 }
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: "bad" | "ok" }) {
+export function Stat({ label, value, sub, tone, href }: { label: string; value: ReactNode; sub?: string; tone?: "bad" | "ok"; href?: string }) {
+  const Wrap = ({ children }: { children: ReactNode }) => href
+    ? <Link href={href} className="block rounded-lg border border-line bg-white px-4 py-3 transition hover:border-burgundy-600 hover:shadow-sm">{children}</Link>
+    : <div className="rounded-lg border border-line bg-white px-4 py-3">{children}</div>;
   return (
-    <div className="rounded-lg border border-line bg-white px-4 py-3">
+    <Wrap>
       <div className="text-xs text-ink-500">{label}</div>
       <div className={`mt-0.5 text-2xl font-extrabold tabular-nums ${tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : ""}`}>{value}</div>
       {sub && <div className="text-xs text-ink-500">{sub}</div>}
-    </div>
+    </Wrap>
   );
 }
 const TONES: Record<string, string> = {
