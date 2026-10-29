@@ -35,6 +35,10 @@ const MAP: [RegExp, string][] = [
   [/batch is not editable|batch is not runnable|batch is not rollbackable/i, "حالة عملية الاستيراد لا تسمح بهذا الإجراء"],
   [/row is not editable|row is not an updatable duplicate/i, "لا يمكن تنفيذ الإجراء على هذا الصف"],
   [/has open work/i, "لا يمكن إيقاف الموظف قبل نقل عمله المفتوح (عملاء / متابعات / اجتماعات / صفقات). استخدم «نقل العمل» أولًا."],
+  [/has history/i, "لا يمكن حذف موظف له سجل في النظام (عملاء أضافهم أو نشاطات أو اجتماعات أو صفقات)، لأن هذا السجل يجب أن يبقى باسمه. استخدم «إيقاف الحساب» بدلًا من الحذف."],
+  [/cannot delete self/i, "لا يمكنك حذف حسابك بنفسك"],
+  [/last super admin/i, "لا يمكن حذف آخر مدير نظام"],
+  [/employee not found/i, "الموظف غير موجود"],
   [/cannot change own status/i, "لا يمكنك تغيير حالة حسابك بنفسك"],
 ];
 export function mapError(e: unknown): string {

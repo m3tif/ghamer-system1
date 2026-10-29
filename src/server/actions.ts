@@ -567,3 +567,12 @@ export async function deleteMonthAction(_: FormState, fd: FormData): Promise<For
   revalidatePath("/leads");
   flashBack(fd, "leads_deleted", "/leads");
 }
+
+export async function deleteEmployeeAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  if (s(fd, "confirm") !== "حذف") return { values: vals(fd), error: "اكتب كلمة «حذف» للتأكيد" };
+  try { await tx(sess.userId, (c) => c.query("select app.delete_employee($1,$2)", [s(fd, "id"), s(fd, "reason")])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/employees");
+  return { ok: "تم حذف الموظف نهائيًا (والعملية مسجلة في سجل التدقيق)" };
+}

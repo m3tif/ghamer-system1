@@ -1,10 +1,11 @@
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { employeeLinks, employeeList, employeeNameHistory } from "@/server/data";
 import Link from "next/link";
-import { createEmployeeAction, reassignEmployeeAction, renameEmployeeAction, resetPasswordAction, setActiveAction, setManagerAction } from "@/server/actions";
+import { createEmployeeAction, reassignEmployeeAction, renameEmployeeAction, deleteEmployeeAction, resetPasswordAction, setActiveAction, setManagerAction } from "@/server/actions";
 import { Badge, Card, PageHeader, Table, td } from "@/components/ui";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
 import { tx } from "@/lib/db";
+import { Dialog } from "@/components/dialog";
 
 export const metadata = { title: "الموظفون" };
 export const dynamic = "force-dynamic";
@@ -70,6 +71,15 @@ export default async function Employees({ searchParams }: { searchParams: Promis
                     <details><summary className="cursor-pointer text-xs text-burgundy-600">{e.is_active ? "إيقاف الحساب (بدون حذف)" : "إعادة التفعيل"}</summary>
                       <ActionForm action={setActiveAction} submit="تأكيد" tone="quiet" className="mt-2 w-56 space-y-2">
                         <Hidden name="id" value={e.id} /><Hidden name="active" value={e.is_active ? "0" : "1"} /><TextArea label="السبب" name="reason" required rows={2} /></ActionForm></details>)}
+                  {s.role === "super_admin" && e.id !== s.userId && (
+                    <Dialog trigger="حذف الموظف نهائيًا" title={`حذف نهائي: ${e.full_name}`} tone="danger">
+                      <ActionForm action={deleteEmployeeAction} submit="حذف الموظف نهائيًا" className="grid gap-4">
+                        <Hidden name="id" value={e.id} />
+                        <p className="text-sm text-bad">يُحذف الحساب بالكامل ولا يمكن التراجع. الحذف متاح فقط للموظف الذي ليس له أي سجل في النظام (لم يضف عملاء ولا نشاطات ولا اجتماعات ولا صفقات). لو له سجل استخدم «إيقاف الحساب».</p>
+                        <TextArea label="السبب" name="reason" rows={2} required />
+                        <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
+                      </ActionForm>
+                    </Dialog>)}
                 </div>
               </td>)}
           </tr>))}
