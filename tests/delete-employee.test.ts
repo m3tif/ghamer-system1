@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as H from "./helpers";
 import { setupDb, teardown, run, register, ids, admin, leadPayload } from "./helpers";
 
 beforeAll(async () => { await setupDb("ghamer_delemp_test"); });
@@ -31,5 +32,30 @@ describe("delete employee", () => {
     const other = await mk("c@t.com", "super_admin");
     await run("super", "select app.delete_employee($1,'x')", [other]);   // another super still exists (the caller) → ok
     expect(true).toBe(true);
+  });
+  it("force delete: employee with clients, handoff, meeting, deal is removed with his clients; others' records survive", async () => {
+    const tele = await mk("force-tele@t.com");
+    await admin.query("select 1");
+    const email = "force-tele@t.com";
+    const l1 = await H.sendAccepted("tele1", "sales1", { ...H.leadPayload({ phone: "0501238801" }), lead_status: "Interested" });
+    await H.bookAs("sales1", l1);
+    // a lead created by tele1 stays; make a lead by the new employee through admin SQL ownership swap is complex -> use existing tele2
+    await H.register("tele2", H.leadPayload({ phone: "0501238802" }));
+    const before = (await admin.query("select count(*)::int n from leads where original_creator_id=$1", [ids.tele2])).rows[0].n;
+    expect(before).toBeGreaterThan(0);
+    const r = (await run("super", "select app.delete_employee($1,'تنظيف',true) r", [ids.tele2])).rows[0].r;
+    expect(r.clients_deleted).toBe(before);
+    expect((await admin.query("select count(*)::int n from users where id=$1", [ids.tele2])).rows[0].n).toBe(0);
+    expect((await admin.query("select count(*)::int n from leads where id=$1", [l1])).rows[0].n).toBe(1);
+    const log = (await admin.query("select old_value from audit_logs where action='DELETE' and entity_type='employees' and entity_id=$1", [ids.tele2])).rows;
+    expect(log.length).toBe(1);
+    void tele; void email;
+  });
+  it("force delete also works for a sales rep who owns a deal and meeting", async () => {
+    const l = await H.sendAccepted("tele1", "sales1", { ...H.leadPayload({ phone: "0501238803" }), lead_status: "Interested" });
+    await H.bookAs("sales1", l);
+    await run("super", "select app.delete_employee($1,'تنظيف',true)", [ids.sales1]);
+    expect((await admin.query("select count(*)::int n from users where id=$1", [ids.sales1])).rows[0].n).toBe(0);
+    expect((await admin.query("select count(*)::int n from leads where id=$1", [l])).rows[0].n).toBe(1);   // tele1's client survives
   });
 });

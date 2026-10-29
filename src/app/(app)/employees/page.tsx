@@ -75,7 +75,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
                     <Dialog trigger="حذف الموظف نهائيًا" title={`حذف نهائي: ${e.full_name}`} tone="danger">
                       <ActionForm action={deleteEmployeeAction} submit="حذف الموظف نهائيًا" className="grid gap-4">
                         <Hidden name="id" value={e.id} />
-                        <p className="text-sm text-bad">يُحذف الحساب بالكامل ولا يمكن التراجع. الحذف متاح فقط للموظف الذي ليس له أي سجل في النظام (لم يضف عملاء ولا نشاطات ولا اجتماعات ولا صفقات). لو له سجل استخدم «إيقاف الحساب».</p>
+                        <p className="text-sm text-bad">يُحذف الحساب نهائيًا ولا يمكن التراجع. وكل العملاء اللي أضافهم هذا الموظف يُحذفون معه بالكامل (بنشاطاتهم واجتماعاتهم وصفقاتهم)، وأي أثر له على عملاء موظفين آخرين يُفصل عنه. لو عاوز تحتفظ بعملائه انقل عمله لموظف آخر ثم «إيقاف الحساب» بدل الحذف.</p>
                         <TextArea label="السبب" name="reason" rows={2} required />
                         <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
                       </ActionForm>
