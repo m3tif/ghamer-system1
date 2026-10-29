@@ -3,6 +3,7 @@ import { can, requireSession } from "@/lib/auth";
 import { logoutAction } from "@/server/actions";
 import { NavLink } from "@/components/nav";
 import { Flash } from "@/components/flash";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSession();
@@ -19,6 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/targets", label: "التارجت", show: can(s, "targets.view") },
     { href: "/archive", label: "الأرشيف الشهري", show: can(s, "leads.view") || can(s, "leads.create") },
     { href: "/duplicates", label: "مراجعة التكرار", show: can(s, "duplicates.review") || can(s, "duplicates.request") },
+    { href: "/visibility", label: "إخفاء وإظهار البيانات", show: s.role === "super_admin" || s.role === "general_manager" },
+    { href: "/import", label: "استيراد البيانات السابقة", show: can(s, "import.own") || can(s, "import.any") },
     { href: "/employees", label: "الموظفون", show: can(s, "employees.view") },
     { href: "/clients/existing", label: "إضافة عميل قائم", show: can(s, "employees.manage") },
     { href: "/audit", label: "سجل التدقيق", show: can(s, "audit.view") },
@@ -57,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <nav aria-label="القائمة الرئيسية" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">{nav}</nav>
         <div className="mt-3 shrink-0 border-t border-white/10 px-3 pt-4">{who}</div>
       </aside>
-      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><div className="mx-auto w-full max-w-[1760px]"><Flash />{children}</div></main>
+      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><div className="mx-auto w-full max-w-[1760px]"><Flash />{children}</div><AutoRefresh /></main>
     </div>
   );
 }

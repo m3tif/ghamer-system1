@@ -29,6 +29,12 @@ const MAP: [RegExp, string][] = [
   [/duplicate key|unique/i, "هذا السجل موجود بالفعل"],
   [/at least one phone/i, "أدخل رقم جوال صالح"],
   [/name required/i, "الاسم مطلوب"],
+  [/file already imported/i, "هذا الملف سبق استيراده لنفس صاحب البيانات. لو أردت إعادته تراجع عن الاستيراد السابق أولًا"],
+  [/too many rows/i, "عدد الصفوف أكبر من المسموح (20,000)"],
+  [/empty file/i, "الملف لا يحتوي على صفوف"],
+  [/batch is not editable|batch is not runnable|batch is not rollbackable/i, "حالة عملية الاستيراد لا تسمح بهذا الإجراء"],
+  [/row is not editable|row is not an updatable duplicate/i, "لا يمكن تنفيذ الإجراء على هذا الصف"],
+  [/has open work/i, "لا يمكن إيقاف الموظف قبل نقل عمله المفتوح (عملاء / متابعات / اجتماعات / صفقات). استخدم «نقل العمل» أولًا."],
   [/cannot change own status/i, "لا يمكنك تغيير حالة حسابك بنفسك"],
 ];
 export function mapError(e: unknown): string {

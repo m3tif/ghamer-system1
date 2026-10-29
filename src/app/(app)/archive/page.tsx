@@ -1,3 +1,4 @@
+import { SearchBox } from "@/components/search-box";
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
@@ -13,7 +14,7 @@ const MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "ماي�
 const label = (d: string | Date) => { const x = new Date(d); return `${MONTHS[x.getUTCMonth()]} ${x.getUTCFullYear()}`; };
 const ym = (d: string | Date) => new Date(d).toISOString().slice(0, 7);
 
-export default async function Archive({ searchParams }: { searchParams: Promise<{ emp?: string; month?: string; status?: string; page?: string }> }) {
+export default async function Archive({ searchParams }: { searchParams: Promise<{ emp?: string; month?: string; status?: string; page?: string; q?: string }> }) {
   const s = await requireSession();
   if (!can(s, "leads.view") && !can(s, "leads.create")) notFound();
   const sp = await searchParams;
@@ -22,12 +23,13 @@ export default async function Archive({ searchParams }: { searchParams: Promise<
   const emp = sp.emp || (isAdmin ? "" : s.userId);
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? `${sp.month}-01` : null;
   const months = emp || !isAdmin ? await archiveMonths(s.userId, emp || null) : [];
-  const { rows, total, page } = await archiveLeads(s.userId, { emp: emp || null, month, status: sp.status || null, page: Number(sp.page) || 1 });
-  const q = (o: Record<string, string | undefined>) => `/archive?${new URLSearchParams(Object.fromEntries(Object.entries({ emp: sp.emp, month: sp.month, status: sp.status, ...o }).filter(([, v]) => v)) as Record<string, string>)}`;
+  const { rows, total, page } = await archiveLeads(s.userId, { emp: emp || null, month, status: sp.status || null, page: Number(sp.page) || 1, q: sp.q });
+  const q = (o: Record<string, string | undefined>) => `/archive?${new URLSearchParams(Object.fromEntries(Object.entries({ emp: sp.emp, month: sp.month, status: sp.status, q: sp.q, ...o }).filter(([, v]) => v)) as Record<string, string>)}`;
   return (
     <>
       <PageHeader title="الأرشيف الشهري" sub="سجل كامل لكل شهر. لا يمكن حذف أي سجل منه أو تغيير تاريخ إضافته." />
       <form className="mb-4 flex flex-wrap gap-2" role="search">
+        <SearchBox className="w-full sm:w-72" />
         {emps.length > 0 && (
           <select name="emp" defaultValue={sp.emp ?? ""} className={inputCls + " max-w-56"} aria-label="الموظف">
             {isAdmin ? <option value="">كل الموظفين</option> : <option value="">أنا</option>}
@@ -46,7 +48,7 @@ export default async function Archive({ searchParams }: { searchParams: Promise<
                 <td className={td}>{m.received}</td><td className={td}>{m.meetings_completed}</td><td className={td}>{m.achievements > 0 ? <Badge tone="brand">★ {m.achievements}</Badge> : "—"}</td>
                 <td className={td}><Link className="text-sm text-burgundy-600 underline" href={q({ month: ym(m.month), page: undefined })}>عرض العملاء</Link></td></tr>))}
           </Table></Card></div>)}
-      {rows.length === 0 ? <Empty title="لا توجد سجلات" hint="غيّر الشهر أو الموظف أو الحالة." /> : (
+      {rows.length === 0 ? <Empty title={sp.q ? `لا توجد نتائج لـ «${sp.q}»` : "لا توجد سجلات"} hint="غيّر كلمة البحث أو الشهر أو الموظف أو الحالة." /> : (
         <Table head={["العميل", "تاريخ الإضافة", "الحالة", "أضافه", "المسؤول الآن", "التحويل"]}>
           {rows.map((l: any) => (
             <tr key={l.lead_id}>

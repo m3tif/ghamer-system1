@@ -2,6 +2,7 @@ import Link from "next/link";
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { addedCounts, employeeList, listLeads, myOutcomes, PAGE_SIZES, salesReps } from "@/server/data";
 import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/components/ui";
+import { SearchBox } from "@/components/search-box";
 import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
 import { HideMonth } from "@/components/leads-cells";
@@ -62,7 +63,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       {tab === "mine" ? (<>
         {can(s, "leads.create") && <QuickAdd today={fmtDate(new Date())} />}
         <form className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" role="search">
-          <input name="q" defaultValue={sp.q} placeholder="ابحث بالاسم أو رقم الهاتف أو رابط المتجر" className={inputCls + " col-span-2 sm:min-w-64 sm:max-w-md sm:flex-1"} aria-label="بحث" />
+          <SearchBox className="col-span-2 sm:min-w-64 sm:max-w-md sm:flex-1" />
           <select name="status" defaultValue={status ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الحالة">
             <option value="">كل الحالات</option>{Object.entries(LEAD_STATUS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>

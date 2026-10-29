@@ -1,3 +1,5 @@
+import { SearchBox } from "@/components/search-box";
+import { filterByClientSearch } from "@/server/data";
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
@@ -13,13 +15,13 @@ export const metadata = { title: "العملاء المسندين إليّ" };
 export const dynamic = "force-dynamic";
 const TABS = [["pending", "بانتظار قرارك"], ["accepted", "المقبولون"], ["rejected", "المرفوضون"]] as const;
 
-export default async function Assigned({ searchParams }: { searchParams: Promise<{ tab?: string; ok?: string; error?: string }> }) {
+export default async function Assigned({ searchParams }: { searchParams: Promise<{ tab?: string; ok?: string; error?: string; q?: string }> }) {
   const s = await requireSession();
   if (!can(s, "deals.view") && !can(s, "meetings.create")) notFound();
   const sp = await searchParams;
   const tab = (TABS.find((t) => t[0] === sp.tab)?.[0] ?? "pending") as "pending" | "accepted" | "rejected";
   const [pending, rows] = await Promise.all([assignedLeads(s.userId, "pending"), tab === "pending" ? null : assignedLeads(s.userId, tab)]);
-  const list = (tab === "pending" ? pending : rows) as any[];
+  const list = await filterByClientSearch(s.userId, (tab === "pending" ? pending : rows) as any[], sp.q);
   return (
     <>
       <PageHeader title="العملاء المسندين إليّ" sub="العميل لا يُعتبر مقبولًا بمجرد إرساله إليك. القرار لك: قبول أو رفض." />
@@ -28,12 +30,13 @@ export default async function Assigned({ searchParams }: { searchParams: Promise
       {sp.error && <p role="alert" className="mb-4 rounded-md border border-bad/30 bg-bad/5 px-3 py-2 text-sm text-bad">{sp.error}</p>}
       <div className="mb-5 flex flex-wrap gap-2" role="tablist">
         {TABS.map(([k, l]) => (
-          <Link key={k} href={`/assigned?tab=${k}`} role="tab" aria-selected={tab === k}
+          <Link key={k} href={`/assigned?tab=${k}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ""}`} role="tab" aria-selected={tab === k}
             className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-sm ${tab === k ? "bg-burgundy-600 font-semibold text-white" : "border border-line bg-white hover:bg-cream"}`}>
             {l}{k === "pending" && <span className={`rounded-full px-2 text-xs font-bold ${tab === k ? "bg-white/20" : pending.length ? "bg-warn/15 text-warn" : "bg-cream-dark"}`}>{pending.length}</span>}
           </Link>))}
       </div>
-      {list.length === 0 ? <Empty title={tab === "pending" ? "لا يوجد عملاء بانتظار قرارك" : tab === "accepted" ? "لا يوجد عملاء مقبولون بعد" : "لا يوجد عملاء مرفوضون"} /> : tab === "pending" ? (
+      <SearchBox className="mb-4 max-w-md" />
+      {list.length === 0 ? <Empty title={sp.q ? `لا توجد نتائج لـ «${sp.q}»` : tab === "pending" ? "لا يوجد عملاء بانتظار قرارك" : tab === "accepted" ? "لا يوجد عملاء مقبولون بعد" : "لا يوجد عملاء مرفوضون"} /> : tab === "pending" ? (
         <div className="grid gap-4 xl:grid-cols-2">
           {list.map((l) => (
             <Card key={l.handoff_id} title={l.name} right={<div className="flex gap-2">{l.lead_temperature && <Badge tone={TEMPERATURE_TONE[l.lead_temperature]}>{TEMPERATURE[l.lead_temperature]}</Badge>}<Badge tone="warn">بانتظار قرارك</Badge></div>}>

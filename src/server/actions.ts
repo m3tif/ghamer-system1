@@ -6,8 +6,9 @@ import { z } from "zod";
 import { tx } from "@/lib/db";
 import { can, currentTokenHash, ensureEnrollment, hashPassword, login, logout, requireSession, validatePasswordStrength, verifyMfa, verifyPassword, getSession } from "@/lib/auth";
 import { mapError } from "@/lib/errors";
-import { normalizePhone, normalizeStoreUrl } from "@/lib/normalize";
+import { normalizePhone, normalizeStoreUrl, parsePhone, asCountry } from "@/lib/normalize";
 import { parseLocal } from "@/lib/format";
+import { FIELDS, buildRows, type Mapping } from "@/lib/import-parse";
 import type { FormState } from "@/lib/form";
 import { ACHIEVEMENT, NEEDS_FOLLOWUP, encourage, nextMilestone } from "@/lib/labels";
 
@@ -60,10 +61,11 @@ function buildContactPayload(fd: FormData): { error?: string; payload?: any } {
   const seen = new Set<string>();
   for (const [field, label] of [["phone", "mobile"], ["alt_phone", "alt_mobile"], ["whatsapp", "whatsapp"]] as const) {
     const raw = s(fd, field); if (!raw) continue;
-    const n = normalizePhone(raw);
-    if (!n) return { error: `رقم غير صالح: ${raw}` };
-    if (seen.has(n)) continue; seen.add(n);
-    identifiers.push({ kind: "phone", value: n, label }); contacts.push({ label, phone: n, is_primary: label === "mobile" });
+    const pp = parsePhone(raw, asCountry(s(fd, field + "_country") || s(fd, "phone_country")));
+    if (!pp.e164 || !pp.valid) return { error: `رقم غير صالح: ${raw}` };
+    if (seen.has(pp.e164)) continue; seen.add(pp.e164);
+    identifiers.push({ kind: "phone", value: pp.e164, label });
+    contacts.push({ label, phone: pp.e164, is_primary: label === "mobile", phone_raw: raw, phone_country: pp.country });
   }
   const urls = s(fd, "store_url").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
   for (const u of urls) {
@@ -99,7 +101,7 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
   try { res = (await tx(sess.userId, (c) => c.query("select app.register_lead($1::jsonb) r", [JSON.stringify(payload)]))).rows[0].r; }
   catch (e) { return fail(e, fd); }
   if (res.status === "duplicate") {
-    return { values: vals(fd), dup: { owner_name: res.owner_name, existing_client_id: res.existing_client_id, matched_kinds: res.matched_kinds, ambiguous: res.ambiguous,
+    return { values: vals(fd), dup: { existing_name: res.existing_name, existing_status: res.existing_status, existing_added_at: res.existing_added_at, owner_name: res.owner_name, existing_client_id: res.existing_client_id, matched_kinds: res.matched_kinds, ambiguous: res.ambiguous,
       attempted: { name: s(fd, "name"), business_name: s(fd, "business_name"), phone: s(fd, "phone"), store: s(fd, "store_url") } } };
   }
   revalidatePath("/leads");
@@ -337,6 +339,22 @@ export async function setActiveAction(_: FormState, fd: FormData): Promise<FormS
   revalidatePath("/employees");
   return { ok: "تم التحديث" };
 }
+export async function renameEmployeeAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  try { await tx(sess.userId, (c) => c.query("select app.rename_employee($1,$2)", [s(fd, "id"), s(fd, "full_name")])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/employees");
+  return { ok: "تم تعديل الاسم، وهو يظهر الآن في كل مكان مع بقاء كل البيانات والسجل" };
+}
+export async function reassignEmployeeAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  if (s(fd, "confirm") !== "1") return { values: vals(fd), error: "أكّد النقل أولًا" };
+  let r: any;
+  try { r = (await tx(sess.userId, (c) => c.query("select app.reassign_employee($1,$2,$3) r", [s(fd, "id"), s(fd, "to"), s(fd, "reason")]))).rows[0].r; }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/employees");
+  return { ok: `تم النقل: ${r.leads_owner + r.leads_sales} عميل، ${r.followups} متابعة، ${r.meetings} اجتماع، ${r.deals} صفقة، ${r.handoffs} قرار معلّق` };
+}
 export async function resetPasswordAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const pw = String(fd.get("password") ?? "");
@@ -455,4 +473,74 @@ export async function hideMonthAction(_: FormState, fd: FormData): Promise<FormS
   catch (e) { return fail(e, fd); }
   revalidatePath("/leads");
   return { ok: n ? `${hide ? "تم إخفاء" : "تم إظهار"} ${n} عميل` : "لا توجد عملاء لتغييرهم" };
+}
+
+export async function hidePeriodAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const scope = s(fd, "scope"), raw = s(fd, "start"), emp = s(fd, "emp"), hide = s(fd, "hide") === "1", why = s(fd, "reason");
+  const start = scope === "day" ? raw.slice(0, 10) : scope === "month" ? `${raw.slice(0, 7)}-01` : `${raw.slice(0, 4)}-01-01`;
+  if (!["day", "month", "year"].includes(scope) || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return { values: vals(fd), error: "اختر النطاق والتاريخ" };
+  if (hide && s(fd, "confirm") !== "1") return { values: vals(fd), error: "أكّد الإخفاء أولًا" };
+  let r: any;
+  try { r = (await tx(sess.userId, (c) => c.query("select app.hide_period($1,$2,$3,$4,$5) r", [scope, start, /^[0-9a-f-]{36}$/.test(emp) ? emp : null, hide, why || null]))).rows[0].r; }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/visibility"); revalidatePath("/leads");
+  return { ok: r.affected ? `${hide ? "تم إخفاء" : "تم إظهار"} ${r.affected} عميل` : hide ? "لا توجد عملاء جدد لإخفائهم في هذه الفترة (أو هي مخفية بالفعل)" : "لا يوجد ما يُظهَر لهذه الفترة" };
+}
+
+// ───── import of previous data ─────
+export async function remapImportAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  const mapping: Mapping = {};
+  for (const f of FIELDS) { const v = s(fd, `map_${f.key}`); if (v) mapping[f.key] = v; }
+  mapping.default_country = asCountry(s(fd, "default_country"));
+  if (!mapping.name || !mapping.phone) return { error: "حدّد عمودي الاسم ورقم الهاتف" };
+  try {
+    await tx(sess.userId, async (c) => {
+      const meta = (await c.query("select mapping from app.import_get($1)", [id])).rows[0];
+      if (!meta) throw new Error("not found or no access");
+      const headers: string[] = meta.mapping.headers ?? [];
+      const raws = (await c.query("select row_no, raw from app.import_raw_rows($1)", [id])).rows as { row_no: number; raw: Record<string, string> }[];
+      const table = { headers, rows: raws.map((r) => headers.map((h) => r.raw[h] ?? "")) };
+      const rows = buildRows(table, mapping, mapping.default_country!).map((r, i) => ({ ...r, row_no: raws[i].row_no }));
+      await c.query("select app.import_apply_mapping($1,$2::jsonb,$3::jsonb)", [id, JSON.stringify({ ...mapping, headers }), JSON.stringify(rows.map(({ raw, ...x }) => x))]);
+    });
+  } catch (e) { return fail(e, fd); }
+  revalidatePath(`/import/${id}`);
+  return { ok: "تم تطبيق ربط الأعمدة وإعادة الفحص" };
+}
+export async function fixImportRowAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  const phone = s(fd, "phone"); const pp = phone ? parsePhone(phone, asCountry(s(fd, "phone_country"))) : null;
+  if (phone && !pp?.e164) return { values: vals(fd), error: "رقم غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.import_fix_row($1,$2,$3,$4,$5)", [s(fd, "row"), s(fd, "name") || null, pp?.e164 ?? null, pp?.country ?? null, pp?.valid ?? false])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath(`/import/${id}`);
+  return { ok: "تم تعديل الصف وإعادة فحصه" };
+}
+export async function skipImportRowAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  try { await tx(sess.userId, (c) => c.query("select app.import_skip_row($1,$2)", [s(fd, "row"), s(fd, "skip") !== "0"])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath(`/import/${id}`);
+  return { ok: s(fd, "skip") === "0" ? "أُعيد الصف" : "تم تخطّي الصف" };
+}
+export async function cancelImportAction(fd: FormData): Promise<void> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  await tx(sess.userId, (c) => c.query("select app.import_cancel($1)", [id]));
+  redirect("/import");
+}
+export async function rollbackImportAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  if (s(fd, "confirm") !== "1") return { error: "أكّد التراجع أولًا", values: vals(fd) };
+  let r: any;
+  try { r = (await tx(sess.userId, (c) => c.query("select app.import_rollback($1,$2) r", [id, s(fd, "reason")]))).rows[0].r; } catch (e) { return fail(e, fd); }
+  revalidatePath(`/import/${id}`); revalidatePath("/leads");
+  return { ok: `تم التراجع عن ${r.rolled_back} عميل، وأُبقي ${r.kept} لأنهم عُدّلوا بعد الاستيراد` };
+}
+export async function updateExistingAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  try { await tx(sess.userId, (c) => c.query("select app.import_apply_update($1)", [s(fd, "row")])); } catch (e) { return fail(e, fd); }
+  revalidatePath(`/import/${id}`);
+  return { ok: "تم ملء الحقول الفارغة في العميل الموجود" };
 }

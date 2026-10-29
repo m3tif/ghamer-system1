@@ -17,6 +17,42 @@ export function normalizePhone(raw: string, defaultCountry: CountryCode = "SA"):
   return p && p.isValid() ? p.number : null;
 }
 
+export type PhoneParse = { e164: string | null; country: string | null; national: string | null; possible: boolean; valid: boolean };
+
+/**
+ * Full parse: E.164 + detected country (from the +code when present, otherwise the selected country).
+ * valid  = a real number for that country (libphonenumber metadata). possible = right length but unknown pattern (goes to review on import).
+ */
+export function parsePhone(raw: string, selectedCountry: CountryCode = "SA"): PhoneParse {
+  const cleaned = toLatinDigits(raw ?? "").replace(/[\s\-().\u200f\u200e]/g, "");
+  const none = { e164: null, country: null, national: null, possible: false, valid: false };
+  if (!cleaned) return none;
+  const withPlus = cleaned.startsWith("00") ? "+" + cleaned.slice(2) : cleaned;
+  const p = parsePhoneNumberFromString(withPlus, selectedCountry);
+  if (!p) return none;
+  return { e164: p.number, country: p.country ?? selectedCountry, national: p.formatNational(), possible: p.isPossible(), valid: p.isValid() };
+}
+
+/** Countries offered in the phone selector (Gulf + Arab first, then common). Any other country still works by typing +code. */
+export const PHONE_COUNTRIES: { code: CountryCode; dial: string; name: string }[] = [
+  { code: "SA", dial: "+966", name: "السعودية" }, { code: "EG", dial: "+20", name: "مصر" },
+  { code: "AE", dial: "+971", name: "الإمارات" }, { code: "KW", dial: "+965", name: "الكويت" },
+  { code: "QA", dial: "+974", name: "قطر" }, { code: "BH", dial: "+973", name: "البحرين" },
+  { code: "OM", dial: "+968", name: "عُمان" }, { code: "JO", dial: "+962", name: "الأردن" },
+  { code: "LB", dial: "+961", name: "لبنان" }, { code: "IQ", dial: "+964", name: "العراق" },
+  { code: "SY", dial: "+963", name: "سوريا" }, { code: "PS", dial: "+970", name: "فلسطين" },
+  { code: "YE", dial: "+967", name: "اليمن" }, { code: "SD", dial: "+249", name: "السودان" },
+  { code: "LY", dial: "+218", name: "ليبيا" }, { code: "TN", dial: "+216", name: "تونس" },
+  { code: "DZ", dial: "+213", name: "الجزائر" }, { code: "MA", dial: "+212", name: "المغرب" },
+  { code: "TR", dial: "+90", name: "تركيا" }, { code: "GB", dial: "+44", name: "بريطانيا" },
+  { code: "US", dial: "+1", name: "أمريكا/كندا" }, { code: "DE", dial: "+49", name: "ألمانيا" },
+  { code: "FR", dial: "+33", name: "فرنسا" }, { code: "IN", dial: "+91", name: "الهند" },
+  { code: "PK", dial: "+92", name: "باكستان" }, { code: "BD", dial: "+880", name: "بنغلاديش" },
+  { code: "PH", dial: "+63", name: "الفلبين" },
+];
+export const COUNTRY_CODES = new Set<string>(PHONE_COUNTRIES.map((c) => c.code));
+export function asCountry(c: string | undefined | null): CountryCode { return (c && COUNTRY_CODES.has(c) ? c : "SA") as CountryCode; }
+
 /** Platforms where the identity of a store is the host + first path segment. */
 const PATH_PLATFORMS = new Set([
   "instagram.com", "facebook.com", "tiktok.com", "x.com", "twitter.com", "snapchat.com",

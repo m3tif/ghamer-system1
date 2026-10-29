@@ -1,5 +1,5 @@
 import { tx } from "@/lib/db";
-import { normalizePhone, toLatinDigits } from "@/lib/normalize";
+import { toLatinDigits } from "@/lib/normalize";
 
 const esc = (s: string) => s.replace(/[\\%_]/g, "\\$&");
 export const PAGE_SIZE = 20;
@@ -18,7 +18,7 @@ export async function listLeads(uid: string, o: LeadFilter) {
   const q = o.q?.trim() || null;
   // a query is treated as a phone number only when it is made of digits/separators (not when a name contains digits)
   const asDigits = q ? toLatinDigits(q) : "";
-  const phone = q && /^[+\d\s().-]{5,}$/.test(asDigits) ? (normalizePhone(q) ?? asDigits.replace(/\D/g, "")) : null;
+  const phone = q && /^[+\d\s().-]{3,}$/.test(asDigits) && asDigits.replace(/\D/g, "").length >= 3 ? asDigits.replace(/\D/g, "") : null;
   const r = await tx(uid, (c) => c.query(
     "select * from app.list_leads($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
     [phone ? null : q, phone, o.status || null, o.month || null, o.creator || null, o.sales || null, o.temp || null, o.sort || null, o.dir || null, size, (page - 1) * size, o.hidden || null]));
@@ -83,7 +83,7 @@ export async function assignedLeads(uid: string, tab: "pending" | "accepted" | "
   return tx(uid, async (c) => {
     if (tab === "pending") {
       return (await c.query(
-        `select h.id handoff_id, l.id lead_id, c.name, c.business_name, l.lead_temperature, l.required_services, l.call_notes, l.lead_status, h.note, h.handed_at,
+        `select h.id handoff_id, l.id lead_id, c.id client_id, c.name, c.business_name, l.lead_temperature, l.required_services, l.call_notes, l.lead_status, h.note, h.handed_at,
                 app.emp_name(h.from_employee_id) from_name, c.original_source,
                 (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc limit 1) phone
          from lead_handoffs h join leads l on l.id = h.lead_id join clients c on c.id = l.client_id
@@ -91,7 +91,7 @@ export async function assignedLeads(uid: string, tab: "pending" | "accepted" | "
     }
     if (tab === "accepted") {
       return (await c.query(
-        `select l.id lead_id, c.name, c.business_name, l.lead_temperature, l.lead_status, l.next_followup_at,
+        `select l.id lead_id, c.id client_id, c.name, c.business_name, l.lead_temperature, l.lead_status, l.next_followup_at,
                 (select h.decided_at from lead_handoffs h where h.lead_id = l.id and h.status = 'accepted' order by h.decided_at desc limit 1) decided_at,
                 app.emp_name(l.original_creator_id) from_name,
                 (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc limit 1) phone
@@ -102,9 +102,20 @@ export async function assignedLeads(uid: string, tab: "pending" | "accepted" | "
   });
 }
 
+/** Keeps only the rows whose client matches the search text (name / store / phone in any format). Runs after the permission-filtered query. */
+export async function filterByClientSearch<T extends { client_id?: string; lead_id?: string }>(uid: string, rows: T[], q?: string | null): Promise<T[]> {
+  const text = q?.trim(); if (!text || rows.length === 0) return rows;
+  const byClient = rows.some((r) => r.client_id);
+  const ids = rows.map((r) => (byClient ? r.client_id : r.lead_id)).filter(Boolean) as string[];
+  const sql = byClient ? "select id from unnest($1::uuid[]) id where app.client_matches(id, $2)"
+                       : "select lid id from unnest($1::uuid[]) lid join leads l on l.id = lid where app.client_matches(l.client_id, $2)";
+  const ok = new Set((await tx(uid, (c) => c.query(sql, [ids, text]))).rows.map((r: any) => r.id));
+  return rows.filter((r) => ok.has((byClient ? r.client_id : r.lead_id) as string));
+}
+
 export async function listDeals(uid: string) {
   const r = await tx(uid, (c) => c.query(
-    `select d.id, d.stage, d.win_probability, d.expected_value, d.updated_at, d.created_at, d.lead_id, c.name client_name, c.business_name,
+    `select d.id, d.client_id, d.stage, d.win_probability, d.expected_value, d.updated_at, d.created_at, d.lead_id, c.name client_name, c.business_name,
             app.emp_name(d.owner_sales_id) owner_name, d.owner_sales_id, l.lead_temperature,
             (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc, cc.created_at limit 1) phone,
             (select min(f.due_at) from follow_ups f where f.deal_id = d.id and f.status = 'open') followup_at,
@@ -164,9 +175,9 @@ export async function myProgress(uid: string, emp: string, month: string) {
 export async function archiveMonths(uid: string, emp: string | null) {
   return (await tx(uid, (c) => c.query("select * from app.archive_months($1)", [emp]))).rows as any[];
 }
-export async function archiveLeads(uid: string, o: { emp?: string | null; month?: string | null; status?: string | null; page?: number }) {
+export async function archiveLeads(uid: string, o: { emp?: string | null; month?: string | null; status?: string | null; page?: number; q?: string | null }) {
   const page = Math.max(1, o.page ?? 1);
-  const r = await tx(uid, (c) => c.query("select * from app.archive_leads($1,$2,$3,$4,$5)", [o.emp ?? null, o.month ?? null, o.status ?? null, PAGE_SIZE, (page - 1) * PAGE_SIZE]));
+  const r = await tx(uid, (c) => c.query("select * from app.archive_leads($1,$2,$3,$4,$5,$6)", [o.emp ?? null, o.month ?? null, o.status ?? null, PAGE_SIZE, (page - 1) * PAGE_SIZE, o.q?.trim() || null]));
   return { rows: r.rows as any[], total: Number(r.rows[0]?.total ?? 0), page };
 }
 export async function pendingHandoffs(uid: string) {
@@ -228,4 +239,30 @@ export async function companyOverview(uid: string, month: string) {
         from app.employee_list() e where e.is_active and e.role_code in ('tele_sales','sales_rep','tele_sales_manager','sales_manager') order by e.role_code, e.full_name`),
     };
   });
+}
+
+export async function employeeLinks(uid: string) {
+  const r = await tx(uid, (c) => c.query("select * from app.employee_link_counts()"));
+  return new Map<string, any>(r.rows.map((x: any) => [x.id, x]));
+}
+export async function employeeNameHistory(uid: string, id: string) {
+  return (await tx(uid, (c) => c.query("select * from app.employee_name_history($1)", [id]))).rows as { at: string; actor_name: string | null; old_name: string; new_name: string }[];
+}
+
+export type DailyRow = { emp_id: string; emp_name: string; family: "tele" | "sales"; added: number; contacted: number; handed: number; accepted: number; rejected: number; received: number; meetings_booked: number };
+export async function dailyReport(uid: string, day?: string | null) {
+  return (await tx(uid, (c) => c.query("select * from app.daily_report($1)", [day || null]))).rows as DailyRow[];
+}
+export async function hideOverview(uid: string, scope: "day" | "month", year: number, month: number, emp?: string | null) {
+  return (await tx(uid, (c) => c.query("select to_char(period,'YYYY-MM-DD') period, total, hidden, rule_active from app.hide_overview($1,$2,$3,$4)", [scope, year, month, emp || null]))).rows as { period: string; total: number; hidden: number; rule_active: boolean }[];
+}
+export async function hideLog(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.hide_log(100)"))).rows as any[];
+}
+
+export async function importBatches(uid: string) { return (await tx(uid, (c) => c.query("select * from app.import_batches_list(50)"))).rows as any[]; }
+export async function importBatch(uid: string, id: string) { return (await tx(uid, (c) => c.query("select * from app.import_get($1)", [id]))).rows[0] as any | undefined; }
+export async function importRows(uid: string, id: string, status: string | null, page: number, size = 50) {
+  const r = await tx(uid, (c) => c.query("select * from app.import_rows_page($1,$2,$3,$4)", [id, status, size, (page - 1) * size]));
+  return { rows: r.rows as any[], total: Number(r.rows[0]?.total ?? 0) };
 }

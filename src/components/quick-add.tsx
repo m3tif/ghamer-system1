@@ -1,4 +1,5 @@
 "use client";
+import { PhoneField } from "@/components/phone-field";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createLeadAction } from "@/server/actions";
 import { Toast } from "@/components/lead-form";
@@ -25,14 +26,14 @@ export function QuickAdd({ today }: { today: string }) {
       {state.error && <p role="alert" className="mb-3 rounded-md border border-bad/30 bg-bad/5 px-3 py-2 text-sm text-bad">{state.error}</p>}
       {state.dup && (
         <p role="alert" className="mb-3 rounded-md border border-warn/40 bg-warn/5 px-3 py-2 text-sm">
-          <span className="font-semibold text-warn">هذا العميل مسجل بالفعل{state.dup.owner_name ? ` لدى ${state.dup.owner_name}` : ""}.</span> لم يُنشأ سجل جديد، وسُجلت محاولتك. لو تراه يخصك افتح «تسجيل عميل جديد» واطلب مراجعة من المدير.
+          <span className="font-semibold text-warn">هذا الرقم مسجل بالفعل{state.dup.existing_name ? ` باسم «${state.dup.existing_name}»` : ""}{state.dup.owner_name ? ` لدى ${state.dup.owner_name}` : ""}{state.dup.existing_status ? ` (الحالة: ${LEAD_STATUS[state.dup.existing_status] ?? state.dup.existing_status})` : ""}.</span> لم يُنشأ سجل جديد، وسُجلت محاولتك. لو تراه يخصك افتح «تسجيل عميل جديد» واطلب مراجعة من المدير.
         </p>)}
       <form key={key} action={action} className="grid grid-cols-2 items-end gap-2 lg:grid-cols-[1.3fr_1fr_1.3fr_auto]">
         <input type="hidden" name="request_id" value={rid} suppressHydrationWarning />
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">اسم العميل <b className="text-burgundy-600">*</b></span>
           <input ref={nameRef} name="name" required autoComplete="off" defaultValue={v.name ?? ""} className={inputCls} placeholder="اسم العميل" /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رقم الجوال <b className="text-burgundy-600">*</b></span>
-          <input name="phone" required dir="ltr" inputMode="tel" autoComplete="off" defaultValue={v.phone ?? ""} className={inputCls} placeholder="05xxxxxxxx" /></label>
+          <PhoneField name="phone" required compact defaultValue={v.phone ?? ""} /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رابط المتجر (اختياري)</span>
           <input name="store_url" dir="ltr" autoComplete="off" defaultValue={v.store_url ?? ""} className={inputCls} placeholder="https://" /></label>
         <div className="col-span-2 flex items-center gap-2 lg:col-span-1">

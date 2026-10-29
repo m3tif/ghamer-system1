@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { can, requireSession } from "@/lib/auth";
-import { addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
+import { dailyReport, type DailyRow, addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
 import { Badge, Card, Empty, PageHeader, Progress, Stat, Table, td } from "@/components/ui";
-import { fmtDateTime, fmtNum, fmtPct, fmtMoney, monthStart } from "@/lib/format";
+import { getTimezone, fmtDateTime, fmtNum, fmtPct, fmtMoney, monthStart } from "@/lib/format";
 import { ACHIEVEMENT, HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, SOURCES, TEMPERATURE, nextMilestone } from "@/lib/labels";
 
 export const metadata = { title: "لوحة التحكم" };
 export const dynamic = "force-dynamic";
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
+  const sp = await searchParams;
   const s = await requireSession();
   const month = monthStart();
   const isAdmin = s.role === "super_admin" || s.role === "general_manager";
@@ -21,6 +22,7 @@ export default async function Dashboard() {
       <PageHeader title={`أهلًا ${s.fullName}`} sub={`${s.roleNameAr} · إحصائيات الشهر الحالي`} />
       {s.role === "tele_sales" && <TeleHome uid={s.userId} month={month} />}
       {s.role === "sales_rep" && <SalesHome uid={s.userId} month={month} />}
+      {isAdmin && <Daily uid={s.userId} day={/^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") ? sp.day! : null} />}
       {(s.role === "tele_sales_manager" || isAdmin) && <TeleTeam uid={s.userId} month={month} team={teleTeam} />}
       {(s.role === "sales_manager" || isAdmin) && <SalesTeam uid={s.userId} month={month} team={salesTeam} />}
       {isAdmin && <Company uid={s.userId} month={month} />}
@@ -235,6 +237,56 @@ async function Company({ uid, month }: { uid: string; month: string }) {
                 <td className={td + " min-w-36"}>{e.goal ? <Progress value={e.added} max={Number(e.goal)} /> : "—"}</td></tr>))}
           </Table>)}
       </Card></div>
+    </section>
+  );
+}
+
+const shiftDay = (d: string, n: number) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+
+/** Admin default view: what happened on ONE day (today unless a past day is chosen), per employee, from the real event times in the company time zone. */
+async function Daily({ uid, day }: { uid: string; day: string | null }) {
+  const rows = await dailyReport(uid, day);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: getTimezone() }).format(new Date());
+  const shown = day ?? today;
+  const sum = (f: DailyRow["family"], k: keyof DailyRow) => rows.filter((r) => r.family === f).reduce((a, r) => a + Number(r[k]), 0);
+  const block = (f: DailyRow["family"], title: string) => {
+    const list = rows.filter((r) => r.family === f);
+    return (
+      <Card title={title}>
+        {list.length === 0 ? <p className="text-sm text-ink-500">لا موظفين.</p> : (
+          <Table head={f === "tele" ? ["الموظف", "أضاف", "تواصل مع", "حوّل للسيلز", "قُبل", "رُفض"] : ["الموظف", "استلم", "قبل", "رفض", "حجز اجتماعات"]}>
+            {list.map((r) => (
+              <tr key={r.emp_id}><td className={td + " font-medium"}>{r.emp_name}</td>
+                {f === "tele" ? <><td className={td + " tabular-nums"}>{r.added}</td><td className={td + " tabular-nums"}>{r.contacted}</td><td className={td + " tabular-nums"}>{r.handed}</td><td className={td + " tabular-nums"}>{r.accepted}</td><td className={td + " tabular-nums"}>{r.rejected}</td></>
+                  : <><td className={td + " tabular-nums"}>{r.received}</td><td className={td + " tabular-nums"}>{r.accepted}</td><td className={td + " tabular-nums"}>{r.rejected}</td><td className={td + " tabular-nums"}>{r.meetings_booked}</td></>}
+              </tr>))}
+            <tr className="bg-cream font-bold"><td className={td}>الإجمالي</td>
+              {f === "tele" ? <><td className={td}>{sum(f, "added")}</td><td className={td}>{sum(f, "contacted")}</td><td className={td}>{sum(f, "handed")}</td><td className={td}>{sum(f, "accepted")}</td><td className={td}>{sum(f, "rejected")}</td></>
+                : <><td className={td}>{sum(f, "received")}</td><td className={td}>{sum(f, "accepted")}</td><td className={td}>{sum(f, "rejected")}</td><td className={td}>{sum(f, "meetings_booked")}</td></>}
+            </tr>
+          </Table>)}
+      </Card>);
+  };
+  return (
+    <section className="mb-8" data-testid="daily-results">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-bold">نتائج {shown === today ? "اليوم" : "يوم"} <span dir="ltr" className="tabular-nums">{shown}</span></h2>
+        <form className="flex items-center gap-2" role="search">
+          <input type="date" name="day" defaultValue={shown} max={today} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm" aria-label="اختر اليوم" />
+          <button className="rounded-md border border-line bg-white px-3 py-1.5 text-sm hover:bg-cream">عرض</button>
+        </form>
+        <Link className="text-sm underline" href={`/?day=${shiftDay(shown, -1)}`}>اليوم السابق</Link>
+        {shown !== today && <><Link className="text-sm underline" href={`/?day=${shiftDay(shown, 1)}`}>اليوم التالي</Link><Link className="text-sm underline" href="/">اليوم</Link></>}
+      </div>
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Stat label="عملاء أُضيفوا" value={sum("tele", "added") + sum("sales", "added")} />
+        <Stat label="تواصل معهم" value={sum("tele", "contacted")} />
+        <Stat label="حُوّلوا للسيلز" value={sum("tele", "handed")} />
+        <Stat label="قبلهم السيلز" value={sum("sales", "accepted")} tone="ok" />
+        <Stat label="رفضهم السيلز" value={sum("sales", "rejected")} tone={sum("sales", "rejected") ? "bad" : undefined} />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">{block("tele", "التيلي سيلز — حسب الموظف")}{block("sales", "السيلز — حسب الموظف")}</div>
+      <p className="mt-2 text-xs text-ink-500">الأرقام من وقت الحدث الفعلي بتوقيت الشركة. التقارير الشهرية في الأسفل كما هي.</p>
     </section>
   );
 }

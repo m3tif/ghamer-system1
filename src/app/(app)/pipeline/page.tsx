@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requirePerm, requireSession } from "@/lib/auth";
-import { listDeals } from "@/server/data";
+import { listDeals, filterByClientSearch } from "@/server/data";
+import { SearchBox } from "@/components/search-box";
 import { Empty, PageHeader } from "@/components/ui";
 import { fmtDateTime, fmtMoney } from "@/lib/format";
 import { DEAL_STAGES, DEAL_STAGE, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
@@ -16,12 +17,12 @@ const BAR: Record<string, string> = {
   "Proposal Preparation": "bg-warn", "Proposal Sent": "bg-warn", "Negotiation": "bg-warn", "Follow-up": "bg-warn", "Postponed": "bg-ink-500",
   "Contract Pending": "bg-ok", "Signed / Finance Pending": "bg-ok", "Financially Approved": "bg-ok", "Lost": "bg-bad",
 };
-type SP = { stage?: string; owner?: string };
+type SP = { stage?: string; owner?: string; q?: string };
 
 export default async function Pipeline({ searchParams }: { searchParams: Promise<SP> }) {
   const s = await requireSession(); await requirePerm(s, "deals.view");
   const sp = await searchParams;
-  const all = await listDeals(s.userId);
+  const all = await filterByClientSearch(s.userId, await listDeals(s.userId), sp.q);
   const owners = [...new Map(all.map((d: any) => [d.owner_sales_id, d.owner_name])).entries()] as [string, string][];
   const multi = owners.length > 1;
   const deals = all.filter((d: any) => !sp.owner || d.owner_sales_id === sp.owner);
@@ -31,13 +32,14 @@ export default async function Pipeline({ searchParams }: { searchParams: Promise
   const overdue = deals.filter((d: any) => d.overdue > 0).length;
   const won = deals.filter((d: any) => d.stage === "Financially Approved").length;
   const lost = deals.filter((d: any) => d.stage === "Lost").length;
-  const link = (o: SP) => { const p = new URLSearchParams(); const m = { ...sp, ...o }; if (m.stage) p.set("stage", m.stage); if (m.owner) p.set("owner", m.owner); return `/pipeline${p.size ? `?${p}` : ""}`; };
+  const link = (o: SP) => { const p = new URLSearchParams(); const m = { ...sp, ...o }; if (m.stage) p.set("stage", m.stage); if (m.owner) p.set("owner", m.owner); if (m.q) p.set("q", m.q); return `/pipeline${p.size ? `?${p}` : ""}`; };
   const shown = stage ? [stage] : DEAL_STAGES.filter((st) => deals.some((d: any) => d.stage === st));
   const kpi = "rounded-lg border border-line bg-white px-4 py-3";
   return (
     <>
       <PageHeader title="خط المبيعات" sub="اضغط على أي بطاقة لفتح الصفقة، وعلى اسم العميل لفتح ملفه، وعلى المرحلة لتصفية الخط." />
-      {all.length === 0 ? <Empty title="لا توجد صفقات بعد" hint="تظهر الصفقة تلقائيًا عند قبول عميل من التيلي سيلز أو حجز اجتماع." /> : (<>
+      <SearchBox className="mb-4 max-w-md" />
+      {all.length === 0 ? <Empty title={sp.q ? `لا توجد نتائج لـ «${sp.q}»` : "لا توجد صفقات بعد"} hint="تظهر الصفقة تلقائيًا عند قبول عميل من التيلي سيلز أو حجز اجتماع." /> : (<>
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Link href={link({ stage: undefined })} className={kpi + " hover:border-burgundy-600"}><div className="text-xs text-ink-500">صفقات مفتوحة</div><div className="text-2xl font-bold">{open.length}</div></Link>
           <div className={kpi}><div className="text-xs text-ink-500">القيمة المتوقعة</div><div className="text-2xl font-bold">{value ? fmtMoney(value) : "—"}</div></div>

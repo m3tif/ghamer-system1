@@ -1,4 +1,5 @@
 "use client";
+import { PhoneField } from "@/components/phone-field";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createLeadAction, requestReviewAction } from "@/server/actions";
 import { ActionForm, Alert, CheckGroup, Field, Hidden, SelectField, TextArea, inputCls } from "./forms";
@@ -46,6 +47,7 @@ export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: s
             تنبيه: هذا العميل مسجل بالفعل{state.dup.owner_name ? <> لدى <span className="underline">{state.dup.owner_name}</span></> : null}
           </p>
           <p className="mt-1 text-sm text-ink-500">
+            {state.dup.existing_name && <>العميل المسجل: <b>{state.dup.existing_name}</b>{state.dup.existing_status ? <> · الحالة: {LEAD_STATUS[state.dup.existing_status] ?? state.dup.existing_status}</> : null}{state.dup.existing_added_at ? <> · أضيف {String(state.dup.existing_added_at).slice(0, 10)}</> : null}. </>}
             التطابق في: {state.dup.matched_kinds.map((k) => KIND_AR[k] ?? k).join("، ")}. لم يتم إنشاء سجل جديد.
             {state.dup.ambiguous && " تم العثور على أكثر من عميل مطابق، يلزم مراجعة المدير."}
           </p>
@@ -70,7 +72,7 @@ export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: s
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium">رقم الجوال <span className="text-burgundy-600">*</span></span>
-            <input name="phone" required dir="ltr" inputMode="tel" autoComplete="off" placeholder="05xxxxxxxx" defaultValue={d("phone")} className={inputCls} />
+            <PhoneField name="phone" required defaultValue={d("phone")} />
           </label>
           {!legacy && (<>
             <label className="block">
@@ -107,8 +109,8 @@ export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: s
           <div className="grid gap-4 border-t border-line p-5 md:grid-cols-2 xl:grid-cols-3">
             <Field label="اسم النشاط التجاري" name="business_name" defaultValue={d("business_name")} />
             <Field label="رابط المتجر" name="store_url" dir="ltr" placeholder="https://" defaultValue={d("store_url")} hint="يمكن إدخال أكثر من رابط. تُفحص الروابط لمنع التكرار." />
-            <Field label="رقم بديل" name="alt_phone" dir="ltr" defaultValue={d("alt_phone")} />
-            <Field label="واتساب" name="whatsapp" dir="ltr" defaultValue={d("whatsapp")} />
+            <label className="block"><span className="mb-1 block text-sm font-medium">رقم بديل</span><PhoneField name="alt_phone" defaultValue={d("alt_phone")} /></label>
+            <label className="block"><span className="mb-1 block text-sm font-medium">واتساب</span><PhoneField name="whatsapp" defaultValue={d("whatsapp")} /></label>
             <Field label="النشاط" name="industry" defaultValue={d("industry")} />
             <Field label="الشخص المسؤول" name="contact_person" defaultValue={d("contact_person")} />
             <Field label="المدينة" name="city" defaultValue={d("city")} />

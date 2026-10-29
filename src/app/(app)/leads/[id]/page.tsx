@@ -1,3 +1,4 @@
+import { PhoneField } from "@/components/phone-field";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
@@ -152,9 +153,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                   </ActionForm>
                   <ActionForm action={updateContactsAction} submit="حفظ أرقام الاتصال والروابط" tone="quiet" className="grid gap-4 sm:grid-cols-2">
                     <Hidden name="client_id" value={lead.client_id} /><Hidden name="lead_id" value={id} />
-                    <Field label="الجوال" name="phone" dir="ltr" defaultValue={get("mobile")} required />
-                    <Field label="رقم بديل" name="alt_phone" dir="ltr" defaultValue={get("alt_mobile")} />
-                    <Field label="واتساب" name="whatsapp" dir="ltr" defaultValue={get("whatsapp")} />
+                    <label className="block"><span className="mb-1 block text-sm font-medium">الجوال</span><PhoneField name="phone" defaultValue={get("mobile")} required /></label>
+                    <label className="block"><span className="mb-1 block text-sm font-medium">رقم بديل</span><PhoneField name="alt_phone" defaultValue={get("alt_mobile")} /></label>
+                    <label className="block"><span className="mb-1 block text-sm font-medium">واتساب</span><PhoneField name="whatsapp" defaultValue={get("whatsapp")} /></label>
                     <TextArea label="روابط المتجر" name="store_url" rows={2} defaultValue={stores.map((x: any) => x.url_raw).join("\n")} />
                   </ActionForm>
                 </div>
