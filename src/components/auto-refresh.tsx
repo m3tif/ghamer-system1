@@ -45,7 +45,7 @@ export function AutoRefresh() {
   }, [router]);
 
   return (
-    <div aria-live="off" data-testid="last-update" className="fixed bottom-3 start-3 z-20 rounded-full border border-line bg-white/90 px-3 py-1 text-xs text-ink-500 shadow-sm backdrop-blur">
+    <div aria-live="off" data-testid="last-update" className="fixed bottom-3 end-3 z-20 rounded-full border border-line bg-white/90 px-3 py-1 text-xs text-ink-500 shadow-sm backdrop-blur">
       {offline ? "تعذّر التحديث — سنعيد المحاولة" : updated ? <>آخر تحديث: <span dir="ltr" className="tabular-nums">{updated.toLocaleTimeString("en-GB")}</span></> : "جارٍ التحديث…"}
     </div>
   );
