@@ -2,7 +2,6 @@ import { getSession } from "@/lib/auth";
 import { tx } from "@/lib/db";
 import { mapError } from "@/lib/errors";
 import { MAX_FILE_BYTES, autoMap, buildRows, readTable, sha256 } from "@/lib/import-parse";
-import { asCountry } from "@/lib/normalize";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 const J = (b: unknown, status = 200) => Response.json(b, { status, headers: { "Cache-Control": "no-store" } });
@@ -21,7 +20,7 @@ export async function POST(req: Request) {
   try {
     const buf = Buffer.from(await f.arrayBuffer());
     const { kind, table } = await readTable(buf, f.name);
-    const country = asCountry(String(fd.get("default_country") || "SA"));
+    const country = "SA";
     const map = autoMap(table.headers);
     const rows = buildRows(table, map, country);
     const header = {

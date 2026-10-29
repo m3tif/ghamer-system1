@@ -1,7 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PHONE_COUNTRIES } from "@/lib/normalize";
 import { inputCls } from "@/components/forms";
 
 export function ImportUpload({ owners, fixedOwner }: { owners: { id: string; name: string }[]; fixedOwner?: string }) {
@@ -30,8 +29,6 @@ export function ImportUpload({ owners, fixedOwner }: { owners: { id: string; nam
       ) : <input type="hidden" name="data_owner_id" value={fixedOwner} />}
       <label className="block"><span className="mb-1 block text-sm font-medium">اسم الموظف كما في الملف القديم (اختياري)</span>
         <input name="original_employee_name" className={inputCls} placeholder="يُحفظ كما هو لكل عميل مستورد" maxLength={120} /></label>
-      <label className="block"><span className="mb-1 block text-sm font-medium">دولة الأرقام المحلية (للأرقام بدون +)</span>
-        <select name="default_country" defaultValue="SA" className={inputCls}>{PHONE_COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}</select></label>
       <div className="sm:col-span-2"><button disabled={busy} className="rounded-md bg-burgundy-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{busy ? "جارٍ قراءة الملف وفحصه…" : "رفع وفحص الملف"}</button>
         <span className="ms-3 text-xs text-ink-500">لن يُضاف أي عميل قبل أن تراجع المعاينة وتضغط «ابدأ الاستيراد».</span></div>
     </form>

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { tx } from "@/lib/db";
 import { can, currentTokenHash, ensureEnrollment, hashPassword, login, logout, requireSession, validatePasswordStrength, verifyMfa, verifyPassword, getSession } from "@/lib/auth";
 import { mapError } from "@/lib/errors";
-import { normalizePhone, normalizeStoreUrl, parsePhone, asCountry } from "@/lib/normalize";
+import { normalizeStoreUrl, parsePhoneAny } from "@/lib/normalize";
 import { parseLocal } from "@/lib/format";
 import { FIELDS, buildRows, type Mapping } from "@/lib/import-parse";
 import type { FormState } from "@/lib/form";
@@ -53,7 +53,7 @@ export async function changePasswordAction(_: FormState, fd: FormData): Promise<
 
 // ───────── leads ─────────
 const leadSchema = z.object({
-  name: z.string().min(2, "اسم العميل مطلوب"), source: z.string().min(1, "اختر مصدر العميل"),
+  name: z.string().max(200), source: z.string().min(1, "اختر مصدر العميل"),
 });
 
 function buildContactPayload(fd: FormData): { error?: string; payload?: any } {
@@ -61,11 +61,11 @@ function buildContactPayload(fd: FormData): { error?: string; payload?: any } {
   const seen = new Set<string>();
   for (const [field, label] of [["phone", "mobile"], ["alt_phone", "alt_mobile"], ["whatsapp", "whatsapp"]] as const) {
     const raw = s(fd, field); if (!raw) continue;
-    const pp = parsePhone(raw, asCountry(s(fd, field + "_country") || s(fd, "phone_country")));
-    if (!pp.e164 || !pp.valid) return { error: `رقم غير صالح: ${raw}` };
-    if (seen.has(pp.e164)) continue; seen.add(pp.e164);
-    identifiers.push({ kind: "phone", value: pp.e164, label });
-    contacts.push({ label, phone: pp.e164, is_primary: label === "mobile", phone_raw: raw, phone_country: pp.country });
+    const pp = parsePhoneAny(raw);
+    if (!pp.value) return { error: `رقم غير صالح (يجب أن يكون من 6 إلى 15 رقمًا): ${raw}` };
+    if (seen.has(pp.value)) continue; seen.add(pp.value);
+    identifiers.push({ kind: "phone", value: pp.value, label });
+    contacts.push({ label, phone: pp.value, is_primary: label === "mobile", phone_raw: raw, phone_country: pp.country });
   }
   const urls = s(fd, "store_url").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
   for (const u of urls) {
@@ -493,7 +493,7 @@ export async function remapImportAction(_: FormState, fd: FormData): Promise<For
   const sess = await requireSession(); const id = s(fd, "id");
   const mapping: Mapping = {};
   for (const f of FIELDS) { const v = s(fd, `map_${f.key}`); if (v) mapping[f.key] = v; }
-  mapping.default_country = asCountry(s(fd, "default_country"));
+  mapping.default_country = "SA";
   if (!mapping.name || !mapping.phone) return { error: "حدّد عمودي الاسم ورقم الهاتف" };
   try {
     await tx(sess.userId, async (c) => {
@@ -511,9 +511,9 @@ export async function remapImportAction(_: FormState, fd: FormData): Promise<For
 }
 export async function fixImportRowAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession(); const id = s(fd, "id");
-  const phone = s(fd, "phone"); const pp = phone ? parsePhone(phone, asCountry(s(fd, "phone_country"))) : null;
-  if (phone && !pp?.e164) return { values: vals(fd), error: "رقم غير صالح" };
-  try { await tx(sess.userId, (c) => c.query("select app.import_fix_row($1,$2,$3,$4,$5)", [s(fd, "row"), s(fd, "name") || null, pp?.e164 ?? null, pp?.country ?? null, pp?.valid ?? false])); }
+  const phone = s(fd, "phone"); const pp = phone ? parsePhoneAny(phone) : null;
+  if (phone && !pp?.value) return { values: vals(fd), error: "رقم غير صالح (6 إلى 15 رقمًا)" };
+  try { await tx(sess.userId, (c) => c.query("select app.import_fix_row($1,$2,$3,$4,$5)", [s(fd, "row"), s(fd, "name") || null, pp?.value ?? null, pp?.country ?? null, true])); }
   catch (e) { return fail(e, fd); }
   revalidatePath(`/import/${id}`);
   return { ok: "تم تعديل الصف وإعادة فحصه" };
@@ -543,4 +543,27 @@ export async function updateExistingAction(_: FormState, fd: FormData): Promise<
   try { await tx(sess.userId, (c) => c.query("select app.import_apply_update($1)", [s(fd, "row")])); } catch (e) { return fail(e, fd); }
   revalidatePath(`/import/${id}`);
   return { ok: "تم ملء الحقول الفارغة في العميل الموجود" };
+}
+
+// ───── complete deletion (Super Admin only, deliberate, logged) ─────
+export async function deleteLeadAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const client = s(fd, "client_id");
+  if (!/^[0-9a-f-]{36}$/.test(client)) return { error: "عميل غير صالح" };
+  if (s(fd, "confirm") !== "حذف") return { error: "اكتب كلمة «حذف» للتأكيد", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.delete_client($1,$2)", [client, s(fd, "reason")])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads");
+  flashBack(fd, "lead_deleted", "/leads");
+}
+export async function deleteMonthAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const emp = s(fd, "emp"), month = s(fd, "month");
+  if (!/^[0-9a-f-]{36}$/.test(emp) || !/^\d{4}-\d{2}$/.test(month)) return { error: "اختر موظفًا وشهرًا" };
+  if (s(fd, "confirm") !== "حذف") return { error: "اكتب كلمة «حذف» للتأكيد", values: vals(fd) };
+  let n = 0;
+  try { n = (await tx(sess.userId, (c) => c.query("select app.delete_leads_month($1,$2,$3) n", [emp, `${month}-01`, s(fd, "reason")]))).rows[0].n; }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads");
+  flashBack(fd, "leads_deleted", "/leads");
 }

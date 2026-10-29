@@ -33,6 +33,29 @@ export function parsePhone(raw: string, selectedCountry: CountryCode = "SA"): Ph
   return { e164: p.number, country: p.country ?? selectedCountry, national: p.formatNational(), possible: p.isPossible(), valid: p.isValid() };
 }
 
+/** Countries tried, in this order, to recognise a LOCAL number typed without a country code (the first one it is valid in wins). */
+const GUESS: CountryCode[] = ["SA", "EG", "AE", "KW", "QA", "BH", "OM", "JO", "LB", "IQ", "SY", "PS", "YE", "SD", "LY", "TN", "DZ", "MA", "TR", "GB", "US", "IN", "PK"];
+
+/**
+ * Accepts ANY phone the employee types — no country picker, no "invalid number" error for odd lengths.
+ *  - "+..." or "00..." → international, kept as typed (formatted as E.164 when it is a known valid number).
+ *  - local number → recognised against the common countries (05x → Saudi, 01x → Egypt …) and stored as +code…
+ *  - anything else with 6–15 digits is still accepted and kept as plain digits, so the same typing is still caught as a duplicate.
+ * Only a number with fewer than 6 or more than 15 digits is rejected.
+ */
+export function parsePhoneAny(raw: string): { value: string | null; country: string | null; recognised: boolean } {
+  const cleaned = toLatinDigits(raw ?? "").replace(/[\s\-().\u200f\u200e]/g, "");
+  const digits = cleaned.replace(/\D/g, "");
+  if (digits.length < 6 || digits.length > 15) return { value: null, country: null, recognised: false };
+  if (cleaned.startsWith("+") || cleaned.startsWith("00")) {
+    const p = parsePhoneNumberFromString(cleaned.startsWith("00") ? "+" + cleaned.slice(2) : cleaned);
+    return p?.isValid() ? { value: p.number, country: p.country ?? null, recognised: true }
+                        : { value: "+" + (cleaned.startsWith("00") ? cleaned.slice(2) : cleaned.slice(1)).replace(/\D/g, ""), country: p?.country ?? null, recognised: false };
+  }
+  for (const c of GUESS) { const p = parsePhoneNumberFromString(cleaned, c); if (p?.isValid()) return { value: p.number, country: c, recognised: true }; }
+  return { value: digits, country: null, recognised: false };
+}
+
 /** Countries offered in the phone selector (Gulf + Arab first, then common). Any other country still works by typing +code. */
 export const PHONE_COUNTRIES: { code: CountryCode; dial: string; name: string }[] = [
   { code: "SA", dial: "+966", name: "السعودية" }, { code: "EG", dial: "+20", name: "مصر" },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui";
-import { CopyPhone, HideLead, QuickEdit, SendToSales } from "@/components/leads-cells";
+import { CopyPhone, DeleteLead, HideLead, QuickEdit, SendToSales } from "@/components/leads-cells";
 import { fmtDate, fmtDateTime, toLocalInput } from "@/lib/format";
 import { hostOf, safeHttpUrl } from "@/lib/url";
 import { LEAD_STATUS, LEAD_STATUS_TONE, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
@@ -33,9 +33,9 @@ function SortTh({ label, field, q, sort, dir, className = "" }: { label: string;
   );
 }
 
-export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wide, followLabels, canHide }: {
+export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wide, followLabels, canHide, canDelete = false }: {
   rows: LeadRow[]; q: Q; sort: string; dir: string; canEdit: boolean; canSend: boolean; reps: { id: string; full_name: string }[]; tz: string; wide: boolean;
-  followLabels: Record<string, string>; canHide: boolean;
+  followLabels: Record<string, string>; canHide: boolean; canDelete?: boolean;
 }) {
   return (
     <div className="overflow-auto rounded-lg border border-line bg-white shadow-sm" style={{ maxHeight: "calc(100vh - 290px)" }} tabIndex={0} aria-label="جدول العملاء">
@@ -114,6 +114,7 @@ export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wid
                   <div className="flex items-center gap-1.5">
                     <Link href={`/leads/${r.id}`} className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium hover:bg-cream">فتح</Link>
                     {canHide && <HideLead leadId={r.id} name={r.name} hidden={!!r.hidden_at} className="!px-2.5 !py-1 !text-xs" />}
+                    {canDelete && <DeleteLead clientId={r.client_id} name={r.name} className="!px-2.5 !py-1 !text-xs" />}
                     {sendable && <SendToSales leadId={r.id} name={r.name} currentStatus={r.lead_status} reps={reps} className="!px-2.5 !py-1 !text-xs" />}
                   </div>
                 </td>

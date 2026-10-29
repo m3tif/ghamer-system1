@@ -8,7 +8,6 @@ import { ActionForm, Field, Hidden } from "@/components/forms";
 import { PhoneField } from "@/components/phone-field";
 import { RunImport } from "@/components/import-client";
 import { FIELDS } from "@/lib/import-parse";
-import { PHONE_COUNTRIES } from "@/lib/normalize";
 import { fmtDateTime } from "@/lib/format";
 import { IMPORT_STATUS as ST } from "@/lib/import-labels";
 
@@ -52,8 +51,6 @@ export default async function ImportBatch({ params, searchParams }: { params: Pr
                 <label key={f.key} className="block"><span className="mb-1 block text-sm font-medium">{f.label}{f.required && <b className="text-burgundy-600"> *</b>}</span>
                   <select name={`map_${f.key}`} defaultValue={b.mapping?.[f.key] ?? ""} className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"><option value="">— غير موجود —</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</select>
                   <span className="text-xs text-ink-500">{f.hint}</span></label>))}
-              <label className="block"><span className="mb-1 block text-sm font-medium">دولة الأرقام المحلية</span>
-                <select name="default_country" defaultValue={b.default_country} className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm">{PHONE_COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}</select></label>
             </ActionForm>
           </Card>
           <Card title="الخطوة 2 — تأكيد الاستيراد">

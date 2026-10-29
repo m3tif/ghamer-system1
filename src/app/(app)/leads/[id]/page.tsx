@@ -2,7 +2,7 @@ import { PhoneField } from "@/components/phone-field";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
-import { HideLead } from "@/components/leads-cells";
+import { DeleteLead, HideLead } from "@/components/leads-cells";
 import { assignable, employeeList, getLead, salesReps } from "@/server/data";
 import { meetingFlags } from "@/server/meeting-rules";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -48,6 +48,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {lead.lead_temperature && <Badge tone={TEMPERATURE_TONE[lead.lead_temperature]}>{TEMPERATURE[lead.lead_temperature]}</Badge>}
           {lead.hidden_at && <Badge tone="bad">مخفي عن الموظفين</Badge>}
           {["super_admin", "general_manager", "tele_sales_manager", "sales_manager"].includes(s.role) && <HideLead leadId={id} name={lead.name} hidden={!!lead.hidden_at} />}
+          {s.role === "super_admin" && <DeleteLead clientId={lead.client_id} name={lead.name} />}
           {deal && can(s, "deals.view") && <Link className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream" href={`/deals/${deal.id}`}>فتح الصفقة</Link>}
         </>} />
 

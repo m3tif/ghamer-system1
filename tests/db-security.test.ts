@@ -13,16 +13,15 @@ describe("duplicate prevention", () => {
     expect(r.rows[0].original_creator_id).toBe(ids.tele1);
     expect(r.rows[0].current_owner_id).toBe(ids.tele1);
   });
-  it("blocks the same phone in another format by another employee and reveals only the owner name", async () => {
+  it("blocks the same phone in another format by another employee and reveals only the owner, status and name — nothing else", async () => {
     const d = await register("tele2", leadPayload({ name: "اسم مختلف", phone: "+966501234567" }));
     expect(d.status).toBe("duplicate");
     expect(d.owner_name).toBe("سارة");
-    expect(Object.keys(d).sort()).toEqual(["ambiguous", "existing_client_id", "matched_kinds", "owner_name", "status"]);
+    expect(Object.keys(d).sort()).toEqual(["ambiguous", "existing_added_at", "existing_client_id", "existing_name", "existing_status", "matched_kinds", "owner_name", "status"]);
   });
-  it("blocks the same store with different www/params/case", async () => {
+  it("a store link alone never blocks (only the phone number is the duplicate rule)", async () => {
     const d = await register("sales1", leadPayload({ name: "x", phone: "0559999999", store: "ROSES.com.sa/products?fbclid=9" }));
-    expect(d.status).toBe("duplicate");
-    expect(d.matched_kinds).toContain("store");
+    expect(d.status).toBe("created");
   });
   it("matches alternative numbers too", async () => {
     await register("tele1", leadPayload({ name: "عميل بديل", phone: "0502222222", alt: "0503333333" }));

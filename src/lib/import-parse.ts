@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { createHash } from "node:crypto";
-import { asCountry, normalizeStoreUrl, parsePhone, toLatinDigits } from "@/lib/normalize";
+import { normalizeStoreUrl, parsePhoneAny, toLatinDigits } from "@/lib/normalize";
 
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;       // Vercel request bodies are limited to ~4.5MB
 export const MAX_ROWS = 20000, MAX_COLS = 40;
@@ -112,18 +112,18 @@ export function parseDate(raw: string): string | null {
 export function buildRows(table: Table, map: Mapping, defaultCountry: string) {
   const idx = (k: FieldKey) => (map[k] ? table.headers.indexOf(map[k]!) : -1);
   const I = Object.fromEntries(FIELDS.map((f) => [f.key, idx(f.key)])) as Record<FieldKey, number>;
-  const country = asCountry(defaultCountry);
+  void defaultCountry;
   const get = (r: string[], k: FieldKey) => (I[k] >= 0 ? (r[I[k]] ?? "").trim() : "");
   return table.rows.map((r, i) => {
     const phoneRaw = get(r, "phone"), alt = get(r, "alt_phone"), store = get(r, "store_url"), dateRaw = get(r, "added_date");
-    const pp = phoneRaw ? parsePhone(phoneRaw, country) : null;
-    const pa = alt ? parsePhone(alt, country) : null;
+    const pp = phoneRaw ? parsePhoneAny(phoneRaw) : null;
+    const pa = alt ? parsePhoneAny(alt) : null;
     const sk = store ? normalizeStoreUrl(store) : null;
     const raw: Record<string, string> = {}; table.headers.forEach((h, j) => { if (r[j]) raw[h] = r[j]; });
     return {
       row_no: i + 2, raw, name: get(r, "name"), business_name: get(r, "business_name"),
-      phone_raw: phoneRaw, phone_e164: pp?.e164 && (pp.valid || pp.possible) ? pp.e164 : null, phone_country: pp?.country ?? null, phone_valid: !!pp?.valid,
-      alt_e164: pa?.valid ? pa.e164 : null, alt_country: pa?.valid ? pa.country : null,
+      phone_raw: phoneRaw, phone_e164: pp?.value ?? null, phone_country: pp?.country ?? null, phone_valid: !!pp?.value,
+      alt_e164: pa?.value ?? null, alt_country: pa?.country ?? null,
       store_url: store, store_key: sk?.key ?? null, source: get(r, "source"), status_text: get(r, "status"), notes: get(r, "notes"),
       original_added: parseDate(dateRaw), date_text: dateRaw || null,
     };

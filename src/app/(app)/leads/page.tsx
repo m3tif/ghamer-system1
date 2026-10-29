@@ -5,7 +5,7 @@ import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/compon
 import { SearchBox } from "@/components/search-box";
 import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
-import { HideMonth } from "@/components/leads-cells";
+import { DeleteMonth, HideMonth } from "@/components/leads-cells";
 import { inputCls } from "@/components/forms";
 import { fmtDate, fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
 import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, MEETING_STATUS, TEMPERATURE } from "@/lib/labels";
@@ -95,9 +95,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
             <span className="text-ink-500">إجراء جماعي لهذا الموظف والشهر:</span>
             <HideMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} hide={hiddenF !== "hidden"} count={total} />
+            {s.role === "super_admin" && <DeleteMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} count={total} />}
           </div>)}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
-          <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide} followLabels={followLabels} />)}
+          <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide} followLabels={followLabels} />)}
         <Pager base={base} page={page} total={total} size={size} />
       </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>

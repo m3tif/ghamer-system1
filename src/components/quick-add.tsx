@@ -30,8 +30,8 @@ export function QuickAdd({ today }: { today: string }) {
         </p>)}
       <form key={key} action={action} className="grid grid-cols-2 items-end gap-2 lg:grid-cols-[1.3fr_1fr_1.3fr_auto]">
         <input type="hidden" name="request_id" value={rid} suppressHydrationWarning />
-        <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">اسم العميل <b className="text-burgundy-600">*</b></span>
-          <input ref={nameRef} name="name" required autoComplete="off" defaultValue={v.name ?? ""} className={inputCls} placeholder="اسم العميل" /></label>
+        <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">اسم العميل (اختياري)</span>
+          <input ref={nameRef} name="name" autoComplete="off" defaultValue={v.name ?? ""} className={inputCls} placeholder="اسم العميل" /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رقم الجوال <b className="text-burgundy-600">*</b></span>
           <PhoneField name="phone" required compact defaultValue={v.phone ?? ""} /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رابط المتجر (اختياري)</span>
@@ -51,7 +51,7 @@ export function QuickAdd({ today }: { today: string }) {
             <input name="call_notes" autoComplete="off" defaultValue={v.call_notes ?? ""} className={inputCls} /></label>
         </div>
       </form>
-      <p className="mt-2 text-xs text-ink-500">تاريخ ووقت التسجيل واسمك بيتسجلوا تلقائيًا ({today}). الاسم والرقم بس هما المطلوبين، ويتفحص التكرار قبل الحفظ.</p>
+      <p className="mt-2 text-xs text-ink-500">تاريخ ووقت التسجيل واسمك بيتسجلوا تلقائيًا ({today}). الرقم هو المطلوب الوحيد، ويتفحص التكرار قبل الحفظ.</p>
     </section>
   );
 }

@@ -67,8 +67,8 @@ export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: s
         {legacy && <input type="hidden" name="mode" value="existing" />}
         <section className="grid gap-4 rounded-lg border border-line bg-white p-5 md:grid-cols-2 xl:grid-cols-3">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">اسم العميل <span className="text-burgundy-600">*</span></span>
-            <input ref={nameRef} name="name" required autoFocus autoComplete="off" defaultValue={d("name")} className={inputCls} />
+            <span className="mb-1 block text-sm font-medium">اسم العميل (اختياري)</span>
+            <input ref={nameRef} name="name" autoFocus autoComplete="off" defaultValue={d("name")} className={inputCls} />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium">رقم الجوال <span className="text-burgundy-600">*</span></span>

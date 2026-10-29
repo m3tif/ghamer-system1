@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/dialog";
 import { ReturnTo } from "@/components/flash";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
-import { handoffAction, hideLeadAction, hideMonthAction, quickEditAction } from "@/server/actions";
+import { deleteLeadAction, deleteMonthAction, handoffAction, hideLeadAction, hideMonthAction, quickEditAction } from "@/server/actions";
 import { LEAD_STATUS, TEMPERATURE } from "@/lib/labels";
 
 const EDIT_STATUS = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
@@ -78,6 +78,32 @@ export function HideMonth({ emp, empName, month, hide, count }: { emp: string; e
         <Hidden name="emp" value={emp} /><Hidden name="month" value={month} /><Hidden name="hide" value={hide ? "1" : "0"} />
         <p className="text-sm">{hide ? `سيُخفى عن ${empName} كل ما أضافه في ${month}` : `سيُظهر لـ ${empName} كل ما أُخفي من إضافاته في ${month}`}{count ? ` (${count} في القائمة الحالية)` : ""}. لا يُحذف شيء ويمكن التراجع.</p>
         {hide && <TextArea label="السبب (اختياري)" name="reason" rows={2} />}
+      </ActionForm>
+    </Dialog>
+  );
+}
+
+export function DeleteLead({ clientId, name, className = "" }: { clientId: string; name: string; className?: string }) {
+  return (
+    <Dialog trigger="حذف" title={`حذف نهائي: ${name}`} triggerClass={className} tone="danger">
+      <ActionForm action={deleteLeadAction} submit="حذف العميل نهائيًا" className="grid gap-4">
+        <Hidden name="client_id" value={clientId} /><ReturnTo />
+        <p className="text-sm text-bad">سيُحذف العميل وكل ما يخصه (النشاطات، المتابعات، الاجتماعات، الصفقة، التحويلات) ولا يمكن التراجع. الرقم يتحرر ويمكن تسجيله من جديد. العملية تُسجَّل في سجل التدقيق.</p>
+        <TextArea label="السبب" name="reason" rows={2} required />
+        <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
+      </ActionForm>
+    </Dialog>
+  );
+}
+
+export function DeleteMonth({ emp, empName, month, count }: { emp: string; empName: string; month: string; count: number }) {
+  return (
+    <Dialog trigger={`حذف نهائي لعملاء ${empName} لشهر ${month}`} title="حذف شهر كامل نهائيًا" tone="danger">
+      <ActionForm action={deleteMonthAction} submit="حذف كل عملاء هذا الشهر نهائيًا" className="grid gap-4">
+        <Hidden name="emp" value={emp} /><Hidden name="month" value={month} /><ReturnTo />
+        <p className="text-sm text-bad">سيُحذف نهائيًا كل ما أضافه {empName} في {month}{count ? ` (${count} في القائمة الحالية)` : ""} مع كل ما يخصه، ولا يمكن التراجع.</p>
+        <TextArea label="السبب" name="reason" rows={2} required />
+        <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
       </ActionForm>
     </Dialog>
   );
