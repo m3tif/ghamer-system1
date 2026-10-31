@@ -1,3 +1,4 @@
+import { PageJump } from "@/components/page-jump";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -69,14 +70,15 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
   );
 }
 export const td = "px-4 py-3.5 align-top";
-export function Pager({ base, page, total, size = 20 }: { base: string; page: number; total: number; size?: number }) {
+export function Pager({ base, page, total, size = 20, jump = false }: { base: string; page: number; total: number; size?: number; jump?: boolean }) {
   const pages = Math.max(1, Math.ceil(total / size));
   if (pages <= 1) return null;
   const sep = base.includes("?") ? "&" : "?";
   return (
     <nav className="mt-4 flex items-center justify-between text-sm" aria-label="الصفحات">
       <span className="text-ink-500">صفحة {page} من {pages} · {total} سجل</span>
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
+        {jump && <PageJump base={base} page={page} pages={pages} />}
         {page > 1 && <Link className={btnQuiet} href={`${base}${sep}page=${page - 1}`}>السابق</Link>}
         {page < pages && <Link className={btnQuiet} href={`${base}${sep}page=${page + 1}`}>التالي</Link>}
       </div>

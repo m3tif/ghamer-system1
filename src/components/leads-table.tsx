@@ -7,8 +7,8 @@ import { LEAD_STATUS, LEAD_STATUS_TONE, TEMPERATURE, TEMPERATURE_TONE } from "@/
 import type { LeadRow } from "@/server/data";
 
 type Q = Record<string, string | undefined>;
-const th = "sticky top-0 z-20 whitespace-nowrap border-b border-l border-white/10 bg-charcoal px-3 py-2.5 text-start text-xs font-semibold text-white";
-const cell = "border-b border-l border-line px-3 py-2 align-middle text-sm";
+const th = "whitespace-nowrap border-b border-l border-white/10 bg-charcoal px-2.5 py-2 text-start text-xs font-semibold text-white";
+const cell = "border-b border-l border-line px-2.5 py-1 align-middle text-[13px] leading-5";
 const SENDABLE_DEAD = ["Not Interested", "Invalid Contact", "Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"];
 
 /** Builds a /leads link that keeps the current filters and changes `over` (page always resets). */
@@ -38,7 +38,7 @@ export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wid
   followLabels: Record<string, string>; canHide: boolean; canDelete?: boolean;
 }) {
   return (
-    <div className="overflow-auto rounded-lg border border-line bg-white shadow-sm" style={{ maxHeight: "calc(100vh - 290px)" }} tabIndex={0} aria-label="جدول العملاء">
+    <div id="leads-table" className="overflow-x-auto rounded-lg border border-line bg-white shadow-sm" tabIndex={0} aria-label="جدول العملاء">
       <table className="w-full min-w-[1480px] border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
@@ -65,10 +65,15 @@ export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wid
             const sendable = canSend && !r.handed_off && !SENDABLE_DEAD.includes(r.lead_status);
             const editable = canEdit;
             return (
-              <tr key={r.id} className={`${zebra} hover:bg-burgundy-600/5`}>
+              <tr key={r.id} data-row data-name={r.name} data-phone={r.phone ?? ""} data-store={r.store_url ?? ""} data-status={LEAD_STATUS[r.lead_status] ?? r.lead_status}
+                data-notes={r.call_notes ?? ""} data-creator={r.creator_name ?? ""} data-date={fmtDate(r.created_at)} className={`${zebra} hover:bg-burgundy-600/5`}>
                 <td className={`${cell} sticky right-0 z-10 min-w-52 ${zebra} font-semibold`}>
-                  <Link href={`/leads/${r.id}`} className="text-burgundy-600 hover:underline">{r.name}</Link>
-                  {r.business_name && <div className="text-xs font-normal text-ink-500">{r.business_name}</div>}
+                  <div className="flex items-center gap-1.5">
+                    <input type="checkbox" className="row-sel h-4 w-4 shrink-0 accent-burgundy-600" aria-label={`تحديد الصف ${i + 1}`} />
+                    <span className="w-5 shrink-0 text-start text-[11px] font-normal text-ink-300" aria-hidden>{i + 1}</span>
+                    <Link href={`/leads/${r.id}`} className="truncate text-burgundy-600 hover:underline">{r.name}</Link>
+                  </div>
+                  {r.business_name && <div className="ps-[2.9rem] text-[11px] font-normal text-ink-500">{r.business_name}</div>}
                   {r.hidden_at && <div className="mt-0.5"><Badge tone="bad">مخفي عن الموظفين</Badge><span className="ms-1 text-[11px] font-normal text-ink-500" title={r.hidden_reason ?? ""}>{r.hidden_by_name}</span></div>}
                 </td>
                 <td className={`${cell} max-w-56`}>
@@ -88,10 +93,10 @@ export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wid
                 <td className={`${cell} max-w-72`}>
                   {editable ? (
                     <QuickEdit lead={{ id: r.id, name: r.name, lead_status: r.lead_status, lead_temperature: r.lead_temperature, call_notes: r.call_notes, next_followup_at: r.next_followup_at, handed_off: r.handed_off }}
-                      followupLabel={followLabels[r.id]} className="!block !w-full !whitespace-normal !border-transparent !bg-transparent !p-1 !text-start !font-normal hover:!bg-cream">
-                      {r.call_notes ? <span className="line-clamp-2 text-start">{r.call_notes}</span> : <span className="text-ink-300">＋ أضف ملاحظة</span>}
+                      followupLabel={followLabels[r.id]} className="!block !w-full !whitespace-normal !border-transparent !bg-transparent !px-1 !py-0 !text-start !font-normal hover:!bg-cream">
+                      {r.call_notes ? <span className="line-clamp-1 text-start">{r.call_notes}</span> : <span className="text-ink-300">＋ أضف ملاحظة</span>}
                     </QuickEdit>
-                  ) : r.call_notes ? <span className="line-clamp-2">{r.call_notes}</span> : <span className="text-ink-300">—</span>}
+                  ) : r.call_notes ? <span className="line-clamp-1">{r.call_notes}</span> : <span className="text-ink-300">—</span>}
                 </td>
                 <td className={`${cell} whitespace-nowrap`}>
                   {r.dup_attempts > 0
@@ -112,10 +117,10 @@ export function LeadsTable({ rows, q, sort, dir, canEdit, canSend, reps, tz, wid
                 </td>
                 <td className={`${cell} whitespace-nowrap`}>
                   <div className="flex items-center gap-1.5">
-                    <Link href={`/leads/${r.id}`} className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium hover:bg-cream">فتح</Link>
-                    {canHide && <HideLead leadId={r.id} name={r.name} hidden={!!r.hidden_at} className="!px-2.5 !py-1 !text-xs" />}
-                    {canDelete && <DeleteLead clientId={r.client_id} name={r.name} className="!px-2.5 !py-1 !text-xs" />}
-                    {sendable && <SendToSales leadId={r.id} name={r.name} currentStatus={r.lead_status} reps={reps} className="!px-2.5 !py-1 !text-xs" />}
+                    <Link href={`/leads/${r.id}`} className="rounded-md border border-line bg-white px-2 py-0.5 text-xs font-medium hover:bg-cream">فتح</Link>
+                    {canHide && <HideLead leadId={r.id} name={r.name} hidden={!!r.hidden_at} className="!px-2 !py-0.5 !text-xs" />}
+                    {canDelete && <DeleteLead clientId={r.client_id} name={r.name} className="!px-2 !py-0.5 !text-xs" />}
+                    {sendable && <SendToSales leadId={r.id} name={r.name} currentStatus={r.lead_status} reps={reps} className="!px-2 !py-0.5 !text-xs" />}
                   </div>
                 </td>
               </tr>);

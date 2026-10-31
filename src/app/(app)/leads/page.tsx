@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { addedCounts, employeeList, listLeads, myOutcomes, PAGE_SIZES, salesReps } from "@/server/data";
 import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/components/ui";
 import { SearchBox } from "@/components/search-box";
 import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
+import { CopyToolbar } from "@/components/copy-toolbar";
 import { DeleteMonth, HideMonth } from "@/components/leads-cells";
 import { inputCls } from "@/components/forms";
 import { fmtDate, fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
@@ -42,6 +44,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     canHand ? salesReps(s.userId) : [],
   ]);
   const { rows, total, page } = list;
+  if (tab === "mine" && rows.length === 0 && page > 1) {
+    // typed/old page number beyond the end → go to the last real page (total is derived from rows, so ask page 1)
+    const first = await listLeads(s.userId, { q: sp.q, status, page: 1, size, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF });
+    const last = Math.max(1, Math.ceil(Number(first.total) / size));
+    const keep = Object.entries({ q: sp.q, status, month: sp.month, creator, sales: salesF, temp, sort: sp.sort, dir: sp.dir, size: sp.size, hidden: hiddenF }).filter((e): e is [string, string] => !!e[1]);
+    redirect(`/leads?${new URLSearchParams([...keep, ["page", String(last)]])}`);
+  }
   const tz = tzLabel(getTimezone());
   const q = { q: sp.q, status, month: sp.month, creator, sales: salesF, temp, sort: sp.sort ? sort : undefined, dir: sp.dir ? dir : undefined, size: sp.size ? String(size) : undefined, hidden: hiddenF };
   const qs = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1])).toString();
@@ -97,9 +106,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <HideMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} hide={hiddenF !== "hidden"} count={total} />
             {s.role === "super_admin" && <DeleteMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} count={total} />}
           </div>)}
+        {rows.length > 0 && <CopyToolbar />}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
           <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide} followLabels={followLabels} />)}
-        <Pager base={base} page={page} total={total} size={size} />
+        <Pager base={base} page={page} total={total} size={size} jump />
       </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (

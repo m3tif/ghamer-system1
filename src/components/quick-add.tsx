@@ -6,6 +6,35 @@ import { Toast } from "@/components/lead-form";
 import { inputCls } from "@/components/forms";
 import { LEAD_STATUS, SOURCES, TEMPERATURE } from "@/lib/labels";
 import type { FormState } from "@/lib/form";
+import Link from "next/link";
+
+type DupHit = { exists: boolean; visible: boolean; lead_id?: string; name?: string; status?: string; owner?: string };
+type DupResult = { phone?: DupHit; store?: DupHit };
+
+/** Debounced live duplicate check (same normalisation + same database as saving). Read-only; shows only what the user may see. */
+function useDupCheck(phone: string, store: string) {
+  const [res, setRes] = useState<DupResult>({});
+  useEffect(() => {
+    const p = phone.trim(), s = store.trim();
+    if (p.length < 6 && s.length < 4) { setRes({}); return; }
+    const ctl = new AbortController();
+    const h = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/dupcheck?${new URLSearchParams({ phone: p, store: s })}`, { signal: ctl.signal, cache: "no-store" });
+        const j = await r.json(); if (j.ok) setRes(j.result ?? {});
+      } catch { /* offline / aborted: the server still checks on save */ }
+    }, 450);
+    return () => { clearTimeout(h); ctl.abort(); };
+  }, [phone, store]);
+  return res;
+}
+function DupNote({ hit, what }: { hit?: DupHit; what: string }) {
+  if (!hit?.exists) return null;
+  return (
+    <p role="status" data-dup={what} className="mt-1 rounded border border-warn/40 bg-warn/5 px-2 py-1 text-[11px] leading-4 text-warn">
+      ⚠ {what} مسجل بالفعل{hit.visible && hit.name ? <> باسم «{hit.name}»{hit.owner ? ` لدى ${hit.owner}` : ""}{hit.lead_id && <> — <Link href={`/leads/${hit.lead_id}`} className="underline">فتح</Link></>}</> : null}.
+    </p>);
+}
 
 const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "00000000-0000-4000-8000-000000000000");
 const STATUSES = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Qualified Lead"];
@@ -17,7 +46,9 @@ export function QuickAdd({ today }: { today: string }) {
   const [key, setKey] = useState(0);
   const [more, setMore] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (state.toast) { setRid(uuid()); setKey((k) => k + 1); } }, [state]);
+  const [phoneVal, setPhoneVal] = useState(""); const [storeVal, setStoreVal] = useState("");
+  const dup = useDupCheck(phoneVal, storeVal);
+  useEffect(() => { if (state.toast) { setRid(uuid()); setKey((k) => k + 1); setPhoneVal(""); setStoreVal(""); } }, [state]);
   useEffect(() => { if (key > 0) nameRef.current?.focus(); }, [key]);
   const v = state.values ?? {};
   return (
@@ -33,9 +64,9 @@ export function QuickAdd({ today }: { today: string }) {
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">اسم العميل (اختياري)</span>
           <input ref={nameRef} name="name" autoComplete="off" defaultValue={v.name ?? ""} className={inputCls} placeholder="اسم العميل" /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رقم الجوال <b className="text-burgundy-600">*</b></span>
-          <PhoneField name="phone" required compact defaultValue={v.phone ?? ""} /></label>
+          <PhoneField name="phone" required compact defaultValue={v.phone ?? ""} onValue={setPhoneVal} /><DupNote hit={dup.phone} what="الرقم" /></label>
         <label className="col-span-2 lg:col-span-1"><span className="mb-1 block text-xs font-medium">رابط المتجر (اختياري)</span>
-          <input name="store_url" dir="ltr" autoComplete="off" defaultValue={v.store_url ?? ""} className={inputCls} placeholder="https://" /></label>
+          <input name="store_url" dir="ltr" autoComplete="off" defaultValue={v.store_url ?? ""} onChange={(e) => setStoreVal(e.target.value)} className={inputCls} placeholder="https://" /><DupNote hit={dup.store} what="الرابط" /></label>
         <div className="col-span-2 flex items-center gap-2 lg:col-span-1">
           <button disabled={pending} className="flex-1 rounded-md bg-burgundy-600 px-5 py-2 text-sm font-semibold text-white hover:bg-burgundy-700 disabled:opacity-60">{pending ? "جارٍ الحفظ…" : "+ إضافة"}</button>
           <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="rounded-md border border-line px-3 py-2 text-sm hover:bg-cream">{more ? "أقل" : "المزيد"}</button>
