@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/meetings", label: "الاجتماعات", show: can(s, "meetings.view") },
     { href: "/pipeline", label: "خط المبيعات", show: can(s, "deals.view") },
     { href: "/distribution", label: "توزيع العملاء", show: can(s, "leads.distribute") },
+    { href: "/bulk-distribution", label: "استيراد وتوزيع العملاء", show: can(s, "leads.bulk_distribute") },
     { href: "/follow-ups", label: "المتابعات", show: can(s, "followups.manage") },
     { href: "/targets", label: "التارجت", show: can(s, "targets.view") },
     { href: "/archive", label: "الأرشيف الشهري", show: can(s, "leads.view") || can(s, "leads.create") },

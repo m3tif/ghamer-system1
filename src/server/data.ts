@@ -266,3 +266,13 @@ export async function importRows(uid: string, id: string, status: string | null,
   const r = await tx(uid, (c) => c.query("select * from app.import_rows_page($1,$2,$3,$4)", [id, status, size, (page - 1) * size]));
   return { rows: r.rows as any[], total: Number(r.rows[0]?.total ?? 0) };
 }
+
+// ───── bulk distribution ─────
+export async function distCandidates(uid: string) { return (await tx(uid, (c) => c.query("select * from app.dist_candidates()"))).rows as { id: string; full_name: string; open_leads: number }[]; }
+export async function distList(uid: string) { return (await tx(uid, (c) => c.query("select * from app.dist_list(100)"))).rows as any[]; }
+export async function distGet(uid: string, id: string) { return (await tx(uid, (c) => c.query("select * from app.dist_get($1)", [id]))).rows[0] as any | undefined; }
+export async function distBreakdown(uid: string, id: string) { return (await tx(uid, (c) => c.query("select * from app.dist_breakdown($1)", [id]))).rows as any[]; }
+export async function distRows(uid: string, id: string, status: string | null, page: number, size = 50) {
+  const r = await tx(uid, (c) => c.query("select * from app.dist_rows_page($1,$2,$3,$4)", [id, status, size, (page - 1) * size]));
+  return { rows: r.rows as any[], total: Number(r.rows[0]?.total ?? 0) };
+}

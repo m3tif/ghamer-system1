@@ -16,6 +16,8 @@ export async function setupDb(dbName = "ghamer_test") {
   await migrate(`${BASE}/${dbName}`, APP_PW);
   admin = new Client({ connectionString: `${BASE}/${dbName}` });
   await admin.connect();
+  // tests compute "this month" with the JS UTC clock; set TEST_TZ=UTC to avoid false failures in the hours around midnight when the company timezone is already on the next day
+  if (process.env.TEST_TZ) await admin.query("insert into settings(key, value) values ('timezone', to_jsonb($1::text)) on conflict (key) do update set value = excluded.value", [process.env.TEST_TZ]);
   process.env.DATABASE_URL = `postgres://ghamer_app:${APP_PW}@${new URL(BASE).host}/${dbName}`;
 
   const mk = async (key: string, role: string, name: string, manager?: string) => {

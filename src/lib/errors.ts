@@ -39,6 +39,9 @@ const MAP: [RegExp, string][] = [
   [/cannot delete self/i, "لا يمكنك حذف حسابك بنفسك"],
   [/last super admin/i, "لا يمكن حذف آخر مدير نظام"],
   [/employee not found/i, "الموظف غير موجود"],
+  [/choose employees/i, "اختر موظفًا واحدًا على الأقل"],
+  [/nothing to distribute/i, "لا يوجد عملاء جدد قابلون للتوزيع (الكل مكرر أو غير صالح)"],
+  [/batch is not runnable/i, "هذه العملية نُفّذت أو أُلغيت بالفعل ولا يمكن تنفيذها مرة ثانية"],
   [/cannot change own status/i, "لا يمكنك تغيير حالة حسابك بنفسك"],
 ];
 export function mapError(e: unknown): string {

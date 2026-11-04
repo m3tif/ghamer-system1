@@ -576,3 +576,36 @@ export async function deleteEmployeeAction(_: FormState, fd: FormData): Promise<
   revalidatePath("/employees");
   return { ok: "تم حذف الموظف نهائيًا (والعملية مسجلة في سجل التدقيق)" };
 }
+
+// ───── bulk distribution (Admin / Sales Manager) ─────
+export async function remapDistributionAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  const mapping: Mapping = {};
+  for (const f of FIELDS) { const v = s(fd, `map_${f.key}`); if (v) mapping[f.key] = v; }
+  if (!mapping.phone) return { error: "حدّد عمود رقم الهاتف" };
+  try {
+    await tx(sess.userId, async (c) => {
+      const meta = (await c.query("select mapping from app.dist_get($1)", [id])).rows[0];
+      if (!meta) throw new Error("not found or no access");
+      const headers: string[] = meta.mapping.headers ?? [];
+      const raws = (await c.query("select row_no, raw from app.dist_raw_rows($1)", [id])).rows as { row_no: number; raw: Record<string, string> }[];
+      const table = { headers, rows: raws.map((r) => headers.map((h) => r.raw[h] ?? "")) };
+      const rows = buildRows(table, mapping, "SA").map((r, i) => ({ ...r, row_no: raws[i].row_no }));
+      await c.query("select app.dist_apply_mapping($1,$2::jsonb,$3::jsonb)", [id, JSON.stringify({ ...mapping, headers }), JSON.stringify(rows.map(({ raw, ...x }) => x))]);
+    });
+  } catch (e) { return fail(e, fd); }
+  revalidatePath(`/bulk-distribution/${id}`);
+  return { ok: "تم تطبيق ربط الأعمدة وإعادة الفحص" };
+}
+export async function skipDistributionRowAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  try { await tx(sess.userId, (c) => c.query("select app.dist_skip_row($1,$2)", [s(fd, "row"), s(fd, "skip") !== "0"])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath(`/bulk-distribution/${id}`);
+  return { ok: s(fd, "skip") === "0" ? "أُعيد الصف" : "تم استبعاد الصف من التوزيع" };
+}
+export async function cancelDistributionAction(fd: FormData): Promise<void> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  await tx(sess.userId, (c) => c.query("select app.dist_cancel($1)", [id]));
+  redirect("/bulk-distribution");
+}

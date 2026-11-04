@@ -47,7 +47,7 @@ export default async function ImportBatch({ params, searchParams }: { params: Pr
           <Card title="الخطوة 1 — ربط الأعمدة">
             <ActionForm action={remapImportAction} submit="تطبيق الربط وإعادة الفحص" tone="quiet" className="grid gap-3 sm:grid-cols-2">
               <Hidden name="id" value={id} />
-              {FIELDS.map((f) => (
+              {FIELDS.filter((f) => !f.distOnly).map((f) => (
                 <label key={f.key} className="block"><span className="mb-1 block text-sm font-medium">{f.label}{f.required && <b className="text-burgundy-600"> *</b>}</span>
                   <select name={`map_${f.key}`} defaultValue={b.mapping?.[f.key] ?? ""} className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"><option value="">— غير موجود —</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</select>
                   <span className="text-xs text-ink-500">{f.hint}</span></label>))}

@@ -5,8 +5,9 @@ import { normalizeStoreUrl, parsePhoneAny, toLatinDigits } from "@/lib/normalize
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;       // Vercel request bodies are limited to ~4.5MB
 export const MAX_ROWS = 20000, MAX_COLS = 40;
 
-export type FieldKey = "name" | "phone" | "alt_phone" | "business_name" | "store_url" | "source" | "status" | "notes" | "added_date";
-export const FIELDS: { key: FieldKey; label: string; required?: boolean; hint: string; names: string[] }[] = [
+export type FieldKey = "hunter" | "name" | "phone" | "alt_phone" | "business_name" | "store_url" | "source" | "status" | "notes" | "added_date";
+export const FIELDS: { key: FieldKey; label: string; required?: boolean; hint: string; names: string[]; distOnly?: boolean }[] = [
+  { key: "hunter", label: "اسم Hunter", hint: "اختياري: من جمع العميل في الملف (يُحفظ كما هو)", distOnly: true, names: ["hunter", "hunter name", "hunt by", "hunted by", "اسم hunter", "هنتر", "الهنتر", "اسم الهنتر", "hunter (أضافه)"] },
   { key: "name", label: "اسم العميل", required: true, hint: "اسم العميل أو صاحب النشاط", names: ["name", "client", "client name", "customer", "الاسم", "اسم العميل", "العميل", "اسم"] },
   { key: "phone", label: "رقم الهاتف", required: true, hint: "محلي أو دولي (+20 / +966 / +971 …)", names: ["phone", "mobile", "tel", "telephone", "number", "cell", "الهاتف", "رقم الهاتف", "الجوال", "رقم الجوال", "رقم", "موبايل", "تليفون", "رقم التليفون"] },
   { key: "alt_phone", label: "رقم بديل", hint: "اختياري", names: ["alt phone", "alt", "phone 2", "mobile 2", "whatsapp", "رقم بديل", "واتساب", "رقم ثاني", "الرقم الاحتياطي"] },
@@ -23,9 +24,11 @@ export type Table = { headers: string[]; rows: string[][] };
 const norm = (s: string) => toLatinDigits(s).toLowerCase().replace(/[\s_\-.:/\\]+/g, " ").trim();
 export function autoMap(headers: string[]): Mapping {
   const m: Mapping = {}; const used = new Set<string>();
-  for (const f of FIELDS) {
-    const hit = headers.find((h) => !used.has(h) && f.names.some((n) => norm(h) === norm(n)))
-      ?? headers.find((h) => !used.has(h) && f.names.some((n) => norm(h).includes(norm(n)) && norm(n).length >= 3));
+  // pass 1: exact names for every field (so «رابط المتجر» is not grabbed by «المتجر» of another field); pass 2: partial names for what is still unmapped
+  for (const pass of [0, 1]) for (const f of FIELDS) {
+    if (m[f.key]) continue;
+    const hit = pass === 0 ? headers.find((h) => !used.has(h) && f.names.some((n) => norm(h) === norm(n)))
+      : headers.find((h) => !used.has(h) && f.names.some((n) => norm(h).includes(norm(n)) && norm(n).length >= 3));
     if (hit) { m[f.key] = hit; used.add(hit); }
   }
   return m;
@@ -121,7 +124,7 @@ export function buildRows(table: Table, map: Mapping, defaultCountry: string) {
     const sk = store ? normalizeStoreUrl(store) : null;
     const raw: Record<string, string> = {}; table.headers.forEach((h, j) => { if (r[j]) raw[h] = r[j]; });
     return {
-      row_no: i + 2, raw, name: get(r, "name"), business_name: get(r, "business_name"),
+      row_no: i + 2, raw, hunter: get(r, "hunter"), name: get(r, "name"), business_name: get(r, "business_name"),
       phone_raw: phoneRaw, phone_e164: pp?.value ?? null, phone_country: pp?.country ?? null, phone_valid: !!pp?.value,
       alt_e164: pa?.value ?? null, alt_country: pa?.country ?? null,
       store_url: store, store_key: sk?.key ?? null, source: get(r, "source"), status_text: get(r, "status"), notes: get(r, "notes"),
@@ -132,3 +135,15 @@ export function buildRows(table: Table, map: Mapping, defaultCountry: string) {
 
 /** Spreadsheet-formula injection guard for anything we export. */
 export const csvSafe = (v: unknown) => { let s = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+
+/** The reference sheet may have title rows above the headers: look at the first 10 rows and use the one that matches the most known column names. */
+export function detectHeaderRow(headers: string[], rows: string[][]): Table {
+  const grid = [headers, ...rows];
+  const score = (h: string[]) => FIELDS.filter((f) => h.some((c) => f.names.some((n) => norm(c) === norm(n)))).length;
+  let best = 0, bs = score(grid[0]);
+  for (let i = 1; i < Math.min(10, grid.length); i++) { const sc = score(grid[i]); if (sc > bs) { bs = sc; best = i; } }
+  if (best === 0) return { headers, rows };
+  const seen = new Map<string, number>();
+  const hs = grid[best].map((h, i) => { const n = h || `عمود ${i + 1}`; const k = seen.get(n) ?? 0; seen.set(n, k + 1); return k ? `${n} (${k + 1})` : n; });
+  return { headers: hs, rows: grid.slice(best + 1).filter((r) => r.some((x) => x !== "")) };
+}
