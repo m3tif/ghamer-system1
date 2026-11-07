@@ -7,7 +7,7 @@ import { LEAD_STATUS, LEAD_STATUS_TONE, TEMPERATURE, TEMPERATURE_TONE } from "@/
 import type { LeadRow } from "@/server/data";
 
 type Q = Record<string, string | undefined>;
-const th = "sticky top-0 z-20 whitespace-nowrap border-b border-l border-white/10 bg-charcoal px-2.5 py-2 text-start text-xs font-semibold text-white";
+const th = "whitespace-nowrap border-b border-l border-white/10 bg-charcoal px-2.5 py-2 text-start text-xs font-semibold text-white";
 const cell = "border-b border-l border-line px-2.5 py-1 align-middle text-[13px] leading-5";
 const SENDABLE_DEAD = ["Not Interested", "Invalid Contact", "Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"];
 
@@ -68,7 +68,7 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                   {url ? <a href={url} target="_blank" rel="noopener noreferrer" dir="ltr" title={url} className="block truncate text-burgundy-600 underline">{hostOf(url)}</a>
                     : r.store_url ? <span dir="ltr" className="block truncate text-ink-500" title="رابط غير صالح للفتح">{r.store_url}</span> : <span className="text-ink-300">—</span>}
                 </td>
-                <td data-col="phone" data-color={r.colors?.phone} className={`${cell} sticky left-0 z-10 whitespace-nowrap border-s border-line ${zebra}`}>{r.phone ? <CopyPhone phone={r.phone} /> : <span className="text-ink-300">—</span>}</td>
+                <td data-col="phone" data-color={r.colors?.phone} className={`${cell} whitespace-nowrap`}>{r.phone ? <CopyPhone phone={r.phone} /> : <span className="text-ink-300">—</span>}</td>
                 <td data-col="hunter" data-color={r.colors?.hunter} className={`${cell} whitespace-nowrap`}>
                   {wide ? <Link href={href(q, { creator: r.original_creator_id })} className="hover:text-burgundy-600 hover:underline" title="تصفية بعملاء هذا الموظف">{r.creator_name}</Link> : r.creator_name}
                 </td>
@@ -103,7 +103,7 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                 <td data-col="followup" data-color={r.colors?.followup} className={`${cell} whitespace-nowrap`}>
                   {r.next_followup_at ? <span className={new Date(r.next_followup_at) < new Date() ? "font-semibold text-bad" : ""}>{fmtDateTime(r.next_followup_at)}</span> : <span className="text-ink-300">—</span>}
                 </td>
-                <td data-col="actions" data-color={r.colors?.actions} className={`${cell} sticky left-0 z-10 whitespace-nowrap border-s border-line ${zebra}`}>
+                <td data-col="actions" data-color={r.colors?.actions} className={`${cell} whitespace-nowrap`}>
                   <div className="flex items-center gap-1.5">
                     <Link href={`/leads/${r.id}`} className="rounded-md border border-line bg-white px-2 py-0.5 text-xs font-medium hover:bg-cream">فتح</Link>
                     {canHide && <HideLead leadId={r.id} name={r.name} hidden={!!r.hidden_at} className="!px-2 !py-0.5 !text-xs" />}
@@ -117,7 +117,7 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
 
 export function LeadsTable({ rows, q, sort, dir, tz, more, ...ctx }: RowsCtx & { rows: LeadRow[]; sort: string; dir: string; tz: string; more?: React.ReactNode }) {
   return (
-    <div id="leads-table" className="max-h-[calc(100vh-7rem)] overflow-auto rounded-lg border border-line bg-white shadow-sm" tabIndex={0} aria-label="جدول العملاء">
+    <div id="leads-table" className="overflow-x-auto rounded-lg border border-line bg-white shadow-sm" tabIndex={0} aria-label="جدول العملاء">
       <table className="w-full min-w-[1480px] border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
@@ -133,7 +133,7 @@ export function LeadsTable({ rows, q, sort, dir, tz, more, ...ctx }: RowsCtx & {
             <SortTh label="الدرجة" field="temperature" q={q} sort={sort} dir={dir} />
             <SortTh label="السيلز المسؤول" q={q} sort={sort} dir={dir} />
             <SortTh label="المتابعة القادمة" field="followup" q={q} sort={sort} dir={dir} />
-            <SortTh label="إجراءات" q={q} sort={sort} dir={dir} className="sticky left-0 z-30" />
+            <SortTh label="إجراءات" q={q} sort={sort} dir={dir} />
           </tr>
         </thead>
         <tbody>

@@ -7,6 +7,7 @@ import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
 import { CopyToolbar } from "@/components/copy-toolbar";
 import { MoreRows } from "@/components/leads-more";
+import { LeadsHScroll } from "@/components/leads-hscroll";
 import { LeadsMarks } from "@/components/leads-marks";
 import { normalizeLeadQuery } from "@/server/leads-view";
 import { DeleteMonth, HideMonth } from "@/components/leads-cells";
@@ -87,6 +88,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </div>)}
         {rows.length > 0 && <CopyToolbar total={Number(total)} />}
         {rows.length > 0 && <LeadsMarks manualActive={sort === "manual"} />}
+        {rows.length > 0 && <LeadsHScroll />}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
           <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide}
             more={<MoreRows key={JSON.stringify(q) + ':' + total} query={q} initialCount={rows.length} total={Number(total)} />} />)}

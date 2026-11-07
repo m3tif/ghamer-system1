@@ -55,7 +55,7 @@ export function LeadsMarks({ manualActive }: { manualActive: boolean }) {
       const idx = tr.querySelector("[data-idx]"); if (idx) idx.textContent = String(i + 1);
       if (tr.className.includes("bg-bad/5")) return;
       const want = i % 2 ? "bg-cream/40" : "bg-white", other = i % 2 ? "bg-white" : "bg-cream/40";
-      for (const el of [tr, tr.querySelector<HTMLElement>("td"), tr.querySelector<HTMLElement>("td[data-col=actions]")]) { el?.classList.remove(other); el?.classList.add(want); }
+      for (const el of [tr, tr.querySelector<HTMLElement>("td")]) { el?.classList.remove(other); el?.classList.add(want); }
     });
   }, []);
   const persistOrder = useCallback(() => {
