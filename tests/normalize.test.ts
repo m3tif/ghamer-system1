@@ -31,6 +31,9 @@ describe("normalizeStoreUrl", () => {
     expect(key("https://www.instagram.com/@brand")).toBe("instagram.com/brand");
     expect(key("https://instagram.com/other")).not.toBe(key("https://instagram.com/brand"));
     expect(key("https://salla.sa/mystore")).toBe("salla.sa/mystore");
+    expect(key("https://mayar.dropora.net/")).toBe("mayar.dropora.net");
+    expect(key("https://www.other.dropora.net/p/1?utm=x")).toBe("other.dropora.net");
+    expect(key("https://mayar.dropora.net")).not.toBe(key("https://other.dropora.net"));
   });
   it("handles Saudi second-level domains", () => {
     expect(key("https://www.store.com.sa/x")).toBe("store.com.sa");

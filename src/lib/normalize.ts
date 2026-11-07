@@ -84,7 +84,7 @@ const PATH_PLATFORMS = new Set([
 /** Platforms where each store is a sub-domain of a shared domain. */
 const SUBDOMAIN_PLATFORMS = new Set([
   "myshopify.com", "zid.store", "salla.sa", "wixsite.com", "blogspot.com", "wordpress.com",
-  "vercel.app", "netlify.app", "github.io", "business.site", "mystrikingly.com",
+  "vercel.app", "netlify.app", "github.io", "business.site", "mystrikingly.com", "dropora.net",
 ]);
 
 export type StoreKey = { raw: string; key: string };
