@@ -8,14 +8,34 @@ import { LEAD_STATUS, TEMPERATURE } from "@/lib/labels";
 
 const EDIT_STATUS = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
 
-export function CopyPhone({ phone }: { phone: string }) {
+function CopyButton({ text, label, title }: { text: string; label: string; title: string }) {
   const [done, setDone] = useState(false);
+  const ok = () => { setDone(true); setTimeout(() => setDone(false), 1500); };
+  const legacy = () => {
+    try { const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.select(); const r = document.execCommand("copy"); document.body.removeChild(ta); if (r) ok(); } catch { /* ignore */ }
+  };
+  return (
+    <button type="button" aria-label={label} title={title}
+      onClick={() => { if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(ok).catch(legacy); else legacy(); }}
+      className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-500 hover:bg-cream">{done ? "تم ✓" : "نسخ"}</button>
+  );
+}
+
+export function CopyPhone({ phone }: { phone: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <a href={`tel:${phone}`} dir="ltr" className="font-mono text-[13px] text-charcoal hover:text-burgundy-600 hover:underline">{phone}</a>
-      <button type="button" aria-label="نسخ رقم الهاتف" title="نسخ الرقم"
-        onClick={() => { navigator.clipboard?.writeText(phone).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }).catch(() => {}); }}
-        className="rounded border border-line px-1.5 text-[11px] text-ink-500 hover:bg-cream">{done ? "تم ✓" : "نسخ"}</button>
+      <CopyButton text={phone} label="نسخ رقم الهاتف" title="نسخ الرقم" />
+    </span>
+  );
+}
+
+/** Copies the full store link (what was typed), next to the shown domain. */
+export function CopyLink({ url, children }: { url: string; children: React.ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {children}
+      <CopyButton text={url} label="نسخ رابط المتجر" title="نسخ الرابط كاملًا" />
     </span>
   );
 }

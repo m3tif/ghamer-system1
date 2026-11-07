@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui";
-import { CopyPhone, DeleteLead, HideLead, QuickEdit, SendToSales } from "@/components/leads-cells";
+import { CopyLink, CopyPhone, DeleteLead, HideLead, QuickEdit, SendToSales } from "@/components/leads-cells";
 import { fmtDate, fmtDateTime, toLocalInput } from "@/lib/format";
 import { hostOf, safeHttpUrl } from "@/lib/url";
 import { LEAD_STATUS, LEAD_STATUS_TONE, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
@@ -64,9 +64,9 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                   {r.business_name && <div className="ps-[3.6rem] text-[11px] font-normal text-ink-500">{r.business_name}</div>}
                   {r.hidden_at && <div className="mt-0.5"><Badge tone="bad">مخفي عن الموظفين</Badge><span className="ms-1 text-[11px] font-normal text-ink-500" title={r.hidden_reason ?? ""}>{r.hidden_by_name}</span></div>}
                 </td>
-                <td data-col="store" data-color={r.colors?.store} className={`${cell} max-w-56`}>
-                  {url ? <a href={url} target="_blank" rel="noopener noreferrer" dir="ltr" title={url} className="block truncate text-burgundy-600 underline">{hostOf(url)}</a>
-                    : r.store_url ? <span dir="ltr" className="block truncate text-ink-500" title="رابط غير صالح للفتح">{r.store_url}</span> : <span className="text-ink-300">—</span>}
+                <td data-col="store" data-color={r.colors?.store} className={`${cell} max-w-64`}>
+                  {url ? <CopyLink url={url}><a href={url} target="_blank" rel="noopener noreferrer" dir="ltr" title={url} className="block min-w-0 truncate text-burgundy-600 underline">{hostOf(url)}</a></CopyLink>
+                    : r.store_url ? <CopyLink url={r.store_url}><span dir="ltr" className="block min-w-0 truncate text-ink-500" title="رابط غير صالح للفتح">{r.store_url}</span></CopyLink> : <span className="text-ink-300">—</span>}
                 </td>
                 <td data-col="phone" data-color={r.colors?.phone} className={`${cell} whitespace-nowrap`}>{r.phone ? <CopyPhone phone={r.phone} /> : <span className="text-ink-300">—</span>}</td>
                 <td data-col="hunter" data-color={r.colors?.hunter} className={`${cell} whitespace-nowrap`}>

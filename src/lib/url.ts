@@ -1,7 +1,7 @@
 /** Only real http(s) links are made clickable (blocks javascript:, data:, etc.). */
 export function safeHttpUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const t = raw.trim();
+  const t = raw.trim().replace(/^[\/\\\s]+(?=[a-z][a-z0-9+.-]*:\/\/)/i, "");   // tolerate a stray leading "/" before https://
   try {
     const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
