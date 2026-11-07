@@ -21,7 +21,7 @@ async function writeClipboard(text: string): Promise<boolean> {
  * (so it can never expose more than the user can see): the selected rows, or the whole page when nothing is selected.
  * Rows are marked in the table with data-row / data-* attributes and a checkbox.row-sel.
  */
-export function CopyToolbar({ tableId = "leads-table" }: { tableId?: string }) {
+export function CopyToolbar({ tableId = "leads-table", total: grand = 0 }: { tableId?: string; total?: number }) {
   const [sel, setSel] = useState(0);
   const [total, setTotal] = useState(0);
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
@@ -35,7 +35,8 @@ export function CopyToolbar({ tableId = "leads-table" }: { tableId?: string }) {
     refresh();
     const el = document.getElementById(tableId);
     el?.addEventListener("change", refresh);
-    return () => el?.removeEventListener("change", refresh);
+    window.addEventListener("leads:rows", refresh);
+    return () => { el?.removeEventListener("change", refresh); window.removeEventListener("leads:rows", refresh); };
   }, [refresh, tableId]);
 
   const flash = (ok: boolean, text: string) => { setMsg({ ok, text }); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => setMsg(null), 3500); };
@@ -63,7 +64,8 @@ export function CopyToolbar({ tableId = "leads-table" }: { tableId?: string }) {
     const rs = rows();
     void copy(rs.map((r) => ["name", "phone", "store", "status", "notes", "creator", "date"].map((k) => clean(r.dataset[k] ?? "")).join("\t")).join("\n"), "صف كامل", rs.length);
   };
-  const scope = sel ? `${sel} محدد` : "كل الصفحة";
+  const scope = sel ? `${sel} محدد` : `كل المحمّل (${total})`;
+  const partial = grand > total;
   const b = "rounded-md border border-line bg-white px-2.5 py-1 text-xs hover:bg-cream";
   return (
     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs" aria-label="أدوات التحديد والنسخ">
@@ -76,6 +78,7 @@ export function CopyToolbar({ tableId = "leads-table" }: { tableId?: string }) {
         <span className="text-ink-500">إلى</span>
         <input value={to} onChange={(e) => setTo(e.target.value)} inputMode="numeric" dir="ltr" aria-label="إلى صف" className="w-12 rounded-md border border-line px-1.5 py-1 text-center" />
         <button type="button" onClick={selectRange} className={b}>حدّد النطاق</button>
+        {partial && <button type="button" onClick={() => window.dispatchEvent(new Event("leads:load-all"))} className={b}>تحميل كل العملاء ({grand})</button>}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="font-semibold">نسخ ({scope}):</span>

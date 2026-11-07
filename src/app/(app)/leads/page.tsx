@@ -1,62 +1,44 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
-import { addedCounts, employeeList, listLeads, myOutcomes, PAGE_SIZES, salesReps } from "@/server/data";
-import { Badge, ButtonLink, Empty, PageHeader, Pager, Table, td } from "@/components/ui";
+import { addedCounts, employeeList, hasManualOrder, listLeads, myOutcomes, salesReps } from "@/server/data";
+import { Badge, ButtonLink, Empty, PageHeader, Table, td } from "@/components/ui";
 import { SearchBox } from "@/components/search-box";
 import { QuickAdd } from "@/components/quick-add";
 import { LeadsTable } from "@/components/leads-table";
 import { CopyToolbar } from "@/components/copy-toolbar";
+import { MoreRows } from "@/components/leads-more";
+import { LeadsMarks } from "@/components/leads-marks";
+import { normalizeLeadQuery } from "@/server/leads-view";
 import { DeleteMonth, HideMonth } from "@/components/leads-cells";
 import { inputCls } from "@/components/forms";
-import { fmtDate, fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
+import { fmtDate, fmtDateTime, getTimezone, tzLabel } from "@/lib/format";
 import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, MEETING_STATUS, TEMPERATURE } from "@/lib/labels";
 
 export const metadata = { title: "العملاء اللي ضفتهم" };
 export const dynamic = "force-dynamic";
 
-type SP = { q?: string; status?: string; page?: string; month?: string; creator?: string; sales?: string; tab?: string; handed?: string; temp?: string; sort?: string; dir?: string; size?: string; hidden?: string };
-const UUID = /^[0-9a-f-]{36}$/;
+type SP = { q?: string; status?: string; month?: string; creator?: string; sales?: string; tab?: string; handed?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
+const CHUNK = 100;
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const s = await requireSession(); await requirePerm(s, "leads.view");
   const sp = await searchParams;
-  // employees see only the leads THEY work on; managers / admin see their whole scope and can filter by employee
-  const employee = ["tele_sales", "sales_rep"].includes(s.role);
+  const manualOrder = await hasManualOrder(s.userId);
+  const f = normalizeLeadQuery(s, sp, manualOrder);
+  const { employee, wide, canHide, month, creator, sales: salesF, temp, status, sort, dir, hidden: hiddenF } = f;
   const tab = sp.tab === "handed" && can(s, "leads.handoff") ? "handed" : "mine";
-  const wide = !employee && can(s, "employees.view");
   const emps = wide ? (await employeeList(s.userId)).filter((e: any) => ["tele_sales", "sales_rep", "tele_sales_manager", "sales_manager"].includes(e.role_code)) : [];
-  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? `${sp.month}-01` : undefined;
-  const creator = wide && UUID.test(sp.creator ?? "") ? sp.creator : undefined;
-  const salesF = wide && UUID.test(sp.sales ?? "") ? sp.sales : undefined;
-  const temp = ["cold", "warm", "hot"].includes(sp.temp ?? "") ? sp.temp : undefined;
-  const status = sp.status && LEAD_STATUS[sp.status] ? sp.status : undefined;
-  const sort = ["name", "created", "status", "temperature", "followup"].includes(sp.sort ?? "") ? sp.sort! : "created";
-  const dir = sp.dir === "asc" ? "asc" : "desc";
-  const size = PAGE_SIZES.includes(Number(sp.size)) ? Number(sp.size) : PAGE_SIZES[0];
   const canHand = can(s, "leads.handoff");
-  const canHide = ["super_admin", "general_manager", "tele_sales_manager", "sales_manager"].includes(s.role);
-  const hiddenF = canHide && ["hidden", "all"].includes(sp.hidden ?? "") ? sp.hidden : undefined;
   const [list, counts, outcomes, reps] = await Promise.all([
-    tab === "mine" ? listLeads(s.userId, { q: sp.q, status, page: Number(sp.page) || 1, size, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF }) : { rows: [], total: 0, page: 1, size },
+    tab === "mine" ? listLeads(s.userId, { q: f.q, status, size: CHUNK, offset: 0, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF }) : { rows: [], total: 0 },
     employee ? addedCounts(s.userId, s.userId) : null,
     tab === "handed" ? myOutcomes(s.userId) : [],
     canHand ? salesReps(s.userId) : [],
   ]);
-  const { rows, total, page } = list;
-  if (tab === "mine" && rows.length === 0 && page > 1) {
-    // typed/old page number beyond the end → go to the last real page (total is derived from rows, so ask page 1)
-    const first = await listLeads(s.userId, { q: sp.q, status, page: 1, size, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF });
-    const last = Math.max(1, Math.ceil(Number(first.total) / size));
-    const keep = Object.entries({ q: sp.q, status, month: sp.month, creator, sales: salesF, temp, sort: sp.sort, dir: sp.dir, size: sp.size, hidden: hiddenF }).filter((e): e is [string, string] => !!e[1]);
-    redirect(`/leads?${new URLSearchParams([...keep, ["page", String(last)]])}`);
-  }
+  const { rows, total } = list;
   const tz = tzLabel(getTimezone());
-  const q = { q: sp.q, status, month: sp.month, creator, sales: salesF, temp, sort: sp.sort ? sort : undefined, dir: sp.dir ? dir : undefined, size: sp.size ? String(size) : undefined, hidden: hiddenF };
-  const qs = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1])).toString();
-  const base = qs ? `/leads?${qs}` : "/leads";
+  const q = { q: f.q, status, month: sp.month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF };
   const filtered = !!(sp.q || status || sp.month || temp || creator || salesF || hiddenF);
-  const followLabels = Object.fromEntries(rows.filter((r) => r.next_followup_at).map((r) => [r.id, toLocalInput(r.next_followup_at!).replace("T", " ")]));
   const tabCls = (on: boolean) => `rounded-md px-3.5 py-2 text-sm ${on ? "bg-burgundy-600 font-semibold text-white" : "border border-line bg-white hover:bg-cream"}`;
   return (
     <>
@@ -92,9 +74,6 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <select name="hidden" defaultValue={hiddenF ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الإخفاء">
               <option value="">العملاء الظاهرون</option><option value="hidden">المخفيون فقط</option><option value="all">الظاهرون + المخفيون</option>
             </select>)}
-          <select name="size" defaultValue={String(size)} className={inputCls + " w-full sm:w-auto"} aria-label="عدد الصفوف">
-            {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} صف</option>)}
-          </select>
           <input type="hidden" name="sort" value={sort} /><input type="hidden" name="dir" value={dir} />
           <button className="rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">تصفية</button>
           {filtered && <Link href="/leads" className="text-sm text-burgundy-600 underline">مسح الفلاتر</Link>}
@@ -106,10 +85,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <HideMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} hide={hiddenF !== "hidden"} count={total} />
             {s.role === "super_admin" && <DeleteMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} count={total} />}
           </div>)}
-        {rows.length > 0 && <CopyToolbar />}
+        {rows.length > 0 && <CopyToolbar total={Number(total)} />}
+        {rows.length > 0 && <LeadsMarks manualActive={sort === "manual"} />}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
-          <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide} followLabels={followLabels} />)}
-        <Pager base={base} page={page} total={total} size={size} jump />
+          <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide}
+            more={<MoreRows key={JSON.stringify(q) + ':' + total} query={q} initialCount={rows.length} total={Number(total)} />} />)}
       </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (

@@ -5,23 +5,25 @@ const esc = (s: string) => s.replace(/[\\%_]/g, "\\$&");
 export const PAGE_SIZE = 20;
 
 export const PAGE_SIZES = [25, 50, 100];
-export type LeadFilter = { q?: string; status?: string; page?: number; size?: number; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
+export type LeadFilter = { q?: string; status?: string; page?: number; size?: number; offset?: number; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
 export type LeadRow = {
   id: string; client_id: string; name: string; business_name: string | null; phone: string | null; store_url: string | null;
   lead_status: string; lead_temperature: string | null; call_notes: string | null; next_followup_at: string | null; created_at: string;
   last_contact_at: string | null; original_creator_id: string; creator_name: string | null; assigned_sales_id: string | null; sales_name: string | null;
   handed_off: boolean; dup_attempts: number; total: number; hidden_at: string | null; hidden_by_name: string | null; hidden_reason: string | null;
+  pos: number | null; colors: Record<string, string>;
 };
 export async function listLeads(uid: string, o: LeadFilter) {
   const size = PAGE_SIZES.includes(o.size ?? 0) ? o.size! : PAGE_SIZES[0];
   const page = Math.max(1, o.page ?? 1);
+  const offset = o.offset ?? (page - 1) * size;
   const q = o.q?.trim() || null;
   // a query is treated as a phone number only when it is made of digits/separators (not when a name contains digits)
   const asDigits = q ? toLatinDigits(q) : "";
   const phone = q && /^[+\d\s().-]{3,}$/.test(asDigits) && asDigits.replace(/\D/g, "").length >= 3 ? asDigits.replace(/\D/g, "") : null;
   const r = await tx(uid, (c) => c.query(
     "select * from app.list_leads($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
-    [phone ? null : q, phone, o.status || null, o.month || null, o.creator || null, o.sales || null, o.temp || null, o.sort || null, o.dir || null, size, (page - 1) * size, o.hidden || null]));
+    [phone ? null : q, phone, o.status || null, o.month || null, o.creator || null, o.sales || null, o.temp || null, o.sort || null, o.dir || null, size, offset, o.hidden || null]));
   const rows = r.rows as LeadRow[];
   return { rows, total: rows[0]?.total ?? 0, page, size };
 }
@@ -275,4 +277,9 @@ export async function distBreakdown(uid: string, id: string) { return (await tx(
 export async function distRows(uid: string, id: string, status: string | null, page: number, size = 50) {
   const r = await tx(uid, (c) => c.query("select * from app.dist_rows_page($1,$2,$3,$4)", [id, status, size, (page - 1) * size]));
   return { rows: r.rows as any[], total: Number(r.rows[0]?.total ?? 0) };
+}
+
+/** Has this user ever arranged the leads by hand? (then "my order" becomes their default view) */
+export async function hasManualOrder(uid: string): Promise<boolean> {
+  return tx(uid, async (c) => (await c.query("select app.has_manual_order() as v")).rows[0]?.v === true);
 }

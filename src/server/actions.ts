@@ -11,6 +11,7 @@ import { parseLocal } from "@/lib/format";
 import { FIELDS, buildRows, type Mapping } from "@/lib/import-parse";
 import type { FormState } from "@/lib/form";
 import { ACHIEVEMENT, NEEDS_FOLLOWUP, encourage, nextMilestone } from "@/lib/labels";
+import { MARK_COLS, MARK_KEYS } from "@/lib/marks";
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const SECRET = /^(password|old|new|confirm)$/;
@@ -608,4 +609,24 @@ export async function cancelDistributionAction(fd: FormData): Promise<void> {
   const sess = await requireSession(); const id = s(fd, "id");
   await tx(sess.userId, (c) => c.query("select app.dist_cancel($1)", [id]));
   redirect("/bulk-distribution");
+}
+
+// ───── leads table: per-user colours and manual order ─────
+type Ack = { ok: boolean; error?: string };
+export async function setCellColorsAction(leadId: string, cols: string[], color: string | null): Promise<Ack> {
+  const sess = await requireSession();
+  if (!/^[0-9a-f-]{36}$/i.test(leadId) || !Array.isArray(cols) || cols.length === 0 || !cols.every((c) => (MARK_COLS as readonly string[]).includes(c)) || (color !== null && !MARK_KEYS.includes(color))) return { ok: false, error: "طلب غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.mark_cells($1,$2::text[],$3)", [leadId, cols, color])); return { ok: true }; }
+  catch (e) { return { ok: false, error: mapError(e) }; }
+}
+export async function reorderLeadsAction(ids: string[]): Promise<Ack> {
+  const sess = await requireSession();
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 2000 || !ids.every((x) => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x))) return { ok: false, error: "طلب غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.reorder_leads($1::uuid[])", [ids])); return { ok: true }; }
+  catch (e) { return { ok: false, error: mapError(e) }; }
+}
+export async function resetLeadOrderAction(): Promise<Ack> {
+  const sess = await requireSession();
+  try { await tx(sess.userId, (c) => c.query("select app.reset_lead_order()")); return { ok: true }; }
+  catch (e) { return { ok: false, error: mapError(e) }; }
 }

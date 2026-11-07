@@ -19,6 +19,7 @@ export function AutoRefresh() {
 
   useEffect(() => {
     stopped.current = false;
+    const busy = () => !!document.querySelector("#leads-table.paint-mode") || document.querySelectorAll("#leads-table tr[data-lead]").length > 100;   // colouring, or more rows loaded than the first batch: a refresh would reset them
     const typing = () => { const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === "TEXTAREA" || a.tagName === "SELECT" || (a.tagName === "INPUT" && (a as HTMLInputElement).type !== "search" && (a as HTMLInputElement).type !== "checkbox" && (a as HTMLInputElement).type !== "radio")) && !!(a as HTMLInputElement).value; };
     const schedule = () => { if (!stopped.current) timer.current = setTimeout(tick, delay.current); };
     const tick = async () => {
@@ -31,7 +32,7 @@ export function AutoRefresh() {
         delay.current = BASE; setOffline(false);
         if (rev.current === null) rev.current = j.rev;
         else if (j.rev !== rev.current) {
-          if (typing()) return schedule();            // try again next tick, do not disturb typing
+          if (typing() || busy()) return schedule();            // try again next tick, do not disturb typing
           rev.current = j.rev; router.refresh();
         }
         setUpdated(new Date());

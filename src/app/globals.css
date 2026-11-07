@@ -26,3 +26,19 @@ body { font-family: var(--font-sans); font-size: 15px; line-height: 1.65; -webki
 input, select, textarea { font: inherit; }
 ::selection { background: var(--color-burgundy-100); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* leads table: per-user cell colours + drag & drop */
+#leads-table td[data-color="red"] { background-color: #fecaca !important; }
+#leads-table td[data-color="orange"] { background-color: #fed7aa !important; }
+#leads-table td[data-color="yellow"] { background-color: #fef08a !important; }
+#leads-table td[data-color="green"] { background-color: #bbf7d0 !important; }
+#leads-table td[data-color="teal"] { background-color: #99f6e4 !important; }
+#leads-table td[data-color="blue"] { background-color: #bfdbfe !important; }
+#leads-table td[data-color="purple"] { background-color: #e9d5ff !important; }
+#leads-table td[data-color="pink"] { background-color: #fbcfe8 !important; }
+#leads-table td[data-color="gray"] { background-color: #d4d4d8 !important; }
+#leads-table tr.dnd-over-top > td { box-shadow: inset 0 3px 0 0 var(--color-burgundy-600); }
+#leads-table tr.dnd-over-bottom > td { box-shadow: inset 0 -3px 0 0 var(--color-burgundy-600); }
+#leads-table tr.dnd-dragging { opacity: .45; }
+#leads-table.paint-mode td[data-col] { cursor: cell; }
+#leads-table.paint-mode a, #leads-table.paint-mode button { pointer-events: none; }
