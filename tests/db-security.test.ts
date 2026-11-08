@@ -142,7 +142,7 @@ describe("meetings (managed by Sales), targets and attribution", () => {
   it("Tele Sales still sees her meeting in the list (name, time, status) but never the link or the private notes", async () => {
     const tl = (await run("tele1", "select * from app.list_meetings('upcoming', 50)")).rows.find((r: any) => r.id === meeting);
     expect(tl).toBeTruthy();
-    expect(tl.meeting_url).toBeNull(); expect(tl.booking_notes).toBeNull(); expect(tl.can_open_lead).toBe(false); expect(tl.client_name).toBe("عميل الاجتماع");
+    expect(tl.meeting_url).toBeNull(); expect(tl.booking_notes).toBeNull(); expect(tl.can_open_lead).toBe(true); expect(tl.client_name).toBe("عميل الاجتماع");
     const sl = (await run("sales1", "select * from app.list_meetings('upcoming', 50)")).rows.find((r: any) => r.id === meeting);
     expect(sl.meeting_url).toBe("https://meet.google.com/abc-defg-hij"); expect(sl.can_open_lead).toBe(true);
     expect((await run("sales2", "select * from app.list_meetings('all', 50)")).rows.find((r: any) => r.id === meeting)).toBeUndefined();

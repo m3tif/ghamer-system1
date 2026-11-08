@@ -33,10 +33,10 @@ function SortTh({ label, field, q, sort, dir, className = "" }: { label: string;
   );
 }
 
-export type RowsCtx = { q: Q; canEdit: boolean; canSend: boolean; reps: { id: string; full_name: string }[]; wide: boolean; canHide: boolean; canDelete?: boolean };
+export type RowsCtx = { q: Q; canEdit: boolean; canSend: boolean; reps: { id: string; full_name: string }[]; wide: boolean; canHide: boolean; canDelete?: boolean; me?: string };
 
 /** Table rows only (used for the first chunk and for the chunks loaded while scrolling). */
-export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide, canHide, canDelete = false }: RowsCtx & { rows: LeadRow[]; startIndex?: number }) {
+export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide, canHide, canDelete = false, me }: RowsCtx & { rows: LeadRow[]; startIndex?: number }) {
   return (<>{rows.map((r, i0) => {
             const i = i0 + startIndex;
             const url = safeHttpUrl(r.store_url);
@@ -44,7 +44,8 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
             const followLabel = r.next_followup_at ? toLocalInput(r.next_followup_at).replace("T", " ") : undefined;
             const zebra = r.hidden_at ? "bg-bad/5 opacity-75" : i % 2 ? "bg-cream/40" : "bg-white";
             const sendable = canSend && !r.handed_off && !SENDABLE_DEAD.includes(r.lead_status);
-            const editable = canEdit;
+            const watching = !!me && r.handed_off && r.original_creator_id === me && r.assigned_sales_id !== me;   // the Tele who handed it over: can look, not edit
+            const editable = canEdit && !watching;
             return (
               <tr key={r.id} data-row data-lead={r.id} data-name={r.name} data-phone={r.phone ?? ""} data-store={r.store_url ?? ""} data-status={LEAD_STATUS[r.lead_status] ?? r.lead_status}
                 data-notes={r.call_notes ?? ""} data-creator={r.creator_name ?? ""} data-date={fmtDate(r.created_at)} className={`${zebra} hover:bg-burgundy-600/5`}>

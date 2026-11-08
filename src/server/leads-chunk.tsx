@@ -18,6 +18,6 @@ export async function loadLeadsChunk(query: LeadQuery, offset: number) {
   const q = { q: f.q, status: f.status, month: query?.month, creator: f.creator, sales: f.sales, temp: f.temp, sort: query?.sort, dir: query?.dir, hidden: f.hidden };
   return {
     count: list.rows.length, total: list.total,
-    node: <LeadRows rows={list.rows} startIndex={off} q={q} canEdit={can(s, "leads.edit")} canSend={can(s, "leads.handoff")} reps={reps} wide={f.wide} canHide={f.canHide} canDelete={s.role === "super_admin"} />,
+    node: <LeadRows rows={list.rows} startIndex={off} q={q} canEdit={can(s, "leads.edit")} canSend={can(s, "leads.handoff")} reps={reps} wide={f.wide} canHide={f.canHide} canDelete={s.role === "super_admin"} me={s.userId} />,
   };
 }

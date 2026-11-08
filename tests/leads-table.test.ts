@@ -85,7 +85,8 @@ describe("Sales cannot see each other's leads", () => {
     expect((await run("sales1", "select app.lead_visible($1) v", [l2])).rows[0].v).toBe(false);
     expect((await run("sales2", "select count(*)::int n from deals")).rows[0].n).toBe(1);
     expect((await list("salesmgr")).map((x) => x.id)).toEqual(expect.arrayContaining([l1, l2]));
-    // after hand-off, Tele Sales no longer sees the lead
-    expect((await list("tele1")).some((x) => x.id === l1)).toBe(false);
+    // after hand-off, the Tele who added it still sees it (read only)
+    expect((await list("tele1")).some((x) => x.id === l1)).toBe(true);
+    expect((await list("tele2")).some((x) => x.id === l1)).toBe(false);
   });
 });

@@ -61,7 +61,7 @@ describe("achievements (computed in the database, kept per month)", () => {
     expect(p.month_count).toBeGreaterThanOrEqual(3);
     expect(Number(p.goal)).toBe(3);
     await expect(run("tele1", "insert into achievements(employee_id, period_month, code) values ($1,$2,'leads_100')", [ids.tele1, month])).rejects.toThrow(/permission denied/);
-    await expect(run("tele2", "select * from app.my_progress($1,$2)", [ids.tele1, month])).rejects.toThrow(/no access/);
+    await expect(run("tele2", "select * from app.my_progress($1,$2)", [ids.tele1, month])).rejects.toThrow(/no access|does not allow/);
   });
   it("previous months keep their own achievements", async () => {
     await admin.query("insert into achievements(employee_id, period_month, code) values ($1,'2026-01-01','leads_50')", [ids.tele2]);
@@ -91,7 +91,7 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
     expect((await run("sales1", "select id from deals where lead_id = $1", [leadA])).rowCount).toBe(0);
     expect((await run("sales1", "select * from notifications where kind = 'lead_pending_review'")).rowCount).toBeGreaterThan(0);
     await expect(run("sales1", "select app.book_meeting($1,$2,'x','online',null,null,null)", [leadA, future()])).rejects.toThrow(/not accepted by sales yet/);
-    await expect(run("tele1", "select app.handoff_lead($1,$2,'again')", [leadA, ids.sales2])).rejects.toThrow(/no access/);
+    await expect(run("tele1", "select app.handoff_lead($1,$2,'again')", [leadA, ids.sales2])).rejects.toThrow(/no access|does not allow/);
   });
   it("only the assigned Sales can decide; accept records who and when, creates the deal, and cannot be repeated", async () => {
     await expect(run("sales2", "select app.accept_handoff($1)", [leadA])).rejects.toThrow(/not allowed/);
@@ -161,11 +161,11 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
     const l = await admin.query("select original_creator_id, current_owner_id, assigned_sales_id from leads where id = $1", [leadC]);
     expect(l.rows[0]).toEqual({ original_creator_id: ids.tele2, current_owner_id: ids.sales2, assigned_sales_id: ids.sales2 });
   });
-  it("the sent lead stays in the Tele Sales archive but cannot be opened", async () => {
+  it("the sent lead stays in the Tele Sales archive and can still be opened by its creator", async () => {
     const a = await run("tele1", "select * from app.archive_leads(null, null, null, 100, 0) where lead_id = $1", [leadA]);
-    expect(a.rows[0].can_open).toBe(false);
+    expect(a.rows[0].can_open).toBe(true);
     expect(a.rows[0].handoff_status).toBe("accepted");
-    await expect(run("tele1", "select * from app.archive_leads($1, null, null, 10, 0)", [ids.tele2])).rejects.toThrow(/no access/);
+    await expect(run("tele1", "select * from app.archive_leads($1, null, null, 10, 0)", [ids.tele2])).rejects.toThrow(/no access|does not allow/);
     const adm = await run("super", "select count(*)::int n from app.archive_leads(null, $1, null, 100, 0)", [month]);
     expect(adm.rows[0].n).toBeGreaterThanOrEqual(100);
   });
@@ -177,7 +177,7 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
     expect(c.accepted).toBeGreaterThanOrEqual(2);
     const rej = (await admin.query("select count(distinct lead_id)::int n from lead_handoffs where from_employee_id = $1 and status = 'rejected'", [ids.tele1])).rows[0].n;
     expect(c.rejected).toBe(rej);
-    await expect(run("tele2", "select * from app.added_counts($1)", [ids.tele1])).rejects.toThrow(/no access/);
+    await expect(run("tele2", "select * from app.added_counts($1)", [ids.tele1])).rejects.toThrow(/no access|does not allow/);
   });
 });
 
