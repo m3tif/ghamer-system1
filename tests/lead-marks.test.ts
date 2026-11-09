@@ -60,3 +60,14 @@ describe("partial reorder keeps earlier places after the new ones", () => {
     expect(r.rows.map((x: any) => x.id)).toEqual([ids3[2], ids3[0], ids3[1]]);
   });
 });
+
+describe("new leads appear on top while 'my order' is active", () => {
+  it("a lead added after arranging comes first, then the arranged ones", async () => {
+    const x = (await register("sales2", leadPayload({ name: "س1", phone: "0559990001" }))).lead_id;
+    const y = (await register("sales2", leadPayload({ name: "س2", phone: "0559990002" }))).lead_id;
+    await run("sales2", "select app.reorder_leads($1::uuid[])", [[y, x]]);
+    const n = (await register("sales2", leadPayload({ name: "جديد", phone: "0559990003" }))).lead_id;
+    const r = await run("sales2", "select * from app.list_leads(null,null,null,null,null,null,null,'manual','asc',100,0,null)");
+    expect(r.rows.map((z: any) => z.id).slice(0, 3)).toEqual([n, y, x]);
+  });
+});
