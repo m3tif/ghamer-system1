@@ -8,7 +8,7 @@ const seen = (who: string, id: string) => run(who, "select count(*)::int n from 
 const today = () => new Date().toISOString().slice(0, 10);
 
 describe("hiding an employee also hides leads distributed/assigned to her", () => {
-  it("hides own, owned and later-assigned leads; restore brings them back", async () => {
+  it("hides own and distributed leads once; new ones appear normally; restore brings the hidden ones back", async () => {
     const own = (await register("tele1", leadPayload({ name: "ملكها", phone: "0554440001" }))).lead_id;
     const given = (await register("super", leadPayload({ name: "موزّع", phone: "0554440002" }))).lead_id;
     await admin.query("update leads set current_owner_id=$2 where id=$1", [given, ids.tele1]);
@@ -18,11 +18,13 @@ describe("hiding an employee also hides leads distributed/assigned to her", () =
     expect(await seen("tele1", own)).toBe(0);
     expect(await seen("tele1", given)).toBe(0);
     expect(await seen("super", given)).toBe(1);
-    // a lead handed to her after the hide is hidden at once
+    // a lead handed to her AFTER the hide appears normally (hiding is one-time)
     const later = (await register("super", leadPayload({ name: "لاحق", phone: "0554440003" }))).lead_id;
     await admin.query("update leads set current_owner_id=$2 where id=$1", [later, ids.tele1]);
-    expect(await seen("tele1", later)).toBe(0);
-    expect(await seen("super", later)).toBe(1);
+    expect(await seen("tele1", later)).toBe(1);
+    const added = (await register("tele1", leadPayload({ name: "أضافتها", phone: "0554440005" }))).lead_id;
+    expect(await seen("tele1", added)).toBe(1);
+    expect(await seen("tele1", own)).toBe(0); expect(await seen("tele1", given)).toBe(0);   // the hidden ones stay hidden
     // other employees are not affected
     expect(await seen("tele2", (await register("tele2", leadPayload({ name: "غيرها", phone: "0554440004" }))).lead_id)).toBe(1);
     await run("super", "select app.hide_period('day',$1::date,$2,false,null)", [today(), ids.tele1]);

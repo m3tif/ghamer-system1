@@ -70,11 +70,10 @@ describe("hide / restore a whole day or month", () => {
     expect(log.length).toBe(1);
     expect(log[0]).toMatchObject({ scope: "day", created_by_name: "المدير النظام", restored_at: null, affected: 1 });
   });
-  it("a lead created later inside a hidden period is hidden from the start", async () => {
+  it("a lead created AFTER the hide appears normally (hiding is one-time); restoring changes nothing for it", async () => {
     await run("super", "select app.hide_period('day', (now() at time zone 'Asia/Riyadh')::date, $1, true, 'اختبار')", [ids.tele2]);
     const n = (await register("tele2", leadPayload({ name: "جديد اليوم", phone: "0561000005" }))).lead_id;
-    expect(await run("tele2", "select count(*)::int n from leads where id = $1", [n]).then((r) => r.rows[0].n)).toBe(0);
-    expect((await run("super", "select count(*)::int n from leads where id = $1", [n])).rows[0].n).toBe(1);
+    expect(await run("tele2", "select count(*)::int n from leads where id = $1", [n]).then((r) => r.rows[0].n)).toBe(1);
     await run("super", "select app.hide_period('day', (now() at time zone 'Asia/Riyadh')::date, $1, false, null)", [ids.tele2]);
     expect(await run("tele2", "select count(*)::int n from leads where id = $1", [n]).then((r) => r.rows[0].n)).toBe(1);
   });
