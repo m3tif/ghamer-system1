@@ -617,6 +617,18 @@ export async function distUndoPreviewAction(batch: string): Promise<{ ok: boolea
   try { return { ok: true, data: (await tx(sess.userId, (c) => c.query("select app.dist_undo_preview($1) d", [batch]))).rows[0].d }; }
   catch (e) { return { ok: false, error: mapError(e) }; }
 }
+export async function importUndoPreviewAction(batch: string): Promise<{ ok: boolean; data?: any; error?: string }> {
+  const sess = await requireSession();
+  if (!/^[0-9a-f-]{36}$/i.test(batch)) return { ok: false, error: "طلب غير صالح" };
+  try { return { ok: true, data: (await tx(sess.userId, (c) => c.query("select app.import_undo_preview($1) d", [batch]))).rows[0].d }; }
+  catch (e) { return { ok: false, error: mapError(e) }; }
+}
+export async function importUndoAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  if (s(fd, "confirm") !== "تراجع") return { error: "اكتب كلمة «تراجع» للتأكيد" };
+  try { const r = (await tx(sess.userId, (c) => c.query("select app.import_undo($1,$2) r", [id, s(fd, "reason")]))).rows[0].r; revalidatePath("/import"); revalidatePath("/leads"); return { ok: `تم التراجع عن الاستيراد: ${r.rolled_back} عميل أُلغي استيرادهم ولم يُحذف أي عميل. يمكنك الآن تصحيح الملف وإعادة رفعه.` }; }
+  catch (e) { return fail(e, fd); }
+}
 export async function distUndoAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession(); const id = s(fd, "id");
   if (s(fd, "confirm") !== "تراجع") return { error: "اكتب كلمة «تراجع» للتأكيد" };

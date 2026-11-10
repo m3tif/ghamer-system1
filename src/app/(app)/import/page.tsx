@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
 import { employeeList, importBatches } from "@/server/data";
 import { Badge, ButtonLink, Card, Empty, PageHeader, Table, td } from "@/components/ui";
+import { UndoDistribution } from "@/components/dist-undo";
 import { ImportUpload } from "@/components/import-client";
 import { IMPORT_STATUS as ST } from "@/lib/import-labels";
 import { fmtDateTime } from "@/lib/format";
@@ -37,7 +38,7 @@ export default async function ImportPage() {
             <tr key={b.id}><td className={td + " font-medium"}>{b.file_name}</td><td className={td}>{b.data_owner_name}</td><td className={td}>{b.original_employee_name ?? "—"}</td>
               <td className={td}>{b.imported_by_name}</td><td className={td}>{fmtDateTime(b.created_at)}</td><td className={td}>{b.rows_total}</td><td className={td}>{b.c_imported}</td><td className={td}>{b.c_duplicate}</td>
               <td className={td}>{b.c_review + b.c_invalid + b.c_error}</td><td className={td}><Badge tone={tone}>{lbl}</Badge></td>
-              <td className={td}><Link className="text-burgundy-600 underline" href={`/import/${b.id}`}>فتح</Link></td></tr>); })}
+              <td className={td + " whitespace-nowrap"}><Link className="text-burgundy-600 underline" href={`/import/${b.id}`}>فتح</Link>{b.status === "completed" && <span className="ms-2"><UndoDistribution batch={b.id} kind="import" /></span>}</td></tr>); })}
         </Table>)}
     </>
   );

@@ -156,3 +156,31 @@ describe("classification and import", () => {
     expect((await batch("tele1", again)).c_new).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("legacy import undo (preview + undo)", () => {
+  const csv = "name,phone\nعميل س1,0507770001\nعميل س2,0507770002\nعميل س3,0507770003";
+  async function imported(name: string) {
+    const id = await stage("tele1", "tele1", csv, { name });
+    await run("tele1", "select app.import_run($1,50)", [id]);
+    return id;
+  }
+  it("preview counts, undo works when untouched, and not twice", async () => {
+    const id = await imported("undo1.csv");
+    const p = (await run("tele1", "select app.import_undo_preview($1) p", [id])).rows[0].p;
+    expect(p).toMatchObject({ total: 3, touched: 0, can_undo: true });
+    await expect(run("tele1", "select app.import_undo($1,'')", [id])).rejects.toThrow();
+    await run("tele1", "select app.import_undo($1,'ملف غلط')", [id]);
+    expect((await run("tele1", "select count(*)::int n from leads where import_batch_id=$1", [id])).rows[0].n).toBe(0);
+    expect((await admin.query("select count(*)::int n from leads where import_batch_id=$1", [id])).rows[0].n).toBe(3);
+    await expect(run("tele1", "select app.import_undo($1,'تاني')", [id])).rejects.toThrow();
+  });
+  it("is refused when a lead was worked on, and for other users", async () => {
+    const id = await imported("undo2.csv");
+    await expect(run("tele2", "select app.import_undo_preview($1)", [id])).rejects.toThrow(/no access/);
+    const lid = (await admin.query("select id from leads where import_batch_id=$1 limit 1", [id])).rows[0].id;
+    await run("tele1", "update leads set call_notes='اشتغلت عليه' where id=$1", [lid]);
+    const p = (await run("tele1", "select app.import_undo_preview($1) p", [id])).rows[0].p;
+    expect(p.touched).toBeGreaterThanOrEqual(1); expect(p.can_undo).toBe(false);
+    await expect(run("tele1", "select app.import_undo($1,'x')", [id])).rejects.toThrow(/worked on/);
+  });
+});
