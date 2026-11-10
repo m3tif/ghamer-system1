@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items: { href: string; label: string; show: boolean; badge?: number }[] = [
     { href: "/", label: "لوحة التحكم", show: true },
     { href: "/leads", label: employee ? "العملاء اللي ضفتهم" : "العملاء", show: can(s, "leads.view") },
+    { href: "/leads?tab=received", label: "الداتا المستلمة", show: s.role === "tele_sales" && can(s, "leads.view") },
     { href: "/assigned", label: "العملاء المسندين إليّ", show: isSales && can(s, "meetings.create"), badge: s.pendingReview },
     { href: "/meetings", label: "الاجتماعات", show: can(s, "meetings.view") },
     { href: "/pipeline", label: "خط المبيعات", show: can(s, "deals.view") },

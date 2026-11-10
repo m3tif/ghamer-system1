@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
 import { distList } from "@/server/data";
 import { Badge, Card, Empty, PageHeader, Table, td } from "@/components/ui";
+import { UndoDistribution } from "@/components/dist-undo";
 import { DistributionUpload } from "@/components/distribution-client";
 import { IMPORT_STATUS as ST } from "@/lib/import-labels";
 import { fmtDateTime } from "@/lib/format";
@@ -34,7 +35,7 @@ export default async function BulkDistributionPage() {
             <tr key={b.id}><td className={td + " max-w-56 truncate font-medium"} title={b.source_url ?? b.file_name}>{b.file_name}</td><td className={td}>{b.imported_by_name}</td><td className={td + " whitespace-nowrap"}>{fmtDateTime(b.finished_at ?? b.created_at)}</td>
               <td className={td}>{b.rows_total}</td><td className={td}>{b.status === "completed" ? b.c_imported : b.c_new}</td><td className={td}>{b.c_duplicate}</td>
               <td className={td + " text-xs leading-5"}>{b.split ?? "—"}</td><td className={td}><Badge tone={tone}>{lbl}</Badge></td>
-              <td className={td}><Link className="text-burgundy-600 underline" href={`/bulk-distribution/${b.id}`}>فتح</Link></td></tr>); })}
+              <td className={td + " whitespace-nowrap"}><Link className="text-burgundy-600 underline" href={`/bulk-distribution/${b.id}`}>فتح</Link>{b.status === "completed" && <span className="ms-2"><UndoDistribution batch={b.id} /></span>}</td></tr>); })}
         </Table>)}
     </>
   );

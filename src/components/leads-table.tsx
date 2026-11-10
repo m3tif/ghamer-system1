@@ -62,6 +62,10 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                     <span data-idx className="w-5 shrink-0 text-start text-[11px] font-normal text-ink-300" aria-hidden>{i + 1}</span>
                     <Link href={`/leads/${r.id}`} className="truncate text-burgundy-600 hover:underline">{r.name}</Link>
                   </div>
+                  {r.received_at && (
+                    <div className="mt-0.5 ps-[3.6rem] text-[11px] font-normal leading-4 text-ink-500">
+                      استلمتها {fmtDate(r.received_at)}{r.received_from ? ` · وزّعها: ${r.received_from}` : ""}{r.batch_name ? ` · من ملف: ${r.batch_name}` : ""}{r.source ? ` · المصدر: ${r.source}` : ""}
+                    </div>)}
                   {r.business_name && <div className="ps-[3.6rem] text-[11px] font-normal text-ink-500">{r.business_name}</div>}
                   {r.hidden_at && <div className="mt-0.5"><Badge tone="bad">مخفي عن الموظفين</Badge><span className="ms-1 text-[11px] font-normal text-ink-500" title={r.hidden_reason ?? ""}>{r.hidden_by_name}</span></div>}
                 </td>

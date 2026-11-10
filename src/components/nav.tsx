@@ -1,10 +1,14 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 export function NavLink({ href, label, badge }: { href: string; label: string; badge?: number }) {
   const path = usePathname();
-  const active = href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+  const tab = useSearchParams().get("tab");
+  const [base, query] = href.split("?");
+  const wantTab = query ? new URLSearchParams(query).get("tab") : null;
+  // "/leads" and "/leads?tab=received" are two different menu items on the same page
+  const active = href === "/" ? path === "/" : (path === base || path.startsWith(base + "/")) && (wantTab ? tab === wantTab : !(base === "/leads" && tab === "received"));
   return (
     <Link href={href} aria-current={active ? "page" : undefined}
       className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors ${

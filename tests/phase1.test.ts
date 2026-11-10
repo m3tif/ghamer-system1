@@ -87,7 +87,7 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
     expect(l).toEqual({ lead_status: "Pending Sales Review", assigned_sales_id: ids.sales1 });
     expect((await run("sales1", "select id from leads where id = $1", [leadA])).rowCount).toBe(1);
     expect((await run("sales2", "select id from leads where id = $1", [leadA])).rowCount).toBe(0);
-    expect((await run("tele1", "select id from leads where id = $1", [leadA])).rowCount).toBe(0);
+    expect((await run("tele1", "select id from leads where id = $1", [leadA])).rowCount).toBe(1);   // the Tele who handed it over keeps seeing it (read only)
     expect((await run("sales1", "select id from deals where lead_id = $1", [leadA])).rowCount).toBe(0);
     expect((await run("sales1", "select * from notifications where kind = 'lead_pending_review'")).rowCount).toBeGreaterThan(0);
     await expect(run("sales1", "select app.book_meeting($1,$2,'x','online',null,null,null)", [leadA, future()])).rejects.toThrow(/not accepted by sales yet/);
@@ -149,7 +149,7 @@ describe("hand-off: Tele Sales sends, Sales decides", () => {
   it("send to admin for distribution: only the Super Admin distributes, then Sales still has to accept", async () => {
     await run("tele2", "select app.handoff_lead($1,null,'وزّعه على من تراه')", [leadC]);
     expect((await run("super", "select * from app.pending_handoffs()")).rowCount).toBe(1);
-    expect((await run("tele2", "select id from leads where id = $1", [leadC])).rowCount).toBe(0);
+    expect((await run("tele2", "select id from leads where id = $1", [leadC])).rowCount).toBe(1);
     expect((await run("salesmgr", "select * from app.pending_handoffs()")).rowCount).toBe(0);
     const ho = (await admin.query("select id from lead_handoffs where lead_id = $1", [leadC])).rows[0].id;
     await expect(run("salesmgr", "select app.assign_handoff($1,$2)", [ho, ids.sales2])).rejects.toThrow(/not allowed/);

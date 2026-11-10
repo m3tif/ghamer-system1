@@ -2,7 +2,7 @@ import { can } from "@/lib/auth";
 import type { Session } from "@/lib/auth";
 import { LEAD_STATUS } from "@/lib/labels";
 
-export type LeadQuery = { q?: string; status?: string; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
+export type LeadQuery = { q?: string; status?: string; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string; tab?: string };
 const UUID = /^[0-9a-f-]{36}$/;
 export const LEAD_SORTS = ["name", "created", "status", "temperature", "followup", "manual"];
 
@@ -21,6 +21,8 @@ export function normalizeLeadQuery(s: Session, sp: LeadQuery, hasManualOrder: bo
     sales: wide && UUID.test(sp.sales ?? "") ? sp.sales : undefined,
     temp: ["cold", "warm", "hot"].includes(sp.temp ?? "") ? sp.temp : undefined,
     sort, dir: sp.dir === "asc" ? "asc" : "desc",
+    // Tele Sales keep what they added themselves apart from the data that was distributed to them
+    scope: s.role === "tele_sales" ? (sp.tab === "received" ? "received" : sp.tab === "handed" ? undefined : "added") : undefined,
     hidden: canHide && ["hidden", "all"].includes(sp.hidden ?? "") ? sp.hidden : undefined,
   };
 }

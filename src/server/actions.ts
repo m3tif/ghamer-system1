@@ -611,6 +611,19 @@ export async function cancelDistributionAction(fd: FormData): Promise<void> {
   redirect("/bulk-distribution");
 }
 
+export async function distUndoPreviewAction(batch: string): Promise<{ ok: boolean; data?: any; error?: string }> {
+  const sess = await requireSession();
+  if (!/^[0-9a-f-]{36}$/i.test(batch)) return { ok: false, error: "طلب غير صالح" };
+  try { return { ok: true, data: (await tx(sess.userId, (c) => c.query("select app.dist_undo_preview($1) d", [batch]))).rows[0].d }; }
+  catch (e) { return { ok: false, error: mapError(e) }; }
+}
+export async function distUndoAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession(); const id = s(fd, "id");
+  if (s(fd, "confirm") !== "تراجع") return { error: "اكتب كلمة «تراجع» للتأكيد" };
+  try { const r = (await tx(sess.userId, (c) => c.query("select app.dist_undo($1,$2) r", [id, s(fd, "reason")]))).rows[0].r; revalidatePath("/bulk-distribution"); return { ok: `تم التراجع عن التوزيع: ${r.undone} عميل أُلغي توزيعهم ولم يُحذف أي عميل. يمكنك الآن تصحيح الملف وإعادة إرساله.` }; }
+  catch (e) { return fail(e, fd); }
+}
+
 // ───── leads table: per-user colours and manual order ─────
 type Ack = { ok: boolean; error?: string };
 export async function setCellColorsAction(leadId: string, cols: string[], color: string | null): Promise<Ack> {
