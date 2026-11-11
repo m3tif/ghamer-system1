@@ -25,7 +25,7 @@ export function Dialog({ trigger, title, children, wide = false, triggerClass = 
           <button type="button" aria-label="إغلاق" onClick={() => ref.current?.close()} className="rounded-md px-2 py-1 text-xl leading-none text-ink-500 hover:bg-cream">×</button>
         </div>
         <div className="max-h-[calc(90vh-4rem)] overflow-y-auto p-5">
-          <DialogCtx.Provider key={gen} value={{ close: () => ref.current?.close() }}>{children}</DialogCtx.Provider>
+          {gen > 0 && <DialogCtx.Provider key={gen} value={{ close: () => ref.current?.close() }}>{children}</DialogCtx.Provider>}
         </div>
       </dialog>
     </>

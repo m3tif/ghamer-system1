@@ -19,7 +19,7 @@ export const metadata = { title: "العملاء اللي ضفتهم" };
 export const dynamic = "force-dynamic";
 
 type SP = { q?: string; status?: string; month?: string; creator?: string; sales?: string; tab?: string; handed?: string; temp?: string; sort?: string; dir?: string; hidden?: string };
-const CHUNK = 100;
+const CHUNK = 40;
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const s = await requireSession(); await requirePerm(s, "leads.view");

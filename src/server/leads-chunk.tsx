@@ -4,7 +4,7 @@ import { listLeads, salesReps } from "@/server/data";
 import { LeadRows } from "@/components/leads-table";
 import { normalizeLeadQuery, type LeadQuery } from "@/server/leads-view";
 
-const CHUNK = 100;
+const CHUNK = 40;
 
 /** Next batch of rows for the continuous leads list. Same filters + same permission checks as the page (the database enforces who can see what). */
 export async function loadLeadsChunk(query: LeadQuery, offset: number) {
