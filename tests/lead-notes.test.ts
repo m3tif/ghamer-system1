@@ -80,4 +80,39 @@ describe("notes are kept forever", () => {
       expect(await bodies("tele2", l.id)).toEqual(["كلمته"]);
     }
   });
+  it("the table column always equals the newest note in the details — own lead, distributed lead, after hand-off", async () => {
+    const col = async (who: string, id: string) => (await run(who, "select call_notes from app.list_leads(null,null,null,null,null,null,null,'created','desc',100,0,'visible',null) where id=$1", [id])).rows[0]?.call_notes;
+    const top = async (who: string, id: string) => (await notes(who, id))[0]?.body;
+    // own lead
+    const own = (await register("tele2", leadPayload({ name: "عميلها", phone: "0551230099" }))).lead_id;
+    await run("tele2", "select app.add_lead_note($1,'ملاحظة على عميلها')", [own]);
+    expect(await col("tele2", own)).toBe("ملاحظة على عميلها"); expect(await top("tele2", own)).toBe("ملاحظة على عميلها");
+    // lead added by the admin and distributed to a Tele
+    const d = String(Date.now()).slice(-7);
+    const rows = [{ row_no: 2, raw: {}, name: "موزع من المدير", phone_raw: "052" + d, phone_e164: "+96652" + d, phone_country: "SA", phone_valid: true, store_url: "", store_key: null, status_text: "", notes: "", hunter: "هنتر", original_added: null, date_text: null }];
+    const b = (await run("super", "select app.dist_create($1::jsonb,$2::jsonb) id", [JSON.stringify({ file_name: "m.csv", file_hash: "h" + Math.random(), file_size: 1, file_kind: "csv", mapping: { headers: [] } }), JSON.stringify(rows)])).rows[0].id;
+    await run("super", "select app.dist_confirm($1,$2::uuid[])", [b, [ids.tele1]]);
+    const dist = (await admin.query("select id, original_creator_id from leads where import_batch_id=$1", [b])).rows[0];
+    expect(dist.original_creator_id).toBe(ids.super);
+    for (const t of ["كلمته الصبح", "رد وقال كلمني بكرة"]) await run("tele1", "select app.add_lead_note($1,$2)", [dist.id, t]);
+    expect(await col("tele1", dist.id)).toBe("رد وقال كلمني بكرة"); expect(await top("tele1", dist.id)).toBe("رد وقال كلمني بكرة");
+    expect(await col("super", dist.id)).toBe("رد وقال كلمني بكرة");
+    // after hand-off, Sales writes: Tele and Sales see the same in the column and the details
+    await admin.query("update leads set lead_status='Interested' where id=$1", [dist.id]);
+    await run("tele1", "select app.handoff_lead($1,$2,'x')", [dist.id, ids.sales2]); await run("sales2", "select app.accept_handoff($1)", [dist.id]);
+    await run("sales2", "select app.add_lead_note($1,'السيلز كلمه')", [dist.id]);
+    for (const w of ["sales2", "tele1", "salesmgr", "super"]) { expect(await col(w, dist.id)).toBe("السيلز كلمه"); expect(await top(w, dist.id)).toBe("السيلز كلمه"); }
+    // the older notes are still there
+    expect((await bodies("super", dist.id))).toEqual(["كلمته الصبح", "رد وقال كلمني بكرة", "السيلز كلمه"]);
+  });
+  it("a file line with the same time as the file's note does not hide the real note", async () => {
+    const id = (await register("tele1", { ...leadPayload({ name: "من ملف", phone: "0551230077" }), call_notes: "ملاحظة الملف" })).lead_id;
+    const t = (await admin.query("select created_at from lead_notes where lead_id=$1", [id])).rows[0].created_at;
+    await admin.query("insert into lead_notes(lead_id, body, created_at, source) values ($1,'مستورد من ملف «x.xlsx» — أضافه أصلًا: فلان',$2,'import')", [id, t]);
+    expect((await notes("tele1", id))[0].body).toBe("ملاحظة الملف");
+    // typing the newest text again keeps one note and the column shows it
+    await run("tele1", "select app.add_lead_note($1,'ملاحظة الملف')", [id]);
+    expect((await notes("tele1", id)).filter((n: any) => n.body === "ملاحظة الملف").length).toBe(1);
+    expect(await latest(id)).toBe("ملاحظة الملف");
+  });
 });

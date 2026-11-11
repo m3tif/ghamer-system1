@@ -4,12 +4,13 @@ import { loadLeadsChunk } from "@/server/leads-chunk";
 import type { LeadQuery } from "@/server/leads-view";
 
 /** Continuous list: loads the next rows while you scroll (no pages). Lives inside <tbody>, after the first server-rendered rows. */
-export function MoreRows({ query, initialCount, total }: { query: LeadQuery; initialCount: number; total: number }) {
+export function MoreRows({ query, initialCount, total, stamp }: { query: LeadQuery; initialCount: number; total: number; stamp: number }) {
   const [chunks, setChunks] = useState<ReactNode[]>([]);
   const [loaded, setLoaded] = useState(initialCount);
   const [err, setErr] = useState<string | null>(null);
   const loadedRef = useRef(initialCount), busy = useRef(false), done = useRef(initialCount >= total);
   const sentinel = useRef<HTMLTableCellElement>(null);
+  const offsets = useRef<number[]>([]);   // where each loaded chunk starts
 
   const load = useCallback(async () => {
     if (busy.current || done.current) return;
@@ -17,6 +18,7 @@ export function MoreRows({ query, initialCount, total }: { query: LeadQuery; ini
     try {
       const r = await loadLeadsChunk(query, loadedRef.current);
       if (r.count === 0) { done.current = true; setLoaded(total); return; }
+      offsets.current.push(loadedRef.current);
       loadedRef.current += r.count;
       setChunks((c) => [...c, r.node]); setLoaded(loadedRef.current);
       if (loadedRef.current >= r.total) done.current = true;
@@ -24,6 +26,27 @@ export function MoreRows({ query, initialCount, total }: { query: LeadQuery; ini
     } catch { setErr("تعذّر تحميل المزيد. تأكد من الاتصال ثم اضغط «تحميل المزيد»."); }
     finally { busy.current = false; }
   }, [query, total]);
+
+  // The page was rendered again on the server (after saving a note / status / colour, or a live update): the first rows are
+  // fresh, so reload the rows that were added while scrolling too — otherwise they keep showing what they had when loaded.
+  const firstStamp = useRef(stamp);
+  useEffect(() => {
+    if (stamp === firstStamp.current) return;
+    firstStamp.current = stamp;
+    let cancelled = false;
+    const refresh = async () => {
+      while (busy.current) await new Promise((r) => setTimeout(r, 50));
+      if (loadedRef.current <= initialCount) return;
+      busy.current = true;
+      try {
+        const res = await Promise.all(offsets.current.map((off) => loadLeadsChunk(query, off)));   // same places, fresh data
+        if (!cancelled) { setChunks(res.map((r) => r.node)); window.dispatchEvent(new Event("leads:rows")); }
+      } catch { /* keep the rows we have; the next save or refresh tries again */ }
+      finally { busy.current = false; }
+    };
+    void refresh();
+    return () => { cancelled = true; };
+  }, [stamp, query, initialCount]);
 
   useEffect(() => {
     const el = sentinel.current; if (!el) return;

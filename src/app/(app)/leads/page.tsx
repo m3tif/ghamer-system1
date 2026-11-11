@@ -95,7 +95,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         {rows.length > 0 && <LeadsHScroll />}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
           <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} me={s.userId} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide}
-            more={<MoreRows key={JSON.stringify(q) + ':' + total} query={q} initialCount={rows.length} total={Number(total)} />} />)}
+            more={<MoreRows key={JSON.stringify(q) + ':' + total} query={q} initialCount={rows.length} total={Number(total)} stamp={Date.now()} />} />)}
       </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (
