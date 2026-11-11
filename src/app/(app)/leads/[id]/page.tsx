@@ -1,3 +1,4 @@
+import { NotesHistory } from "@/components/lead-notes";
 import { PhoneField } from "@/components/phone-field";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -113,6 +114,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 <Field label="سبب المتابعة" name="followup_reason" />
               </ActionForm>
             </Card>)}
+
+          <Card title="سجل الملاحظات">
+            <NotesHistory leadId={id} />
+          </Card>
 
           <Card title="سجل النشاط">
             {activities.length === 0 ? <p className="text-sm text-ink-500">لا يوجد نشاط.</p> : (

@@ -1,4 +1,5 @@
 "use client";
+import { NotesHistory } from "@/components/lead-notes";
 import { useState } from "react";
 import { Dialog } from "@/components/dialog";
 import { ReturnTo } from "@/components/flash";
@@ -52,7 +53,8 @@ export function QuickEdit({ lead, children, className = "", followupLabel }: { l
           ? <div><p className="mb-1 text-sm font-medium">الحالة</p><p className="rounded-md bg-cream px-3 py-2 text-sm">{LEAD_STATUS[lead.lead_status]} <span className="text-xs text-ink-500">(يديرها مسار السيلز)</span></p></div>
           : <SelectField label="الحالة" name="status" defaultValue={lead.lead_status} options={EDIT_STATUS.map((k) => ({ value: k, label: LEAD_STATUS[k] }))} />}
         <SelectField label="درجة العميل" name="temperature" defaultValue={lead.lead_temperature ?? ""} empty="غير مصنّف" options={Object.entries(TEMPERATURE).map(([value, label]) => ({ value, label }))} />
-        <div className="md:col-span-2"><TextArea label="الملاحظات" name="notes" rows={4} defaultValue={lead.call_notes ?? ""} /></div>
+        <div className="md:col-span-2"><TextArea label="إضافة ملاحظة جديدة" name="notes" rows={3} placeholder="اكتب الملاحظة الجديدة — الملاحظات القديمة محفوظة تحت ولن تُمسح" /></div>
+        <div className="md:col-span-2"><p className="mb-1 text-sm font-medium">سجل الملاحظات</p><NotesHistory leadId={lead.id} /></div>
         <Field label="موعد متابعة جديد (اختياري)" name="next_followup" type="datetime-local" hint={followupLabel ? `الحالي: ${followupLabel}` : "مطلوب مع «يحتاج متابعة»"} />
         <Field label="سبب المتابعة" name="followup_reason" />
       </ActionForm>

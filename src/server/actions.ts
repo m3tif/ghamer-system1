@@ -136,8 +136,9 @@ export async function logCallAction(_: FormState, fd: FormData): Promise<FormSta
       await c.query("insert into lead_activities(lead_id, kind, status_from, status_to, note, created_by) values ($1,'call',$2,$3,$4,$5)",
         [id, cur.lead_status, status || cur.lead_status, note, sess.userId]);
       await c.query("update follow_ups set status = 'done', completed_at = now() where lead_id = $1 and status = 'open' and owner_id = $2", [id, sess.userId]);
-      await c.query("update leads set lead_status = $2, last_contact_at = now(), updated_by = $3, call_notes = $4, next_followup_at = $5 where id = $1",
-        [id, status || cur.lead_status, sess.userId, note, next]);
+      await c.query("update leads set lead_status = $2, last_contact_at = now(), updated_by = $3, next_followup_at = $4 where id = $1",
+        [id, status || cur.lead_status, sess.userId, next]);
+      await c.query("select app.add_lead_note($1,$2,'call')", [id, note]);   // kept in the notes history, never overwrites an older note
       if (next) await c.query("insert into follow_ups(lead_id, owner_id, due_at, reason, created_by) values ($1,$2,$3,$4,$2)", [id, sess.userId, next, why]);
     });
   } catch (e) { return fail(e, fd); }
@@ -437,9 +438,11 @@ export async function quickEditAction(_: FormState, fd: FormData): Promise<FormS
       if (["Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"].includes(cur.lead_status) && status && status !== cur.lead_status)
         throw new Error("status is managed by the Sales workflow");
       const newStatus = status || cur.lead_status;
-      const r = await c.query("update leads set lead_status = $2, lead_temperature = $3, call_notes = $4, updated_by = $5 where id = $1",
-        [id, newStatus, temp || null, notes || null, sess.userId]);
+      const r = await c.query("update leads set lead_status = $2, lead_temperature = $3, updated_by = $4 where id = $1",
+        [id, newStatus, temp || null, sess.userId]);
       if (!r.rowCount) throw new Error("no access");
+      // "notes" is a NEW note: added to the history; the older notes stay as they are
+      if (notes) await c.query("select app.add_lead_note($1,$2,'note')", [id, notes]);
       if (newStatus !== cur.lead_status)
         await c.query("insert into lead_activities(lead_id, kind, status_from, status_to, note, created_by) values ($1,'status_change',$2,$3,'تعديل من جدول العملاء',$4)", [id, cur.lead_status, newStatus, sess.userId]);
       if (notes && notes !== (cur.call_notes ?? ""))
@@ -654,4 +657,27 @@ export async function resetLeadOrderAction(): Promise<Ack> {
   const sess = await requireSession();
   try { await tx(sess.userId, (c) => c.query("select app.reset_lead_order()")); return { ok: true }; }
   catch (e) { return { ok: false, error: mapError(e) }; }
+}
+
+
+// ───────── notes history ─────────
+export type LeadNote = { id: string; body: string; created_at: string; by_name: string | null; source: string; deleted_at: string | null; deleted_by_name: string | null; delete_reason: string | null };
+export async function leadNotesAction(leadId: string): Promise<{ notes: LeadNote[]; canDelete: boolean } | { error: string }> {
+  const sess = await requireSession();
+  if (!/^[0-9a-f-]{36}$/.test(leadId)) return { error: "عميل غير صالح" };
+  try {
+    const rows = (await tx(sess.userId, (c) => c.query("select * from app.lead_notes($1)", [leadId]))).rows;
+    return { notes: rows.map((r: any) => ({ ...r, created_at: new Date(r.created_at).toISOString(), deleted_at: r.deleted_at ? new Date(r.deleted_at).toISOString() : null })), canDelete: sess.role === "super_admin" };
+  } catch { return { error: "تعذّر تحميل الملاحظات" }; }
+}
+export async function deleteNoteAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "note_id"), why = s(fd, "reason"), lead = s(fd, "lead_id");
+  if (sess.role !== "super_admin") return { error: "حذف الملاحظات لمدير النظام فقط" };
+  if (!why) return { error: "اكتب سبب الحذف", values: vals(fd) };
+  if (s(fd, "confirm") !== "حذف") return { error: "اكتب كلمة «حذف» للتأكيد", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.delete_lead_note($1,$2)", [id, why]), why); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/leads"); if (/^[0-9a-f-]{36}$/.test(lead)) revalidatePath(`/leads/${lead}`);
+  return { ok: "تم حذف الملاحظة (محفوظة في سجل التدقيق)" };
 }
