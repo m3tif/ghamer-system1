@@ -68,7 +68,7 @@ export function CopyToolbar({ tableId = "leads-table", total: grand = 0 }: { tab
   const partial = grand > total;
   const b = "rounded-md border border-line bg-white px-2.5 py-1 text-xs hover:bg-cream";
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs" aria-label="أدوات التحديد والنسخ">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs" aria-label="أدوات التحديد والنسخ">
       <div className="flex items-center gap-1.5">
         <span className="font-semibold">تحديد:</span>
         <button type="button" onClick={() => setAll(true)} className={b}>الكل</button>

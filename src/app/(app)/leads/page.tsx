@@ -90,8 +90,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <HideMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} hide={hiddenF !== "hidden"} count={total} />
             {s.role === "super_admin" && <DeleteMonth emp={creator} empName={emps.find((e: any) => e.id === creator)?.full_name ?? "الموظف"} month={sp.month!} count={total} />}
           </div>)}
-        {rows.length > 0 && <CopyToolbar total={Number(total)} />}
-        {rows.length > 0 && <LeadsMarks manualActive={sort === "manual"} />}
+        {rows.length > 0 && (
+          // both tool bars stay on screen while scrolling the list
+          <div className="sticky top-14 z-20 mb-2 space-y-1.5 rounded-lg bg-cream/95 pb-1 shadow-md backdrop-blur lg:top-2" data-testid="leads-tools">
+            <CopyToolbar total={Number(total)} />
+            <LeadsMarks manualActive={sort === "manual"} />
+          </div>)}
         {rows.length > 0 && <LeadsHScroll />}
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
           <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} me={s.userId} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide}
