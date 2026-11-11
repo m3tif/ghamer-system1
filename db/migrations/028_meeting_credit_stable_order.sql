@@ -6,6 +6,9 @@
 -- (2) fixed order number. Existing leads: by time, then the file row order of the import/distribution, then id.
 alter table leads add column if not exists seq bigint;
 create sequence if not exists leads_seq_seq owned by leads.seq;
+-- filling the number is technical: it must not change "last updated" (used to tell untouched imports/distributions apart) nor flood the audit log
+alter table leads disable trigger leads_touch;
+alter table leads disable trigger audit_leads;
 do $$ begin
   if exists (select 1 from leads where seq is null) then
     with o as (select l.id, row_number() over (order by l.created_at, (select min(r.row_no) from import_rows r where r.lead_id = l.id), l.id) n from leads l)
@@ -13,6 +16,8 @@ do $$ begin
   end if;
   perform setval('leads_seq_seq', greatest((select coalesce(max(seq), 0) from leads), 1));
 end $$;
+alter table leads enable trigger leads_touch;
+alter table leads enable trigger audit_leads;
 alter table leads alter column seq set default nextval('leads_seq_seq');
 alter table leads alter column seq set not null;
 create index if not exists leads_created_seq on leads(created_at desc, seq);
