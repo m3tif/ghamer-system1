@@ -106,7 +106,7 @@ export function LeadsMarks({ manualActive }: { manualActive: boolean }) {
   const manualHref = (() => { const p = new URLSearchParams(sp.toString()); p.set("sort", "manual"); p.delete("dir"); return `${pathname}?${p}`; })();
   const chip = "h-6 w-6 rounded-full border border-black/10 outline-offset-2 hover:scale-110";
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs" aria-label="أدوات التلوين والترتيب">
+    <div className="sticky top-14 z-20 mb-2 flex shadow-md lg:top-2 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs" aria-label="أدوات التلوين والترتيب">
       <div className="flex items-center gap-1.5">
         <span className="font-semibold">🎨 تلوين:</span>
         {MARK_COLORS.map((c) => (
