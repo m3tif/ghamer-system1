@@ -33,7 +33,7 @@ export function ActionForm({ action, submit, children, className = "space-y-4", 
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const dlg = useDialog();
   // inside a dialog: show the success message briefly, then close it
-  useEffect(() => { if (state.ok && dlg) { const t = setTimeout(dlg.close, 900); return () => clearTimeout(t); } }, [state.ok]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (state.ok && dlg) { const t = setTimeout(dlg.close, 900); return () => clearTimeout(t); } }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <form action={formAction} className={className}>
       <Ctx.Provider value={state}>
