@@ -440,6 +440,11 @@ export async function quickEditAction(_: FormState, fd: FormData): Promise<FormS
       const newStatus = status || cur.lead_status;
       const r = await c.query("update leads set lead_status = $2, lead_temperature = $3, updated_by = $4 where id = $1",
         [id, newStatus, temp || null, sess.userId]);
+      // "has WhatsApp?" — optional; only touched when the field was in the form (yes / no / not known)
+      if (fd.has("whatsapp")) {
+        const w = s(fd, "whatsapp");
+        await c.query("update leads set has_whatsapp = $2 where id = $1 and has_whatsapp is distinct from $2", [id, w === "yes" ? true : w === "no" ? false : null]);
+      }
       if (!r.rowCount) throw new Error("no access");
       // "notes" is a NEW note: added to the history; the older notes stay as they are
       if (notes) await c.query("select app.add_lead_note($1,$2,'note')", [id, notes]);
@@ -680,4 +685,11 @@ export async function deleteNoteAction(_: FormState, fd: FormData): Promise<Form
   catch (e) { return fail(e, fd); }
   revalidatePath("/leads"); if (/^[0-9a-f-]{36}$/.test(lead)) revalidatePath(`/leads/${lead}`);
   return { ok: "تم حذف الملاحظة (محفوظة في سجل التدقيق)" };
+}
+
+export async function dismissReleaseAction(id: string) {
+  const sess = await requireSession();
+  if (!/^[0-9a-f-]{36}$/.test(id)) return;
+  await tx(sess.userId, (c) => c.query("update notifications set read_at = now() where id = $1 and read_at is null", [id]));
+  revalidatePath("/", "layout");
 }

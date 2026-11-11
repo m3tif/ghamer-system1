@@ -8,7 +8,7 @@ export const PAGE_SIZES = [25, 50, 100];
 export type LeadFilter = { q?: string; status?: string; page?: number; size?: number; offset?: number; month?: string; creator?: string; sales?: string; temp?: string; sort?: string; dir?: string; hidden?: string; scope?: string };
 export type LeadRow = {
   id: string; client_id: string; name: string; business_name: string | null; phone: string | null; store_url: string | null;
-  lead_status: string; lead_temperature: string | null; call_notes: string | null; next_followup_at: string | null; created_at: string;
+  lead_status: string; lead_temperature: string | null; call_notes: string | null; next_followup_at: string | null; created_at: string; has_whatsapp: boolean | null;
   last_contact_at: string | null; original_creator_id: string; creator_name: string | null; assigned_sales_id: string | null; sales_name: string | null;
   handed_off: boolean; dup_attempts: number; total: number; hidden_at: string | null; hidden_by_name: string | null; hidden_reason: string | null;
   pos: number | null; colors: Record<string, string>;
@@ -283,4 +283,10 @@ export async function distRows(uid: string, id: string, status: string | null, p
 /** Has this user ever arranged the leads by hand? (then "my order" becomes their default view) */
 export async function hasManualOrder(uid: string): Promise<boolean> {
   return tx(uid, async (c) => (await c.query("select app.has_manual_order() as v")).rows[0]?.v === true);
+}
+
+/** The newest unread "what's new" notice for the signed-in user (one-time pop-up). */
+export async function pendingRelease(uid: string) {
+  return (await tx(uid, (c) => c.query("select id, title, body, link from notifications where read_at is null and kind = 'system' and dedupe_key like 'release:%' order by created_at desc limit 1"))).rows[0] as
+    { id: string; title: string; body: string | null; link: string | null } | undefined;
 }

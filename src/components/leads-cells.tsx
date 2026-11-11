@@ -41,7 +41,7 @@ export function CopyLink({ url, children }: { url: string; children: React.React
   );
 }
 
-export type EditableLead = { id: string; name: string; lead_status: string; lead_temperature: string | null; call_notes: string | null; next_followup_at: string | null; handed_off: boolean };
+export type EditableLead = { id: string; name: string; lead_status: string; lead_temperature: string | null; call_notes: string | null; has_whatsapp?: boolean | null; next_followup_at: string | null; handed_off: boolean };
 
 export function QuickEdit({ lead, children, className = "", followupLabel }: { lead: EditableLead; children: React.ReactNode; className?: string; followupLabel?: string }) {
   const locked = ["Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed", "Rejected by Sales"].includes(lead.lead_status);
@@ -53,6 +53,9 @@ export function QuickEdit({ lead, children, className = "", followupLabel }: { l
           ? <div><p className="mb-1 text-sm font-medium">الحالة</p><p className="rounded-md bg-cream px-3 py-2 text-sm">{LEAD_STATUS[lead.lead_status]} <span className="text-xs text-ink-500">(يديرها مسار السيلز)</span></p></div>
           : <SelectField label="الحالة" name="status" defaultValue={lead.lead_status} options={EDIT_STATUS.map((k) => ({ value: k, label: LEAD_STATUS[k] }))} />}
         <SelectField label="درجة العميل" name="temperature" defaultValue={lead.lead_temperature ?? ""} empty="غير مصنّف" options={Object.entries(TEMPERATURE).map(([value, label]) => ({ value, label }))} />
+        <SelectField label="عنده واتساب؟ (اختياري)" name="whatsapp" defaultValue={lead.has_whatsapp === true ? "yes" : lead.has_whatsapp === false ? "no" : ""} empty="مش معروف"
+          options={[{ value: "yes", label: "أيوه، عنده واتساب" }, { value: "no", label: "لا، معندوش واتساب" }]} />
+        <div className="hidden md:block" />
         <div className="md:col-span-2"><TextArea label="إضافة ملاحظة جديدة" name="notes" rows={3} placeholder="اكتب الملاحظة الجديدة — الملاحظات القديمة محفوظة تحت ولن تُمسح" /></div>
         <div className="md:col-span-2"><p className="mb-1 text-sm font-medium">سجل الملاحظات</p><NotesHistory leadId={lead.id} /></div>
         <Field label="موعد متابعة جديد (اختياري)" name="next_followup" type="datetime-local" hint={followupLabel ? `الحالي: ${followupLabel}` : "مطلوب مع «يحتاج متابعة»"} />

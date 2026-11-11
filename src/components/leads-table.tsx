@@ -73,7 +73,9 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                   {url ? <CopyLink url={url}><a href={url} target="_blank" rel="noopener noreferrer" dir="ltr" title={url} className="block min-w-0 truncate text-burgundy-600 underline">{hostOf(url)}</a></CopyLink>
                     : r.store_url ? <CopyLink url={r.store_url}><span dir="ltr" className="block min-w-0 truncate text-ink-500" title="رابط غير صالح للفتح">{r.store_url}</span></CopyLink> : <span className="text-ink-300">—</span>}
                 </td>
-                <td data-col="phone" data-color={r.colors?.phone} className={`${cell} whitespace-nowrap`}>{r.phone ? <CopyPhone phone={r.phone} /> : <span className="text-ink-300">—</span>}</td>
+                <td data-col="phone" data-color={r.colors?.phone} className={`${cell} whitespace-nowrap`}>{r.phone ? <CopyPhone phone={r.phone} /> : <span className="text-ink-300">—</span>}
+                  {r.has_whatsapp === true && <span className="ms-1 rounded bg-ok/10 px-1.5 py-0.5 text-[11px] font-semibold text-ok" title="عنده واتساب">واتساب ✓</span>}
+                  {r.has_whatsapp === false && <span className="ms-1 rounded bg-ink-300/15 px-1.5 py-0.5 text-[11px] text-ink-500" title="معندوش واتساب">بدون واتساب</span>}</td>
                 <td data-col="hunter" data-color={r.colors?.hunter} className={`${cell} whitespace-nowrap`}>
                   {wide ? <Link href={href(q, { creator: r.original_creator_id })} className="hover:text-burgundy-600 hover:underline" title="تصفية بعملاء هذا الموظف">{r.creator_name}</Link> : r.creator_name}
                 </td>
@@ -85,7 +87,7 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                 </td>
                 <td data-col="notes" data-color={r.colors?.notes} className={`${cell} max-w-72`}>
                   {editable ? (
-                    <QuickEdit lead={{ id: r.id, name: r.name, lead_status: r.lead_status, lead_temperature: r.lead_temperature, call_notes: r.call_notes, next_followup_at: r.next_followup_at, handed_off: r.handed_off }}
+                    <QuickEdit lead={{ id: r.id, name: r.name, lead_status: r.lead_status, lead_temperature: r.lead_temperature, call_notes: r.call_notes, has_whatsapp: r.has_whatsapp, next_followup_at: r.next_followup_at, handed_off: r.handed_off }}
                       followupLabel={followLabel} className="!block !w-full !whitespace-normal !border-transparent !bg-transparent !px-1 !py-0 !text-start !font-normal hover:!bg-cream">
                       {r.call_notes ? <span className="line-clamp-1 text-start">{r.call_notes}</span> : <span className="text-ink-300">＋ أضف ملاحظة</span>}
                     </QuickEdit>
