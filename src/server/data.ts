@@ -269,3 +269,26 @@ export async function pendingRelease(uid: string) {
   return (await tx(uid, (c) => c.query("select id, title, body, link from notifications where read_at is null and kind = 'system' and dedupe_key like 'release:%' order by created_at desc limit 1"))).rows[0] as
     { id: string; title: string; body: string | null; link: string | null } | undefined;
 }
+
+// ───────── Phase 2: contracts ─────────
+export async function servicesList(uid: string) {
+  return (await tx(uid, (c) => c.query("select code, name_ar from services where is_active order by sort, name_ar"))).rows as { code: string; name_ar: string }[];
+}
+export async function contractList(uid: string, f: { status?: string | null; q?: string | null; page?: number }) {
+  const page = Math.max(1, f.page ?? 1), size = 20;
+  const rows = (await tx(uid, (c) => c.query("select * from app.contract_list($1,$2,$3,$4)", [f.status || null, f.q?.trim() || null, size, (page - 1) * size]))).rows as any[];
+  return { rows, total: Number(rows[0]?.total ?? 0), page };
+}
+export async function contractGet(uid: string, id: string) {
+  return (await tx(uid, (c) => c.query("select app.contract_get($1) j", [id]))).rows[0]?.j as
+    { contract: any; items: any[]; installments: any[]; files: any[] } | null;
+}
+export async function dealContract(uid: string, dealId: string) {
+  return (await tx(uid, (c) => c.query("select * from app.deal_contract($1)", [dealId]))).rows[0] as { id: string; contract_no: string; status: string; total_amount: string } | undefined;
+}
+export async function vatRate(uid: string) {
+  return Number((await tx(uid, (c) => c.query("select (value #>> '{}')::numeric v from settings where key = 'vat_rate'"))).rows[0]?.v ?? 0.15);
+}
+export async function attachmentGet(uid: string, id: string) {
+  return (await tx(uid, (c) => c.query("select * from app.attachment_get($1)", [id]))).rows[0] as { filename: string; mime_type: string; content: Buffer } | undefined;
+}

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
-import { getDeal } from "@/server/data";
+import { dealContract, getDeal } from "@/server/data";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ActionForm, CheckGroup, Field, Hidden, SelectField, TextArea } from "@/components/forms";
 import { moveDealAction, saveBriefAction } from "@/server/actions";
 import { fmtDateTime } from "@/lib/format";
-import { DEAL_STAGE, DEAL_STAGES, FOLLOWUP_STATUS, SERVICES } from "@/lib/labels";
+import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, DEAL_STAGE, DEAL_STAGES, FOLLOWUP_STATUS, SERVICES } from "@/lib/labels";
+import { fmtSar } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const closed = ["Lost", "Financially Approved"].includes(deal.stage);
   const canEdit = can(s, "deals.edit") && !closed;
   const b = brief as any;
+  const contract = can(s, "contracts.view") ? await dealContract(s.userId, id) : undefined;
   return (
     <>
       <PageHeader title={deal.client_name} sub={`${deal.business_name ?? ""} · المسؤول: ${deal.owner_name}`}
@@ -50,16 +52,30 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             </dl>)}
         </Card>
         <div className="space-y-6">
+          {(contract || canEdit) && (
+            <Card title="العقد">
+              {contract ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-2"><Link href={`/contracts/${contract.id}`} className="font-semibold text-burgundy-700 underline" dir="ltr">{contract.contract_no}</Link>
+                    <Badge tone={CONTRACT_STATUS_TONE[contract.status]}>{CONTRACT_STATUS[contract.status]}</Badge></div>
+                  <p className="text-ink-500">الإجمالي: <span className="tabular-nums">{fmtSar(contract.total_amount)}</span></p>
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <p className="text-ink-500">لما العميل يوافق: اكتب العقد، ارفع النسخة الموقّعة، وابعته للمالية.</p>
+                  <Link href={`/contracts/new?deal=${id}`} className="inline-flex rounded-md bg-burgundy-600 px-4 py-2 font-semibold text-white hover:bg-burgundy-700">إنشاء عقد</Link>
+                </div>)}
+            </Card>)}
           {canEdit && (
             <Card title="تحديث المرحلة">
               <ActionForm action={moveDealAction} submit="تحديث المرحلة" className="space-y-3">
                 <Hidden name="deal_id" value={id} />
                 <SelectField label="المرحلة الجديدة" name="to" required defaultValue={deal.stage}
-                  options={DEAL_STAGES.filter((x) => x !== "Financially Approved").map((x) => ({ value: x, label: DEAL_STAGE[x] }))} />
+                  options={DEAL_STAGES.filter((x) => x !== "Financially Approved" && (x !== "Signed / Finance Pending" || deal.stage === x)).map((x) => ({ value: x, label: DEAL_STAGE[x] }))} />
                 <TextArea label="ملاحظة / سبب" name="reason" rows={2} hint="مطلوب عند «خسرناه»" />
                 <Field label="موعد المتابعة" name="followup_at" type="datetime-local" hint="مطلوب عند «مؤجل» و«متابعة»" />
                 <Field label="سبب المتابعة" name="followup_reason" />
-                <p className="text-xs text-ink-500">الاعتماد المالي يتم من قسم المالية فقط.</p>
+                <p className="text-xs text-ink-500">«تم الاتفاق / التوقيع» بتتم بإرسال العقد للمالية. الاعتماد المالي يتم من قسم المالية فقط.</p>
               </ActionForm>
             </Card>)}
           <Card title="سجل المراحل">

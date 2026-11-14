@@ -55,3 +55,10 @@ export function tzLabel(tz: string = TZ): string {
 }
 /** First day of the current month in company time, as YYYY-MM-01. */
 export const monthStart = (date = new Date()) => `${toLocalInput(date).slice(0, 7)}-01`;
+
+/** Exact money for contracts and payments: halalas are shown when there are any (3,833.33 ر.س). */
+export const fmtSar = (v: string | number | null | undefined) => {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  return new Intl.NumberFormat("ar-SA-u-nu-latn", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n) + " ر.س";
+};

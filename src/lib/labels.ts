@@ -73,5 +73,14 @@ export const METRIC: Record<string, string> = { new_leads: "عملاء جدد", 
 export const ENTITY: Record<string, string> = {
   clients: "عميل", leads: "عميل محتمل", meetings: "اجتماع", deals: "صفقة", targets: "تارجت", users: "حساب", employees: "موظف",
   team_memberships: "فريق", role_permissions: "صلاحيات", settings: "إعدادات", follow_ups: "متابعة", lead_assignments: "إسناد",
-  duplicate_reviews: "مراجعة تكرار", lead_handoffs: "تحويل إلى Sales", achievements: "إنجاز", client_contacts: "بيانات تواصل", client_stores: "متجر", client_identifiers: "معرّف عميل",
+  duplicate_reviews: "مراجعة تكرار", contracts: "عقد", contract_services: "خدمة في عقد", payment_installments: "قسط", attachments: "ملف مرفق", lead_handoffs: "تحويل إلى Sales", achievements: "إنجاز", client_contacts: "بيانات تواصل", client_stores: "متجر", client_identifiers: "معرّف عميل",
 };
+
+// ───────── Phase 2: contracts ─────────
+export const CONTRACT_STATUS: Record<string, string> = { draft: "مسودة", submitted: "عند المالية", returned: "رجع للتعديل", approved: "معتمد ماليًا", cancelled: "ملغي" };
+export const CONTRACT_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { draft: "neutral", submitted: "brand", returned: "warn", approved: "ok", cancelled: "bad" };
+export const PACKAGE: Record<string, string> = { monthly: "شهرية", quarterly: "ربع سنوية", semiannual: "نصف سنوية", annual: "سنوية", one_time: "مرة واحدة", custom: "مخصصة" };
+export const PACKAGE_MONTHS: Record<string, number | null> = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12, one_time: 1, custom: null };
+export const PAYMENT_METHOD: Record<string, string> = { bank_transfer: "تحويل بنكي", cash: "نقدي", card: "بطاقة", payment_link: "رابط دفع", other: "أخرى" };
+export const INSTALLMENT_KIND: Record<string, string> = { down_payment: "مقدم", installment: "قسط", full: "دفعة كاملة" };
+export const FILE_KIND: Record<string, string> = { signed_contract: "العقد الموقّع", other: "مستند آخر" };

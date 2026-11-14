@@ -693,3 +693,72 @@ export async function dismissReleaseAction(id: string) {
   await tx(sess.userId, (c) => c.query("update notifications set read_at = now() where id = $1 and read_at is null", [id]));
   revalidatePath("/", "layout");
 }
+
+
+// ───────── Phase 2: contracts ─────────
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const money = (v: unknown) => { const n = Number(String(v ?? "").replace(/[,٬\s]/g, "")); return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN; };
+
+/** Create / edit the contract of a deal while it is still with Sales. The form sends one JSON payload (services + instalments). */
+export async function saveContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const deal = s(fd, "deal_id");
+  if (!UUID.test(deal)) return { error: "صفقة غير صالحة" };
+  let p: any;
+  try { p = JSON.parse(s(fd, "payload")); } catch { return { error: "بيانات العقد غير صالحة" }; }
+  const items = (Array.isArray(p.items) ? p.items : []).map((i: any) => ({ service: String(i.service ?? ""), description: String(i.description ?? "").slice(0, 500), amount: money(i.amount) }))
+    .filter((i: any) => i.service || i.amount);
+  const installments = (Array.isArray(p.installments) ? p.installments : []).map((i: any) => ({ kind: String(i.kind ?? "installment"), due_date: String(i.due_date ?? ""), amount: money(i.amount), note: String(i.note ?? "").slice(0, 300) }))
+    .filter((i: any) => i.due_date || i.amount);
+  if (items.length === 0) return { error: "أضف خدمة واحدة على الأقل بسعرها" };
+  if (items.some((i: any) => !i.service || !(i.amount > 0))) return { error: "كل خدمة محتاجة اختيار من القايمة وسعر أكبر من صفر" };
+  if (installments.some((i: any) => !DATE.test(i.due_date) || !(i.amount > 0))) return { error: "كل قسط محتاج مبلغ وتاريخ استحقاق" };
+  for (const k of ["start_date", "end_date", "agreed_at"]) if (p[k] && !DATE.test(String(p[k]))) return { error: "تاريخ غير صالح" };
+  const discount = p.discount ? money(p.discount) : 0;
+  if (!(discount >= 0)) return { error: "الخصم غير صالح" };
+  const payload = { package: String(p.package ?? "monthly"), duration_months: p.duration_months ? String(Math.trunc(Number(p.duration_months))) : "", start_date: p.start_date ?? "", end_date: p.end_date ?? "",
+    agreed_at: p.agreed_at ?? "", discount, payment_method: String(p.payment_method ?? ""), payment_terms: String(p.payment_terms ?? "").slice(0, 2000), notes: String(p.notes ?? "").slice(0, 4000), items, installments };
+  let id: string;
+  try { id = (await tx(sess.userId, (c) => c.query("select app.contract_save($1,$2::jsonb) id", [deal, JSON.stringify(payload)]))).rows[0].id; }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/deals/${deal}`); revalidatePath("/contracts"); revalidatePath("/pipeline");
+  redirect(`/contracts/${id}?saved=1`);
+}
+
+const FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+export async function uploadContractFileAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), kind = s(fd, "kind") === "signed_contract" ? "signed_contract" : "other";
+  const f = fd.get("file");
+  if (!UUID.test(id)) return { error: "عقد غير صالح" };
+  if (!(f instanceof File) || f.size === 0) return { error: "اختر الملف الأول" };
+  if (f.size > 4 * 1024 * 1024) return { error: "الملف أكبر من 4 ميجا. صغّره أو صوّره بجودة أقل" };
+  if (!FILE_TYPES.includes(f.type)) return { error: "نوع الملف غير مدعوم. المسموح: PDF أو صورة (JPG / PNG / WEBP)" };
+  const bytes = Buffer.from(await f.arrayBuffer());   // read before opening the database transaction
+  try { await tx(sess.userId, (c) => c.query("select app.contract_attach($1,$2,$3,$4,$5)", [id, kind, f.name, f.type, bytes])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/contracts/${id}`);
+  return { ok: kind === "signed_contract" ? "تم رفع العقد الموقّع" : "تم رفع الملف" };
+}
+
+export async function submitContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id");
+  if (!UUID.test(id)) return { error: "عقد غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.contract_submit($1)", [id])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/contracts/${id}`); revalidatePath("/contracts"); revalidatePath("/pipeline"); revalidatePath("/", "layout");
+  return { ok: "تم إرسال العقد للمالية" };
+}
+
+export async function returnContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), why = s(fd, "reason");
+  if (!UUID.test(id)) return { error: "عقد غير صالح" };
+  if (!why) return { error: "اكتب سبب إرجاع العقد", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.contract_return($1,$2)", [id, why]), why); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath(`/contracts/${id}`); revalidatePath("/contracts"); revalidatePath("/pipeline");
+  return { ok: "تم إرجاع العقد للسيلز للتعديل" };
+}

@@ -83,3 +83,17 @@ export async function bookAs(sales: string, lead: string, minutes = 120, url: st
   return r.rows[0].id as string;
 }
 export const pastMeeting = (id: string) => admin.query("update meetings set scheduled_at = now() - interval '1 hour' where id = $1", [id]);
+
+/** A minimal real PDF header — enough for the server's content check. */
+export const PDF = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n");
+export const contractPayload = (o: { amount?: number; installments?: { kind?: string; due_date: string; amount: number }[]; discount?: number; start?: string; months?: number } = {}) => ({
+  package: "monthly", duration_months: o.months ?? 3, start_date: o.start ?? "2027-01-01", payment_method: "bank_transfer", discount: o.discount ?? 0,
+  items: [{ service: "social_media", description: "إدارة حسابات", amount: o.amount ?? 11500 }], installments: o.installments ?? [],
+});
+/** Sales writes the contract of a deal, uploads the signed file and sends it to Finance (the only way to reach «تم الاتفاق / التوقيع»). Returns the contract id. */
+export async function signContract(sales: string, deal: string, payload: any = contractPayload()) {
+  const id = (await run(sales, "select app.contract_save($1,$2::jsonb) id", [deal, JSON.stringify(payload)])).rows[0].id as string;
+  await run(sales, "select app.contract_attach($1,'signed_contract','عقد موقع.pdf','application/pdf',$2)", [id, PDF]);
+  await run(sales, "select app.contract_submit($1)", [id]);
+  return id;
+}

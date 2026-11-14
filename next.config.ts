@@ -20,6 +20,8 @@ const securityHeaders = [
 const config: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["pg", "@node-rs/argon2"],
+  // signed contracts / payment proofs are uploaded through server actions (files up to 4 MB — the hosting limit is 4.5 MB per request)
+  experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() { return [{ source: "/:path*", headers: securityHeaders }]; },
 };
 export default config;

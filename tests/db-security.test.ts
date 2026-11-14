@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupDb, teardown, run, register, leadPayload, ids, admin, future, sendAccepted, bookAs, pastMeeting } from "./helpers";
+import { setupDb, teardown, run, register, leadPayload, ids, admin, future, sendAccepted, bookAs, pastMeeting, signContract } from "./helpers";
 
 beforeAll(async () => { await setupDb(); });
 afterAll(async () => { await teardown(); });
@@ -253,7 +253,10 @@ describe("sales pipeline", () => {
     expect((await run("sales1", "select id from follow_ups where deal_id = $1 and status = 'open'", [deal])).rowCount).toBe(1);
     await expect(run("sales1", "select app.move_deal_stage($1,'Financially Approved','x',null,null)", [deal])).rejects.toThrow(/Finance only/);
     await expect(run("sales1", "select app.move_deal_stage($1,'Lost','',null,null)", [deal])).rejects.toThrow(/reason required/);
-    await run("sales1", "select app.move_deal_stage($1,'Signed / Finance Pending','تم التوقيع',null,null)", [deal]);
+    // Phase 2: «تم الاتفاق / التوقيع» is reached only by sending the signed contract to Finance
+    await expect(run("sales1", "select app.move_deal_stage($1,'Signed / Finance Pending','تم التوقيع',null,null)", [deal])).rejects.toThrow(/needs a contract/);
+    await signContract("sales1", deal);
+    expect((await run("sales1", "select stage from deals where id = $1", [deal])).rows[0].stage).toBe("Signed / Finance Pending");
     const h = await run("sales1", "select count(*)::int n from deal_stage_history where deal_id = $1", [deal]);
     expect(h.rows[0].n).toBeGreaterThanOrEqual(3); // history is kept, never overwritten
   });
@@ -262,7 +265,7 @@ describe("sales pipeline", () => {
     const m = await bookAs("sales1", l, 60); await pastMeeting(m);
     await run("sales1", "select app.complete_meeting($1,'positive',null,null,null)", [m]);
     const d = await admin.query("select id from deals where lead_id = $1", [l]);
-    await run("sales1", "select app.move_deal_stage($1,'Signed / Finance Pending','تم',null,null)", [d.rows[0].id]);
+    await signContract("sales1", d.rows[0].id);
     const o = await run("tele2", "select * from app.my_lead_outcomes() where lead_id = $1", [l]);
     expect(o.rows[0]).toMatchObject({ meeting_status: "Completed", deal_outcome: "won", handoff_status: "accepted" });
     expect(Object.keys(o.rows[0]).sort()).toEqual(["business_name", "client_name", "deal_outcome", "decided_at", "handed_off_at", "handoff_status", "lead_id",
