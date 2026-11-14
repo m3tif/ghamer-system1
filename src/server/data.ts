@@ -168,8 +168,8 @@ export async function teleStats(uid: string, emp: string, month: string) {
 export async function salesStats(uid: string, emp: string, month: string) {
   return (await tx(uid, (c) => c.query("select * from app.sales_stats($1,$2)", [emp, month]))).rows[0];
 }
-export async function myOutcomes(uid: string) {
-  return (await tx(uid, (c) => c.query("select * from app.my_lead_outcomes()"))).rows as any[];
+export async function myOutcomes(uid: string, q?: string | null) {
+  return (await tx(uid, (c) => c.query("select * from app.my_lead_outcomes($1)", [q?.trim() || null]))).rows as any[];
 }
 export async function myProgress(uid: string, emp: string, month: string) {
   return (await tx(uid, (c) => c.query("select * from app.my_progress($1,$2)", [emp, month]))).rows[0] as

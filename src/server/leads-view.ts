@@ -22,7 +22,8 @@ export function normalizeLeadQuery(s: Session, sp: LeadQuery, hasManualOrder: bo
     temp: ["cold", "warm", "hot"].includes(sp.temp ?? "") ? sp.temp : undefined,
     sort, dir: sp.dir === "asc" ? "asc" : "desc",
     // Tele Sales keep what they added themselves apart from the data that was distributed to them
-    scope: s.role === "tele_sales" ? (sp.tab === "received" ? "received" : sp.tab === "handed" ? undefined : "added") : undefined,
+    // ... but a search always looks through everything she is allowed to see (added, received, handed over), not only the open tab
+    scope: s.role === "tele_sales" && !sp.q?.trim() ? (sp.tab === "received" ? "received" : sp.tab === "handed" ? undefined : "added") : undefined,
     hidden: canHide && ["hidden", "all"].includes(sp.hidden ?? "") ? sp.hidden : undefined,
   };
 }

@@ -35,7 +35,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const [list, counts, outcomes, reps] = await Promise.all([
     inList ? listLeads(s.userId, { q: f.q, status, size: CHUNK, offset: 0, month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF, scope: f.scope }) : { rows: [], total: 0 },
     employee ? addedCounts(s.userId, s.userId) : null,
-    tab === "handed" ? myOutcomes(s.userId) : [],
+    tab === "handed" ? myOutcomes(s.userId, f.q) : [],
     canHand ? salesReps(s.userId) : [],
   ]);
   const { rows, total } = list;
@@ -83,6 +83,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <button className="rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">تصفية</button>
           {filtered && <Link href="/leads" className="text-sm text-burgundy-600 underline">مسح الفلاتر</Link>}
         </form>
+        {isTele && f.q && <p className="mb-2 rounded-md bg-cream px-3 py-1.5 text-xs text-charcoal">🔎 البحث شغال على كل عملائك: اللي ضفتهم، والداتا المستلمة، واللي حوّلتيهم للسيلز.</p>}
         <p className="mb-2 text-xs text-ink-500">{total} نتيجة · التواريخ بـ{tz} · اضغط على اسم العميل لفتحه، وعلى الحالة أو الدرجة أو الشهر لتصفية الجدول، وعلى الملاحظات لتعديلها.</p>
         {canHide && creator && month && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
@@ -100,15 +101,28 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         {rows.length === 0 ? <Empty title="لا توجد نتائج" hint={filtered ? "جرّب تغيير البحث أو الفلاتر." : "سجّل أول عميل ليظهر هنا."} /> : (
           <LeadsTable rows={rows} q={q} sort={sort} dir={dir} canHide={canHide} canDelete={s.role === "super_admin"} me={s.userId} canEdit={can(s, "leads.edit")} canSend={canHand} reps={reps} tz={tz} wide={wide}
             more={<MoreRows key={JSON.stringify(q) + ':' + total} query={q} initialCount={rows.length} total={Number(total)} stamp={Date.now()} />} />)}
-      </>) : outcomes.length === 0 ? <Empty title="لم تحوّل أي عميل بعد" hint="أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل." /> : (
+      </>) : (<>
+        <form className="mb-3 flex flex-wrap items-center gap-2" role="search">
+          <input type="hidden" name="tab" value="handed" />
+          <SearchBox className="min-w-64 max-w-md flex-1" />
+          <button className="rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">بحث</button>
+          {sp.q && <Link href="/leads?tab=handed" className="text-sm text-burgundy-600 underline">مسح البحث</Link>}
+        </form>
+        <p className="mb-2 text-xs text-ink-500">
+          {outcomes.length} عميل{sp.q ? " (نتيجة البحث)" : ""} · اتقبل {outcomes.filter((o: any) => o.handoff_status === "accepted").length}
+          {" "}· مستني قرار السيلز {outcomes.filter((o: any) => String(o.handoff_status).startsWith("pending")).length}
+          {" "}· اترفض {outcomes.filter((o: any) => o.handoff_status === "rejected").length}
+        </p>
+        {outcomes.length === 0 ? <Empty title={sp.q ? "لا توجد نتائج" : "لم تحوّل أي عميل بعد"} hint={sp.q ? "جرّب جزء من الرقم أو الاسم." : "أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل."} /> : (
         <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (
-            <tr key={o.lead_id}><td className={td + " font-medium"}>{o.client_name}</td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.handed_off_at)}</td>
+            <tr key={o.lead_id}><td className={td + " font-medium"}><Link href={`/leads/${o.lead_id}`} className="text-burgundy-700 hover:underline">{o.client_name}</Link></td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.handed_off_at)}</td>
               <td className={td}><Badge tone={HANDOFF_TONE[o.handoff_status] ?? "neutral"}>{HANDOFF_STATUS[o.handoff_status] ?? "—"}</Badge></td>
               <td className={td}>{o.to_name ?? "—"}</td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.decided_at)}</td>
               <td className={td}>{o.meeting_status ? MEETING_STATUS[o.meeting_status] : "—"}</td>
               <td className={td}>{o.deal_outcome === "won" ? <Badge tone="ok">تم التعاقد</Badge> : o.deal_outcome === "lost" ? <Badge tone="bad">خسرناه</Badge> : o.deal_outcome === "open" ? <Badge tone="warn">قيد التفاوض</Badge> : "—"}</td></tr>))}
         </Table>)}
+      </>)}
     </>
   );
 }
