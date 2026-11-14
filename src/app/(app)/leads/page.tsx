@@ -10,7 +10,8 @@ import { MoreRows } from "@/components/leads-more";
 import { LeadsHScroll } from "@/components/leads-hscroll";
 import { LeadsMarks } from "@/components/leads-marks";
 import { normalizeLeadQuery } from "@/server/leads-view";
-import { DeleteMonth, HideMonth } from "@/components/leads-cells";
+import { CopyLink, CopyPhone, DeleteMonth, HideMonth } from "@/components/leads-cells";
+import { hostOf, safeHttpUrl } from "@/lib/url";
 import { inputCls } from "@/components/forms";
 import { fmtDate, fmtDateTime, getTimezone, tzLabel } from "@/lib/format";
 import { HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, MEETING_STATUS, TEMPERATURE } from "@/lib/labels";
@@ -114,9 +115,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           {" "}· اترفض {outcomes.filter((o: any) => o.handoff_status === "rejected").length}
         </p>
         {outcomes.length === 0 ? <Empty title={sp.q ? "لا توجد نتائج" : "لم تحوّل أي عميل بعد"} hint={sp.q ? "جرّب جزء من الرقم أو الاسم." : "أرسل العميل للسيلز من زر «إرسال للسيلز» في الجدول أو من صفحة العميل."} /> : (
-        <Table head={["العميل", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
+        <Table head={["العميل", "رقم الهاتف", "رابط المتجر", "وقت التحويل", "حالة التحويل", "السيلز", "وقت القرار", "الاجتماع", "نتيجة الصفقة"]}>
           {outcomes.map((o: any) => (
-            <tr key={o.lead_id}><td className={td + " font-medium"}><Link href={`/leads/${o.lead_id}`} className="text-burgundy-700 hover:underline">{o.client_name}</Link></td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.handed_off_at)}</td>
+            <tr key={o.lead_id}><td className={td + " font-medium"}><Link href={`/leads/${o.lead_id}`} className="text-burgundy-700 hover:underline">{o.client_name}</Link>{o.business_name && <span className="block text-xs text-ink-500">{o.business_name}</span>}</td>
+              <td className={td + " whitespace-nowrap"}>{o.phone ? <CopyPhone phone={o.phone} /> : <span className="text-ink-300">—</span>}</td>
+              <td className={td + " max-w-56"}>{(() => { const u = safeHttpUrl(o.store_url); return u
+                ? <CopyLink url={u}><a href={u} target="_blank" rel="noopener noreferrer" dir="ltr" title={u} className="block min-w-0 truncate text-burgundy-600 underline">{hostOf(u)}</a></CopyLink>
+                : o.store_url ? <CopyLink url={o.store_url}><span dir="ltr" className="block min-w-0 truncate text-ink-500">{o.store_url}</span></CopyLink> : <span className="text-ink-300">—</span>; })()}</td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.handed_off_at)}</td>
               <td className={td}><Badge tone={HANDOFF_TONE[o.handoff_status] ?? "neutral"}>{HANDOFF_STATUS[o.handoff_status] ?? "—"}</Badge></td>
               <td className={td}>{o.to_name ?? "—"}</td><td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(o.decided_at)}</td>
               <td className={td}>{o.meeting_status ? MEETING_STATUS[o.meeting_status] : "—"}</td>
