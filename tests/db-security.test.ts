@@ -266,7 +266,7 @@ describe("sales pipeline", () => {
     const o = await run("tele2", "select * from app.my_lead_outcomes() where lead_id = $1", [l]);
     expect(o.rows[0]).toMatchObject({ meeting_status: "Completed", deal_outcome: "won", handoff_status: "accepted" });
     expect(Object.keys(o.rows[0]).sort()).toEqual(["business_name", "client_name", "deal_outcome", "decided_at", "handed_off_at", "handoff_status", "lead_id",
-      "lead_status", "meeting_status", "to_name"]);
+      "lead_status", "meeting_status", "phone", "store_url", "to_name"]);   // phone + store link: the client's own contact data (added on request), still no deal details
     expect((await run("tele2", "select id from leads where id = $1", [l])).rowCount).toBe(1);
     const st = (await run("tele2", "select * from app.tele_stats($1, date_trunc('month', now())::date)", [ids.tele2])).rows[0];
     expect(st.contracts_generated).toBe(1);

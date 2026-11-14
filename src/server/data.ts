@@ -214,34 +214,13 @@ export async function auditList(uid: string, o: { entity?: string; actor?: strin
   return { rows: r.rows, total: r.rows[0]?.total ?? 0, page };
 }
 
+/** Company dashboard. Every number comes from ONE database function (app.company_overview) — months in company time, hidden leads stated separately. */
 export async function companyOverview(uid: string, month: string) {
-  return tx(uid, async (c) => {
-    const q = (sql: string, p: unknown[] = []) => c.query(sql, p).then((x) => x.rows);
-    const win = `(date '${month}')`, end = `(date '${month}' + interval '1 month')`;
-    const one = async (sql: string) => (await q(sql))[0].n as number;
-    return {
-      totalLeads: await one(`select count(*)::int n from leads`),
-      leads: await one(`select count(*)::int n from leads where created_month = ${win}`),
-      handoffs: await one(`select count(*)::int n from lead_handoffs where handed_at >= ${win} and handed_at < ${end}`),
-      pendingDistribution: await one(`select count(*)::int n from lead_handoffs where status = 'pending_distribution'`),
-      meetingsDone: await one(`select count(*)::int n from meetings where status='Completed' and completed_at >= ${win} and completed_at < ${end}`),
-      meetingsUpcoming: await one(`select count(*)::int n from meetings where status in ('Scheduled','Confirmed','Rescheduled') and scheduled_at >= now()`),
-      meetingsMonth: await one(`select count(*)::int n from meetings where created_at >= ${win} and created_at < ${end}`),
-      followUpsOpen: await one(`select count(*)::int n from follow_ups where status='open'`),
-      overdue: await one(`select count(*)::int n from follow_ups where status='open' and due_at < now()`),
-      openReviews: await one(`select count(*)::int n from duplicate_reviews where status='open'`),
-      byStatus: await q(`select lead_status s, count(*)::int n from leads group by 1 order by 2 desc`),
-      byTemperature: await q(`select coalesce(lead_temperature, 'none') t, count(*)::int n from leads group by 1 order by 2 desc`),
-      handoffMonth: await q(`select status s, count(*)::int n from lead_handoffs where handed_at >= ${win} and handed_at < ${end} group by 1`),
-      rejectedWaiting: await one(`select count(*)::int n from leads where lead_status = 'Rejected by Sales'`),
-      bySource: await q(`select cl.original_source src, count(*)::int n from leads l join clients cl on cl.id = l.client_id where l.created_month = ${win} group by 1 order by 2 desc`),
-      perEmployee: await q(`select e.id, e.full_name, e.role_name_ar role,
-          (select count(*)::int from leads l where l.original_creator_id = e.id and l.created_month = ${win}) added,
-          (select count(*)::int from leads l where l.current_owner_id = e.id and l.lead_status not in ('Not Interested','Invalid Contact')) active_owned,
-          (select t.target_value from targets t where t.employee_id = e.id and t.period_month = ${win} and t.metric = 'new_leads') goal
-        from app.employee_list() e where e.is_active and e.role_code in ('tele_sales','sales_rep','tele_sales_manager','sales_manager') order by e.role_code, e.full_name`),
-    };
-  });
+  return (await tx(uid, (c) => c.query("select app.company_overview($1::date) o", [month]))).rows[0].o as {
+    totalLeads: number; hiddenLeads: number; leads: number; leadsHidden: number; handoffs: number; handoffOps: number; pendingDistribution: number;
+    meetingsDone: number; meetingsUpcoming: number; meetingsMonth: number; followUpsOpen: number; overdue: number; openReviews: number;
+    byStatus: { s: string; n: number }[]; byTemperature: { t: string; n: number }[]; handoffMonth: { s: string; n: number }[]; rejectedWaiting: number;
+    bySource: { src: string; n: number }[]; perEmployee: { id: string; full_name: string; role: string; added: number; received: number; active_owned: number; goal: string | null }[] };
 }
 
 export async function employeeLinks(uid: string) {

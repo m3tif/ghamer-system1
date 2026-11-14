@@ -217,7 +217,7 @@ describe("admin overview (data layer, as used by the dashboard)", () => {
       expect(o.totalLeads).toBeGreaterThan(100);
       expect(o.byStatus.length).toBeGreaterThan(0);
       const t2 = o.perEmployee.find((e: any) => e.full_name === "نورة");
-      expect(t2.added).toBeGreaterThanOrEqual(100);
+      expect(t2!.added).toBeGreaterThanOrEqual(100);
     }
   });
 });
