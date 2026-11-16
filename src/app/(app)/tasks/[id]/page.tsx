@@ -62,14 +62,14 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
             <Card title="تسليم التاسك">
               <ActionForm action={submitTaskAction} submit="تسليم للمراجعة" hiddenOnOk>
                 <Hidden name="task_id" value={id} />
-                <Field label="رابط التسليم" name="link" required dir="ltr" placeholder="https://drive.google.com/..." defaultValue={t.delivery_link ?? ""} hint="رابط الملف أو الفولدر (درايف، فيجما، رابط الصفحة…)" />
+                <Field label="رابط التسليم (اختياري)" name="link" dir="ltr" placeholder="https://drive.google.com/..." defaultValue={t.delivery_link ?? ""} hint="رابط الملف أو الفولدر لو فيه (درايف، فيجما…). ممكن تسلّم من غير رابط وترفع الملف تحت في «ملفات»." />
                 <TextArea label="ملاحظة (اختياري)" name="note" rows={2} />
               </ActionForm>
             </Card>)}
 
-          {t.delivery_link && (
+          {(t.delivery_link || ["submitted", "client_review", "approved"].includes(t.status)) && (
             <Card title="التسليم">
-              <p className="text-sm"><a href={t.delivery_link} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all font-medium text-burgundy-700 underline">{t.delivery_link}</a></p>
+              {t.delivery_link ? <p className="text-sm"><a href={t.delivery_link} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all font-medium text-burgundy-700 underline">{t.delivery_link}</a></p> : <p className="text-sm text-ink-500">اتسلّم من غير رابط — شوف الملفات والملاحظة.</p>}
               {t.delivery_note && <p className="mt-2 whitespace-pre-wrap text-sm">{t.delivery_note}</p>}
               <p className="mt-2 text-xs text-ink-500">سلّمه {t.assignee_name} · {fmtDateTime(t.submitted_at)}</p>
               {t.can_review && t.status === "submitted" && (

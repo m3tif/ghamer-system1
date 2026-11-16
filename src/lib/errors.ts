@@ -57,7 +57,7 @@ const MAP: [RegExp, string][] = [
   [/due date is before start date/i, "تاريخ التسليم قبل تاريخ البداية"],
   [/task is closed/i, "التاسك معتمد ومقفول"],
   [/task cannot be started now/i, "التاسك عند المراجعة أو معتمد، مينفعش تشتغل عليه دلوقتي"],
-  [/delivery link required/i, "حط رابط التسليم (يبدأ بـ https://)"],
+  [/invalid delivery link/i, "الرابط لازم يبدأ بـ https://"],
   [/cannot review own task/i, "مينفعش تراجع تاسك إنت اللي منفذه"],
   [/task is not waiting for review/i, "التاسك مش مستني مراجعة"],
   [/invalid minutes/i, "اكتب عدد الدقايق (من 1 لـ 720)"],

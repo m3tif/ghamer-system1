@@ -61,8 +61,7 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     expect(g.logs.filter((l: any) => l.manual).length).toBe(1);
   });
   it("delivery needs a link and goes to review; the reviewer is told", async () => {
-    await expect(run("designer", "select app.task_submit($1,'','')", [task])).rejects.toThrow(/delivery link required/);
-    await expect(run("designer", "select app.task_submit($1,'drive','')", [task])).rejects.toThrow(/delivery link required/);
+    await expect(run("designer", "select app.task_submit($1,'drive','')", [task])).rejects.toThrow(/invalid delivery link/);
     await expect(run("seo", "select app.task_submit($1,'https://x.com/a','')", [task])).rejects.toThrow(/not allowed/);
     await run("designer", "select app.task_submit($1,'https://drive.google.com/file/1','النسخة الأولى')", [task]);
     await run("designer", "select app.task_submit($1,'https://drive.google.com/file/1','النسخة الأولى')", [task]);
@@ -197,5 +196,12 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     await run("smm", "select app.task_submit($1,'https://instagram.com/p/1',null)", [pub]);
     await run("am1", "select app.task_review($1,true,null)", [pub]);
     expect((await get("smm", pub)).status).toBe("approved");
+  });
+  it("the delivery link is optional", async () => {
+    const t = await save("am1", ops, null, { title: "تاسك من غير رابط", assignee: ids.designer });
+    await run("designer", "select app.task_submit($1,'','سلّمت الملف في المرفقات')", [t]);
+    const g = await get("am1", t);
+    expect(g.status).toBe("submitted"); expect(g.delivery_link).toBeNull(); expect(g.delivery_note).toBe("سلّمت الملف في المرفقات");
+    await run("am1", "select app.task_review($1,true,null)", [t]);
   });
 });

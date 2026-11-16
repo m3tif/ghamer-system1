@@ -839,7 +839,7 @@ export async function addTaskTimeAction(_: FormState, fd: FormData): Promise<For
   return [m, why]; }); }
 export async function submitTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_submit($1,$2,$3)", "تم تسليم التاسك للمراجعة", (fd) => {
   const link = s(fd, "link");
-  if (!/^https?:\/\/\S+$/i.test(link)) return "حط رابط التسليم (يبدأ بـ https://)";
+  if (link && !/^https?:\/\/\S+$/i.test(link)) return "الرابط لازم يبدأ بـ https://";
   return [link, s(fd, "note") || null]; }); }
 export async function approveTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,true,$2)", "تم اعتماد التاسك", (fd) => [s(fd, "note") || null]); }
 export async function rejectTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,false,$2)", "تم إرجاع التاسك للموظف للتعديل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل المطلوب"; }); }
