@@ -24,4 +24,9 @@ describe("Tele Sales can rename their clients", () => {
     expect(r.rowCount).toBe(0); expect(await nameOf(own)).toBe("متجر الريحان");
     expect((await admin.query("select count(*)::int n from audit_logs where entity_type='clients' and action='UPDATE' and new_value->>'name' = 'متجر الريحان'")).rows[0].n).toBe(1);
   });
+  it("a client handed to Sales and already accepted can still be renamed by the Tele who brought it (same SQL as renameClientAction)", async () => {
+    const r = await run("tele1", "update clients set name = $2 where id = (select client_id from leads where id = $1)", [handed, "بعد القبول"]);
+    expect(r.rowCount).toBe(1); expect(await nameOf(handed)).toBe("بعد القبول");
+    expect((await run("sales1", "update clients set name = $2 where id = (select client_id from leads where id = $1)", [handed, "السيلز"])).rowCount).toBe(1);
+  });
 });

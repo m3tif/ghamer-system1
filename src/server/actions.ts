@@ -419,6 +419,20 @@ export async function setTemperatureAction(_: FormState, fd: FormData): Promise<
   return { ok: "تم حفظ درجة التواصل" };
 }
 
+/** Rename the client from the leads table. The database decides who may (anyone who can edit leads and sees this client). */
+export async function renameClientAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "lead_id"), name = s(fd, "name").slice(0, 200);
+  if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "عميل غير صالح" };
+  if (!name) return { error: "اكتب اسم العميل", values: vals(fd) };
+  try {
+    const r = await tx(sess.userId, (c) => c.query("update clients set name = $2 where id = (select client_id from leads where id = $1)", [id, name]));
+    if (!r.rowCount) return { error: "مش مسموح لك تعدّل العميل ده", values: vals(fd) };
+  } catch (e) { return fail(e, fd); }
+  revalidatePath("/leads"); revalidatePath(`/leads/${id}`);
+  return { ok: "تم حفظ الاسم" };
+}
+
 /** Quick edit from the leads table: status, temperature, notes and (optionally) the next follow-up. Permissions are enforced by the database. */
 const EDITABLE_STATUS = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
 export async function quickEditAction(_: FormState, fd: FormData): Promise<FormState> {

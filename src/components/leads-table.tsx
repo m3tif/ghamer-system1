@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui";
-import { CopyLink, CopyPhone, DeleteLead, HideLead, QuickEdit, SendToSales } from "@/components/leads-cells";
+import { CopyLink, CopyPhone, DeleteLead, HideLead, QuickEdit, RenameClient, SendToSales } from "@/components/leads-cells";
 import { fmtDate, fmtDateTime, toLocalInput } from "@/lib/format";
 import { hostOf, safeHttpUrl } from "@/lib/url";
 import { LEAD_STATUS, LEAD_STATUS_TONE, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
@@ -61,6 +61,7 @@ export function LeadRows({ rows, startIndex = 0, q, canEdit, canSend, reps, wide
                     <input type="checkbox" className="row-sel h-4 w-4 shrink-0 accent-burgundy-600" aria-label={`تحديد الصف ${i + 1}`} />
                     <span data-idx className="w-5 shrink-0 text-start text-[11px] font-normal text-ink-300" aria-hidden>{i + 1}</span>
                     <Link href={`/leads/${r.id}`} className="truncate text-burgundy-600 hover:underline">{r.name}</Link>
+                    {canEdit && <RenameClient leadId={r.id} name={r.name} />}
                   </div>
                   {r.received_at && (
                     <div className="mt-0.5 ps-[3.6rem] text-[11px] font-normal leading-4 text-ink-500">

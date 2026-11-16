@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/dialog";
 import { ReturnTo } from "@/components/flash";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
-import { deleteLeadAction, deleteMonthAction, handoffAction, hideLeadAction, hideMonthAction, quickEditAction } from "@/server/actions";
+import { deleteLeadAction, deleteMonthAction, handoffAction, hideLeadAction, hideMonthAction, quickEditAction, renameClientAction } from "@/server/actions";
 import { LEAD_STATUS, TEMPERATURE } from "@/lib/labels";
 
 const EDIT_STATUS = ["New Lead", "Contacted", "No Answer", "Interested", "Not Interested", "Follow-up Required", "Qualified Lead", "Invalid Contact"];
@@ -131,6 +131,18 @@ export function DeleteMonth({ emp, empName, month, count }: { emp: string; empNa
         <p className="text-sm text-bad">سيُحذف نهائيًا كل ما أضافه {empName} في {month}{count ? ` (${count} في القائمة الحالية)` : ""} مع كل ما يخصه، ولا يمكن التراجع.</p>
         <TextArea label="السبب" name="reason" rows={2} required />
         <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
+      </ActionForm>
+    </Dialog>
+  );
+}
+
+/** Small ✎ next to the client's name: rename from the table, also for clients already handed to Sales. */
+export function RenameClient({ leadId, name }: { leadId: string; name: string }) {
+  return (
+    <Dialog trigger="✎" title="تعديل اسم العميل" tone="quiet" triggerClass="!shrink-0 !border-transparent !bg-transparent !px-1 !py-0 !text-xs !font-normal !text-ink-300 hover:!text-burgundy-600 print:hidden">
+      <ActionForm action={renameClientAction} submit="حفظ الاسم" className="grid gap-4">
+        <Hidden name="lead_id" value={leadId} />
+        <Field label="اسم العميل" name="name" required defaultValue={name === "بدون اسم" ? "" : name} />
       </ActionForm>
     </Dialog>
   );
