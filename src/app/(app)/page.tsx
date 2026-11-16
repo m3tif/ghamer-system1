@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FinanceDashboard, type FinSP } from "@/components/finance/dashboard";
 import { contractList, opsAccountManagers, opsList, taskList } from "@/server/data";
 import { can, requireSession } from "@/lib/auth";
 import { dailyReport, type DailyRow, addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
@@ -9,9 +10,10 @@ import { ACHIEVEMENT, HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TON
 export const metadata = { title: "لوحة التحكم" };
 export const dynamic = "force-dynamic";
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ day?: string } & FinSP> }) {
   const sp = await searchParams;
   const s = await requireSession();
+  if (s.role === "finance_manager") return <FinanceDashboard uid={s.userId} name={s.fullName} sp={sp} />;
   const month = monthStart();
   const isAdmin = s.role === "super_admin" || s.role === "general_manager";
   const emps = can(s, "employees.view") ? await employeeList(s.userId) : [];
@@ -27,7 +29,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {(s.role === "tele_sales_manager" || isAdmin) && <TeleTeam uid={s.userId} month={month} team={teleTeam} />}
       {(s.role === "sales_manager" || isAdmin) && <SalesTeam uid={s.userId} month={month} team={salesTeam} />}
       {isAdmin && <Company uid={s.userId} month={month} />}
-      {(s.role === "finance_manager" || s.role === "finance_employee") && <FinanceHome uid={s.userId} />}
+      {s.role === "finance_employee" && <FinanceHome uid={s.userId} />}
       {s.role === "operations_manager" && <TechManagerHome uid={s.userId} />}
       {s.role === "account_manager" && <AccountManagerHome uid={s.userId} />}
       {TECH_ROLES.includes(s.role) && <TechHome uid={s.userId} />}

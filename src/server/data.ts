@@ -347,3 +347,17 @@ export async function opsSteps(uid: string, opsId: string) {
 export async function opsPackages(uid: string, opsId: string) {
   return ((await tx(uid, (c) => c.query("select app.ops_packages($1) p", [opsId]))).rows[0]?.p ?? []) as string[];
 }
+
+// ───────── Finance Manager dashboard ─────────
+export async function financeDashboard(uid: string, from: string | null, to: string | null) {
+  return (await tx(uid, (c) => c.query("select app.finance_dashboard($1,$2) j", [from, to]))).rows[0].j as any;
+}
+export type FinContract = { id: string; contract_no: string; client_name: string; business_name: string | null; phone: string | null; sales_name: string | null; tele_name: string | null;
+  status: string; total_amount: string; packages: string | null; created_at: string; updated_at: string; submitted_at: string | null; approved_at: string | null; start_date: string | null; end_date: string | null; total: string };
+export async function financeContracts(uid: string, f: { q?: string; status?: string; emp?: string; from?: string; to?: string; limit?: number; offset?: number }) {
+  return (await tx(uid, (c) => c.query("select * from app.finance_contracts($1,$2,$3,$4,$5,$6,$7)",
+    [f.q || null, f.status || null, f.emp || null, f.from || null, f.to || null, f.limit ?? 15, f.offset ?? 0]))).rows as FinContract[];
+}
+export async function financeEmployees(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.finance_employees()"))).rows as { id: string; full_name: string; role_name: string }[];
+}
