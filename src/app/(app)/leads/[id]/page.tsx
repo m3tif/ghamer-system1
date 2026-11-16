@@ -50,6 +50,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {lead.hidden_at && <Badge tone="bad">مخفي عن الموظفين</Badge>}
           {["super_admin", "general_manager", "tele_sales_manager", "sales_manager"].includes(s.role) && <HideLead leadId={id} name={lead.name} hidden={!!lead.hidden_at} />}
           {s.role === "super_admin" && <DeleteLead clientId={lead.client_id} name={lead.name} />}
+          {deal && can(s, "deals.edit") && !["Lost", "Financially Approved"].includes(deal.stage) && <Link className="rounded-md bg-burgundy-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-burgundy-700" href={`/contracts/new?deal=${deal.id}`}>{["Contract Pending", "Signed / Finance Pending"].includes(deal.stage) ? "فتح العقد" : "إنشاء عقد"}</Link>}
           {deal && can(s, "deals.view") && <Link className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream" href={`/deals/${deal.id}`}>فتح الصفقة</Link>}
         </>} />
 

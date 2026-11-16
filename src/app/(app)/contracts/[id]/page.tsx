@@ -1,3 +1,4 @@
+import { DeleteFile } from "@/components/delete-file";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
@@ -56,7 +57,8 @@ export default async function ContractPage({ params, searchParams }: { params: P
               <ul className="divide-y divide-line text-sm">{files.map((f: any) => (
                 <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span><Badge tone={f.kind === "signed_contract" ? "ok" : f.kind === "payment_receipt" ? "brand" : "neutral"}>{FILE_KIND[f.kind] ?? f.kind}</Badge> <a href={`/files/${f.id}`} target="_blank" rel="noopener noreferrer" className="ms-1 font-medium text-burgundy-700 underline">{f.filename}</a></span>
-                  <span className="text-xs text-ink-500">{kb(Number(f.size_bytes))} · {f.uploaded_by} · {fmtDateTime(f.created_at)}</span></li>))}</ul>)}
+                  <span className="flex items-center gap-3 text-xs text-ink-500"><span>{kb(Number(f.size_bytes))} · {f.uploaded_by} · {fmtDateTime(f.created_at)}</span>
+                    {f.can_delete && <DeleteFile contractId={id} fileId={f.id} name={f.filename} />}</span></li>))}</ul>)}
             {(canWrite || canAddDoc) && (
               <div className="mt-4 border-t border-line pt-4">
                 <ActionForm action={uploadContractFileAction} submit="رفع الملف" className="grid gap-3 md:grid-cols-[12rem_1fr_auto] md:items-end">
@@ -66,7 +68,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
                       {canWrite && <option value="signed_contract">العقد الموقّع</option>}<option value="payment_receipt">وصل الدفع</option><option value="other">مستند آخر</option></select></div>
                   <div><label htmlFor="file" className="mb-1 block text-sm font-medium">الملف</label>
                     <input id="file" name="file" type="file" required accept="application/pdf,image/jpeg,image/png,image/webp" className={inputCls + " file:me-3 file:rounded file:border-0 file:bg-cream file:px-3 file:py-1 file:text-sm"} />
-                    <p className="mt-1 text-xs text-ink-500">PDF أو صورة (JPG / PNG / WEBP) — لحد 4 ميجا. الملفات مبتتمسحش بعد الرفع.</p></div>
+                    <p className="mt-1 text-xs text-ink-500">PDF أو صورة (JPG / PNG / WEBP) — لحد 4 ميجا. لو رفعت ملف غلط اضغط «مسح» جنبه.</p></div>
                 </ActionForm>
               </div>)}
           </Card>

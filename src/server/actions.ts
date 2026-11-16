@@ -742,6 +742,16 @@ export async function uploadContractFileAction(_: FormState, fd: FormData): Prom
   return { ok: kind === "signed_contract" ? "تم رفع العقد الموقّع" : kind === "payment_receipt" ? "تم رفع وصل الدفع" : "تم رفع الملف" };
 }
 
+export async function deleteContractFileAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), file = s(fd, "file_id");
+  if (!UUID.test(id) || !UUID.test(file)) return { error: "ملف غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.contract_file_delete($1)", [file]), "حذف ملف مرفوع بالغلط"); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/contracts/${id}`);
+  return { ok: "تم مسح الملف" };
+}
+
 export async function submitContractAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   const id = s(fd, "contract_id");

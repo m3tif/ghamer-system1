@@ -79,6 +79,23 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     await run("fin", "select app.contract_attach($1,'payment_receipt','وصل البنك.pdf','application/pdf',$2)", [id, PDF]);
     await expect(run("sales2", "select app.contract_attach($1,'payment_receipt','x.pdf','application/pdf',$2)", [id, PDF])).rejects.toThrow(/no access/);
     expect((await get("fin", id)).files.filter((f: any) => f.kind === "payment_receipt").length).toBe(2);
+    // a wrong upload can be deleted by whoever uploaded it (or the Super Admin) — not by anyone else, and never the signed contract while with Finance
+    const w = (await run("fin", "select app.contract_attach($1,'other','غلط.pdf','application/pdf',$2) id", [id, PDF])).rows[0].id;
+    const fl = (await get("sales1", id)).files;
+    expect(fl.find((f: any) => f.id === w).can_delete).toBe(false);
+    expect((await get("fin", id)).files.find((f: any) => f.id === w).can_delete).toBe(true);
+    await expect(run("sales1", "select app.contract_file_delete($1)", [w])).rejects.toThrow(/not the uploader/);
+    await expect(run("sales2", "select app.contract_file_delete($1)", [w])).rejects.toThrow(/no access/);
+    const sg = fl.find((f: any) => f.kind === "signed_contract");
+    expect(sg.can_delete).toBe(false);
+    await expect(run("sales1", "select app.contract_file_delete($1)", [sg.id])).rejects.toThrow(/locked/);
+    await expect(run("super", "select app.contract_file_delete($1)", [sg.id])).rejects.toThrow(/locked/);
+    await run("fin", "select app.contract_file_delete($1)", [w]);
+    await run("fin", "select app.contract_file_delete($1)", [w]);          // twice: no error
+    expect((await get("fin", id)).files.some((f: any) => f.id === w)).toBe(false);
+    expect((await admin.query("select count(*)::int n from attachment_blobs where attachment_id=$1", [w])).rows[0].n).toBe(0);
+    expect((await admin.query("select count(*)::int n from audit_logs where entity_type='attachments' and entity_id=$1 and action ilike '%delete%'", [w])).rows[0].n).toBe(1);
+    await expect(run("fin", "delete from attachments where id=$1", [sg.id])).rejects.toThrow(/permission denied/);
     await expect(run("sales1", "select app.move_deal_stage($1,'Negotiation',null,null,null)", [deal])).rejects.toThrow(/locked/);
     await expect(run("sales1", "select app.move_deal_stage($1,'Lost','سبب',null,null)", [deal])).rejects.toThrow(/locked/);
   });
