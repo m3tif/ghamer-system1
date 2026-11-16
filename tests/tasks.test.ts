@@ -27,7 +27,7 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     task = await save("am1", ops, null, p);
     t2 = await save("techmgr", ops, null, { title: "تحسين السيو", assignee: ids.seo, service: "seo" });
     expect((await admin.query("select count(*)::int n from notifications where kind='task_new' and user_id=$1", [ids.designer])).rows[0].n).toBe(1);
-    expect((await run("am1", "select * from app.task_assignees()")).rows.map((r: any) => r.full_name).sort()).toEqual(["ديزاينر", "سيو", "موظف تقني"]);
+    expect((await run("am1", "select * from app.task_assignees()")).rows.map((r: any) => r.full_name).sort()).toEqual(["ديزاينر", "سوشيال", "سيو", "موظف تقني"]);
   });
   it("who sees a task: the assignee, the client's Account Manager, the Technical Manager, admins — nobody else; no direct table access", async () => {
     for (const w of ["designer", "am1", "techmgr", "super", "gm"]) expect((await get(w, task))?.title).toBe("تصميم بنرات المتجر");
@@ -121,11 +121,11 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
   it("task templates: only the Technical Manager writes them; whoever writes tasks can use them", async () => {
     await expect(run("am1", "select app.task_template_save($1::jsonb)", [JSON.stringify({ title: "قالب" })])).rejects.toThrow(/not allowed/);
     const id = (await run("techmgr", "select app.task_template_save($1::jsonb) id", [JSON.stringify({ title: "تدقيق سيو أولي", service: "seo", estimated_hours: 4 })])).rows[0].id;
-    expect((await run("am1", "select * from app.task_template_list(false)")).rows.map((r: any) => r.title)).toEqual(["تدقيق سيو أولي"]);
+    expect((await run("am1", "select * from app.task_template_list(false)")).rows.map((r: any) => r.title)).toContain("تدقيق سيو أولي");
     expect((await run("designer", "select * from app.task_template_list(true)")).rows.length).toBe(0);
     await run("techmgr", "select app.task_template_set($1,false)", [id]);
-    expect((await run("am1", "select * from app.task_template_list(false)")).rows.length).toBe(0);
-    expect((await run("techmgr", "select * from app.task_template_list(true)")).rows.length).toBe(1);
+    expect((await run("am1", "select * from app.task_template_list(false)")).rows.map((r: any) => r.title)).not.toContain("تدقيق سيو أولي");
+    expect((await run("techmgr", "select * from app.task_template_list(true)")).rows.map((r: any) => r.title)).toContain("تدقيق سيو أولي");
   });
   it("files on a task: the assignee or the manager uploads; only people who see the task download; the uploader deletes", async () => {
     await expect(run("seo", "select app.task_attach($1,'a.pdf','application/pdf',$2)", [t2, PDF])).rejects.toThrow(/not allowed/);
@@ -159,5 +159,43 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     for (const w of ["techmgr", "am1"]) { const j = await c360(w); expect(j.show_money).toBe(false); expect(j.contracts[0].total).toBeNull(); expect(j.tasks.length).toBe(3); }
     expect((await c360("fin")).show_money).toBe(true);
     for (const w of ["am2", "designer", "sales1", "sales2", "tele1"]) expect(await c360(w)).toBeNull();
+  });
+  it("package steps: the «full» package comes with its 10 steps; the Account Manager sends each step himself; a step that needs the client waits for his answer", async () => {
+    const deal = await dealOf(await sendAccepted("tele1", "sales1", leadPayload({ name: "متجر فل", phone: "0573000002", status: "Interested" })));
+    const c = await signContract("sales1", deal, { ...contractPayload({ start: "2027-01-01" }), total: 20000, items: [{ service: "full_service" }] });
+    await run("fin", "select app.contract_approve($1,null)", [c]);
+    const o2 = (await run("techmgr", "select id from app.ops_list('new')")).rows[0].id;
+    await run("techmgr", "select app.ops_assign($1,$2,null)", [o2, ids.am1]);
+    const steps = async (w: string) => (await run(w, "select * from app.ops_steps($1)", [o2])).rows;
+    let st = await steps("am1");
+    expect(st.length).toBe(10);
+    expect(st[0].title).toBe("اختيار المنصة المناسبة للمتجر"); expect(st[0].role_code).toBe("seo_specialist"); expect(st[0].needs_client).toBe(true);
+    expect(st[9].role_code).toBe("social_media_manager"); expect(st.every((x: any) => x.task_id === null)).toBe(true);
+    expect((await steps("am2")).length).toBe(0); expect((await steps("seo")).length).toBe(0);
+    const tk = await save("am1", o2, null, { title: st[0].title, assignee: ids.seo, template: st[0].template_id, needs_client: true });
+    st = await steps("am1");
+    expect(st[0].task_id).toBe(tk); expect(st[0].task_status).toBe("todo"); expect(st[1].task_id).toBeNull();
+    await run("seo", "select app.task_submit($1,'https://docs.google.com/x',null)", [tk]);
+    await expect(run("am1", "select app.task_client($1,true,null)", [tk])).rejects.toThrow(/not waiting for the client/);
+    await run("am1", "select app.task_review($1,true,null)", [tk]);
+    expect((await get("seo", tk)).status).toBe("client_review");
+    await expect(run("seo", "select app.task_start($1)", [tk])).rejects.toThrow(/cannot be started/);
+    await expect(run("seo", "select app.task_client($1,true,null)", [tk])).rejects.toThrow(/not allowed/);
+    await expect(run("am1", "select app.task_client($1,false,'')", [tk])).rejects.toThrow(/reason required/);
+    await run("am1", "select app.task_client($1,false,'العميل عاوز زد مش سلة')", [tk]);
+    let g = await get("seo", tk);
+    expect(g.status).toBe("changes_requested"); expect(g.review_note).toContain("العميل طلب تعديل"); expect(g.revisions).toBe(1);
+    await run("seo", "select app.task_submit($1,'https://docs.google.com/y',null)", [tk]);
+    await run("am1", "select app.task_review($1,true,null)", [tk]);
+    await run("am1", "select app.task_client($1,true,null)", [tk]);
+    await run("am1", "select app.task_client($1,true,null)", [tk]);
+    g = await get("seo", tk);
+    expect(g.status).toBe("approved"); expect(g.client_decided_at).not.toBeNull();
+    expect((await steps("am1"))[0].task_status).toBe("approved");
+    // a task without the client flag is approved straight away, as before; the publishing step goes to the Social Media Manager
+    const pub = await save("am1", o2, null, { title: st[9].title, assignee: ids.smm, template: st[9].template_id });
+    await run("smm", "select app.task_submit($1,'https://instagram.com/p/1',null)", [pub]);
+    await run("am1", "select app.task_review($1,true,null)", [pub]);
+    expect((await get("smm", pub)).status).toBe("approved");
   });
 });

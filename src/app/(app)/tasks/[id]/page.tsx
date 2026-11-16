@@ -10,6 +10,7 @@ import { uploadTaskFileAction } from "@/server/actions";
 import { DeleteFile } from "@/components/delete-file";
 import { BRIEF_FIELDS } from "@/components/onboarding-card";
 import { inputCls } from "@/components/forms";
+import { clientNoTaskAction, clientOkTaskAction } from "@/server/actions";
 import { addTaskTimeAction, approveTaskAction, commentTaskAction, pauseTaskAction, rejectTaskAction, startTaskAction, submitTaskAction } from "@/server/actions";
 import { fmtDate, fmtDateTime, fmtMins } from "@/lib/format";
 import { TASK_PRIORITY, TASK_STATUS, TASK_STATUS_TONE } from "@/lib/labels";
@@ -23,7 +24,7 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const t = await taskGet(s.userId, id);
   if (!t) notFound();
-  const mine = t.is_assignee, workable = mine && !["submitted", "approved"].includes(t.status), running = !!t.running_since;
+  const mine = t.is_assignee, workable = mine && !["submitted", "client_review", "approved"].includes(t.status), running = !!t.running_since;
   const editable = t.can_manage && t.status !== "approved";
   const [assignees, services] = editable ? await Promise.all([taskAssignees(s.userId), servicesList(s.userId)]) : [[], []];
   const closedSeconds = (t.logs as any[]).filter((l) => l.ended_at).reduce((a, l) => a + Math.round((new Date(l.ended_at).getTime() - new Date(l.started_at).getTime()) / 1000), 0);
@@ -73,8 +74,16 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
               <p className="mt-2 text-xs text-ink-500">سلّمه {t.assignee_name} · {fmtDateTime(t.submitted_at)}</p>
               {t.can_review && t.status === "submitted" && (
                 <div className="mt-4 grid gap-4 border-t border-line pt-4 md:grid-cols-2">
-                  <ActionForm action={approveTaskAction} submit="اعتماد ✓" hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="ملاحظة (اختياري)" name="note" rows={2} /></ActionForm>
+                  <ActionForm action={approveTaskAction} submit={t.needs_client ? "اعتماد وإرسال للعميل" : "اعتماد ✓"} hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="ملاحظة (اختياري)" name="note" rows={2} /></ActionForm>
                   <ActionForm action={rejectTaskAction} submit="طلب تعديل" tone="quiet" hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="التعديل المطلوب" name="note" rows={2} required /></ActionForm>
+                </div>)}
+              {t.can_review && t.status === "client_review" && (
+                <div className="mt-4 border-t border-line pt-4">
+                  <p className="mb-3 text-sm font-medium">ابعت الشغل للعميل، ولما يرد سجّل رده هنا:</p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <ActionForm action={clientOkTaskAction} submit="العميل وافق ✓" hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="ملاحظة (اختياري)" name="note" rows={2} /></ActionForm>
+                    <ActionForm action={clientNoTaskAction} submit="العميل طلب تعديل" tone="quiet" hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="التعديل اللي العميل طلبه" name="note" rows={2} required /></ActionForm>
+                  </div>
                 </div>)}
             </Card>)}
 
@@ -116,6 +125,7 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
               {row("تاريخ التسليم", t.due_date ? fmtDate(t.due_date) : null)}
               {row("الساعات المتوقعة", t.estimated_hours ? `${Number(t.estimated_hours)} س` : null)}
               {row("الوقت الفعلي", fmtMins(t.minutes))}
+              {row("موافقة العميل", t.needs_client ? (t.client_decided_at && t.status === "approved" ? `وافق · ${fmtDateTime(t.client_decided_at)}` : "مطلوبة") : "مش مطلوبة")}
               {row("عدد مرات التعديل", String(t.revisions))}
               {row("أنشأه", `${t.created_by_name} · ${fmtDateTime(t.created_at)}`)}
             </dl>

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
+import { opsSteps } from "@/server/data";
+import { PackageSteps } from "@/components/package-steps";
 import { onboardingGet, opsList, servicesList, taskAssignees, taskList, taskTemplates } from "@/server/data";
 import { OnboardingCards } from "@/components/onboarding-card";
 import { TemplatePicker } from "@/components/template-picker";
@@ -21,6 +23,7 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
   const manage = can(s, "tasks.manage") && (s.role !== "account_manager" || r.account_manager_id === s.userId);
   const [tasks, assignees, services, templates, onboarding] = await Promise.all([taskList(s.userId, "all", id), manage ? taskAssignees(s.userId) : Promise.resolve([]), manage ? servicesList(s.userId) : Promise.resolve([]),
     manage ? taskTemplates(s.userId) : Promise.resolve([]), onboardingGet(s.userId, id)]);
+  const steps = await opsSteps(s.userId, id);
   const done = tasks.filter((t) => t.status === "approved").length, mins = tasks.reduce((a, t) => a + t.minutes, 0);
   const row = (k: string, v: React.ReactNode) => (<div className="flex justify-between gap-3"><dt className="shrink-0 text-ink-500">{k}</dt><dd className="min-w-0 break-words text-end" dir="auto">{v || "—"}</dd></div>);
   return (
@@ -31,6 +34,7 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
           <Link href="/operations" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">رجوع</Link></>} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
+          {steps.length > 0 && <PackageSteps opsId={id} steps={steps} assignees={assignees} manage={manage} />}
           <Card title={`التاسكات (${tasks.length})`} right={tasks.length ? <span className="text-sm text-ink-500">{done} معتمد · {fmtMins(mins)} شغل</span> : undefined}>
             {tasks.length === 0 ? <Empty title="مفيش تاسكات لسه" hint={manage ? "اعمل أول تاسك من الفورم اللي تحت." : undefined} /> : <TaskTable rows={tasks} showClient={false} />}
           </Card>

@@ -39,7 +39,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 }
 
 /** Finance: what is waiting for them right now (payments and approvals are added in the next steps of Phase 2). */
-const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "content_creator", "media_buyer", "technical_employee", "technical_team_leader"];
+const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "content_creator", "media_buyer", "social_media_manager", "technical_employee", "technical_team_leader"];
 
 async function TechManagerHome({ uid }: { uid: string }) {
   const [waiting, assigned, ams] = await Promise.all([opsList(uid, "new"), opsList(uid, "assigned"), opsAccountManagers(uid)]);
@@ -68,7 +68,7 @@ async function TechHome({ uid }: { uid: string }) {
       <h2 className="mb-3 text-lg font-bold">تاسكاتي</h2>
       {running && <Link href={`/tasks/${running.id}`} className="mb-3 block rounded-lg border border-ok/40 bg-ok/5 px-4 py-3 text-sm font-semibold text-ok">● العدّاد شغّال على: {running.title} — {running.client_name}</Link>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat href="/tasks?f=open" label="شغلي الحالي" value={n((x) => !["approved", "submitted"].includes(x.status))} />
+        <Stat href="/tasks?f=open" label="شغلي الحالي" value={n((x) => !["approved", "submitted", "client_review"].includes(x.status))} />
         <Stat href="/tasks?f=open" label="مطلوب تعديل" value={n((x) => x.status === "changes_requested")} tone={n((x) => x.status === "changes_requested") ? "bad" : undefined} />
         <Stat href="/tasks?f=late" label="متأخر" value={n((x) => x.late)} tone={n((x) => x.late) ? "bad" : undefined} />
         <Stat href="/tasks?f=done" label="معتمد" value={n((x) => x.status === "approved")} tone="ok" />

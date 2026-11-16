@@ -63,6 +63,7 @@ const MAP: [RegExp, string][] = [
   [/invalid minutes/i, "اكتب عدد الدقايق (من 1 لـ 720)"],
   [/comment required/i, "اكتب التعليق"],
   [/item label required/i, "اكتب البند"],
+  [/task is not waiting for the client/i, "التاسك مش مستني موافقة العميل"],
   [/contract is locked/i, "العقد عند المالية دلوقتي ومينفعش يتعدّل. لو فيه تعديل، المالية ترجّعه الأول"],
   [/signed contract file required/i, "ارفع ملف العقد الموقّع الأول قبل الإرسال للمالية"],
   [/contract dates required/i, "اكتب تاريخ بداية ونهاية العقد"],

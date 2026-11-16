@@ -3,7 +3,7 @@ import { saveTaskAction } from "@/server/actions";
 import { TASK_PRIORITY } from "@/lib/labels";
 
 /** Create / edit a task. Used by the Account Manager and the Technical Manager. */
-export function TaskForm({ opsId, assignees, services, task }: { opsId: string; assignees: { id: string; full_name: string; role_name: string; open_tasks: number }[];
+export function TaskForm({ opsId, assignees, services, task }: { opsId: string; assignees: { id: string; full_name: string; role_name: string; open_tasks: number; role_code?: string }[];
   services: { code: string; name_ar: string }[]; task?: any }) {
   const d = (v: unknown) => (v ? String(v).slice(0, 10) : "");
   return (
@@ -17,6 +17,7 @@ export function TaskForm({ opsId, assignees, services, task }: { opsId: string; 
       <Field label="الساعات المتوقعة" name="estimated_hours" type="number" min="0.25" step="0.25" dir="ltr" defaultValue={task?.estimated_hours ? String(Number(task.estimated_hours)) : ""} />
       <Field label="تاريخ البداية" name="start_date" type="date" defaultValue={d(task?.start_date)} />
       <Field label="تاريخ التسليم" name="due_date" type="date" defaultValue={d(task?.due_date)} />
+      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium md:col-span-2"><input type="checkbox" id="needs_client" name="needs_client" value="1" defaultChecked={!!task?.needs_client} className="h-4 w-4 accent-burgundy-600" />محتاج موافقة العميل بعد مراجعة الأكاونت</label>
       <TextArea label="الوصف والمطلوب" name="description" rows={3} defaultValue={task?.description ?? ""} className="md:col-span-2" />
     </ActionForm>
   );

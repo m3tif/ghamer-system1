@@ -321,14 +321,14 @@ export async function taskGet(uid: string, id: string) {
   return (await tx(uid, (c) => c.query("select app.task_get($1) j", [id]))).rows[0]?.j as any | null;
 }
 export async function taskAssignees(uid: string) {
-  return (await tx(uid, (c) => c.query("select * from app.task_assignees()"))).rows as { id: string; full_name: string; role_name: string; open_tasks: number }[];
+  return (await tx(uid, (c) => c.query("select * from app.task_assignees()"))).rows as { id: string; full_name: string; role_name: string; open_tasks: number; role_code: string }[];
 }
 
 // ───────── Phase 3: onboarding, templates, performance, 360 ─────────
 export async function onboardingGet(uid: string, opsId: string) {
   return (await tx(uid, (c) => c.query("select app.onboarding_get($1) j", [opsId]))).rows[0]?.j as { brief: any | null; items: { id: string; label: string; done: boolean; done_at: string | null; done_by: string | null }[]; can_edit: boolean } | null;
 }
-export type TaskTemplate = { id: string; service_code: string | null; service_name: string | null; title: string; description: string | null; estimated_hours: string | null; is_active: boolean };
+export type TaskTemplate = { id: string; service_code: string | null; service_name: string | null; title: string; description: string | null; estimated_hours: string | null; is_active: boolean; stage: string | null; role_code: string | null; role_name: string | null; needs_client: boolean; sort: number };
 export async function taskTemplates(uid: string, all = false) {
   return (await tx(uid, (c) => c.query("select * from app.task_template_list($1)", [all]))).rows as TaskTemplate[];
 }
@@ -338,4 +338,9 @@ export async function techPerformance(uid: string, month: string | null) {
 }
 export async function client360(uid: string, clientId: string) {
   return (await tx(uid, (c) => c.query("select app.client_360($1) j", [clientId]))).rows[0]?.j as any | null;
+}
+export type OpsStep = { template_id: string; service_name: string; stage: string | null; title: string; description: string | null; role_code: string | null; role_name: string | null;
+  needs_client: boolean; estimated_hours: string | null; task_id: string | null; task_status: string | null; assignee_name: string | null };
+export async function opsSteps(uid: string, opsId: string) {
+  return (await tx(uid, (c) => c.query("select * from app.ops_steps($1)", [opsId]))).rows as OpsStep[];
 }

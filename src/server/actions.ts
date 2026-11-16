@@ -803,7 +803,8 @@ export async function saveTaskAction(_: FormState, fd: FormData): Promise<FormSt
   const ops = s(fd, "ops_id"), task = s(fd, "task_id");
   if (!UUID.test(ops) || (task && !UUID.test(task))) return { error: "بيانات غير صالحة" };
   const p = { title: s(fd, "title").slice(0, 200), description: s(fd, "description").slice(0, 4000), assignee: s(fd, "assignee"), service: s(fd, "service"), priority: s(fd, "priority") || "normal",
-    start_date: s(fd, "start_date"), due_date: s(fd, "due_date"), estimated_hours: s(fd, "estimated_hours") };
+    start_date: s(fd, "start_date"), due_date: s(fd, "due_date"), estimated_hours: s(fd, "estimated_hours"),
+    template: UUID.test(s(fd, "template")) ? s(fd, "template") : "", needs_client: s(fd, "needs_client") === "1" };
   if (p.title.length < 2) return { error: "اكتب عنوان التاسك", values: vals(fd) };
   if (!UUID.test(p.assignee)) return { error: "اختار الموظف اللي هينفذ التاسك", values: vals(fd) };
   if (!["low", "normal", "high", "urgent"].includes(p.priority)) return { error: "أولوية غير صالحة", values: vals(fd) };
@@ -838,6 +839,8 @@ export async function submitTaskAction(_: FormState, fd: FormData): Promise<Form
   return [link, s(fd, "note") || null]; }); }
 export async function approveTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,true,$2)", "تم اعتماد التاسك", (fd) => [s(fd, "note") || null]); }
 export async function rejectTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,false,$2)", "تم إرجاع التاسك للموظف للتعديل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل المطلوب"; }); }
+export async function clientOkTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_client($1,true,$2)", "تم تسجيل موافقة العميل", (fd) => [s(fd, "note") || null]); }
+export async function clientNoTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_client($1,false,$2)", "تم إرجاع التاسك للموظف بتعديل العميل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل اللي العميل طلبه"; }); }
 export async function commentTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_comment($1,$2)", "تم إضافة التعليق", (fd) => { const b = s(fd, "body"); return b ? [b.slice(0, 2000)] : "اكتب التعليق"; }); }
 
 
@@ -877,7 +880,8 @@ export async function setOnboardingItemAction(_: FormState, fd: FormData): Promi
 }
 export async function saveTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  const p = { title: s(fd, "title").slice(0, 200), service: s(fd, "service"), description: s(fd, "description").slice(0, 4000), estimated_hours: s(fd, "estimated_hours") };
+  const p = { title: s(fd, "title").slice(0, 200), service: s(fd, "service"), description: s(fd, "description").slice(0, 4000), estimated_hours: s(fd, "estimated_hours"),
+    stage: s(fd, "stage").slice(0, 100), role: s(fd, "role"), needs_client: s(fd, "needs_client") === "1", sort: /^\d{1,3}$/.test(s(fd, "sort")) ? s(fd, "sort") : "" };
   if (p.title.length < 2) return { error: "اكتب عنوان القالب", values: vals(fd) };
   if (p.estimated_hours && !(Number(p.estimated_hours) > 0 && Number(p.estimated_hours) <= 1000)) return { error: "الساعات المتوقعة رقم أكبر من صفر", values: vals(fd) };
   try { await tx(sess.userId, (c) => c.query("select app.task_template_save($1::jsonb)", [JSON.stringify(p)])); }

@@ -15,14 +15,14 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<{ 
   const all = await taskList(s.userId, manager ? "all" : "mine");
   const f = (await searchParams).f ?? "open";
   const filters: [string, string, (t: (typeof all)[number]) => boolean][] = manager
-    ? [["review", "مستني مراجعتي", (t) => t.status === "submitted"], ["late", "متأخر", (t) => t.late], ["open", "كل المفتوح", (t) => t.status !== "approved"], ["done", "معتمد", (t) => t.status === "approved"]]
-    : [["open", "شغلي الحالي", (t) => !["approved", "submitted"].includes(t.status)], ["review", "سلّمته ومستني مراجعة", (t) => t.status === "submitted"], ["late", "متأخر", (t) => t.late], ["done", "معتمد", (t) => t.status === "approved"]];
+    ? [["review", "مستني مراجعتي", (t) => t.status === "submitted"], ["client", "مستني العميل", (t) => t.status === "client_review"], ["late", "متأخر", (t) => t.late], ["open", "كل المفتوح", (t) => t.status !== "approved"], ["done", "معتمد", (t) => t.status === "approved"]]
+    : [["open", "شغلي الحالي", (t) => !["approved", "submitted", "client_review"].includes(t.status)], ["review", "سلّمته ومستني مراجعة", (t) => ["submitted", "client_review"].includes(t.status)], ["late", "متأخر", (t) => t.late], ["done", "معتمد", (t) => t.status === "approved"]];
   const cur = filters.find((x) => x[0] === f) ?? filters[0];
   const rows = all.filter(cur[2]);
   return (
     <>
       <PageHeader title={manager ? "التاسكات" : "تاسكاتي"} sub={manager ? "كل تاسكات عملائك. التاسكات بتتعمل من صفحة العميل." : "التاسكات اللي اتبعتتلك. افتح التاسك عشان تشغّل العدّاد وتسلّم."}
-        actions={<>{["super_admin", "operations_manager"].includes(s.role) && <Link href="/tasks/templates" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">قوالب التاسكات</Link>}
+        actions={<>{["super_admin", "operations_manager"].includes(s.role) && <Link href="/tasks/templates" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">مراحل الباقات</Link>}
           {["super_admin", "general_manager", "operations_manager"].includes(s.role) && <Link href="/tasks/performance" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">أداء الفريق</Link>}</>} />
       <div className="mb-5 flex flex-wrap gap-2">
         {filters.map(([k, label, fn]) => (

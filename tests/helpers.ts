@@ -43,6 +43,7 @@ export async function setupDb(dbName = "ghamer_test") {
   await mk("am2", "account_manager", "أكاونت 2");
   await mk("designer", "designer", "ديزاينر");
   await mk("seo", "seo_specialist", "سيو");
+  await mk("smm", "social_media_manager", "سوشيال");
 }
 
 export async function teardown() { await admin?.end(); const { closePool } = await import("../src/lib/db"); await closePool(); }
