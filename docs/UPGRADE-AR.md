@@ -245,3 +245,7 @@ update settings set value = '"Africa/Cairo"' where key = 'timezone';
 ## الدفعة 048 — رابط التسليم اختياري
 - الموظف يقدر يسلّم التاسك من غير رابط (مع ملاحظة أو ملف). لو كتب رابط لازم يبدأ بـ https://.
 - شغّل `db/migrations/048_delivery_link_optional.sql` مرة واحدة.
+
+## الدفعة 049 — المدير التقني يضيف عميل قائم
+- «إضافة عميل قائم» بقت متاحة للمدير التقني زي مدير النظام.
+- شغّل `db/migrations/049_techmgr_existing.sql` مرة واحدة.

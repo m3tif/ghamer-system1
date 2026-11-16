@@ -88,4 +88,12 @@ describe("Phase 3 — approved clients go to the Technical Manager, who hands th
     // the same phone cannot be added again
     expect((await register("super", { ...leadPayload({ name: "تكرار", phone: "0572000099" }), mode: "existing" })).status).toBe("duplicate");
   });
+  it("the Technical Manager can add an existing client herself; an Account Manager cannot", async () => {
+    await expect(register("am1", { ...leadPayload({ name: "x", phone: "0572000088" }), mode: "existing" })).rejects.toThrow(/not allowed/);
+    const r = await register("techmgr", { ...leadPayload({ name: "قائم من التقني", phone: "0572000088" }), mode: "existing", packages: ["seo"] });
+    expect(r.status).toBe("created");
+    const q = (await run("techmgr", "select * from app.ops_list('new')")).rows.find((x: any) => x.client_name === "قائم من التقني");
+    expect(q.is_existing).toBe(true); expect(q.packages).toEqual(["باقة سيو"]);
+    await run("techmgr", "select app.ops_assign($1,$2,null)", [q.id, ids.am1]);
+  });
 });

@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/import", label: "استيراد البيانات السابقة", show: can(s, "import.own") || can(s, "import.any") },
     { href: "/messages", label: "رسائل للموظفين", show: s.role === "super_admin" },
     { href: "/employees", label: "الموظفون", show: can(s, "employees.view") },
-    { href: "/clients/existing", label: "إضافة عميل قائم", show: can(s, "employees.manage") },
+    { href: "/clients/existing", label: "إضافة عميل قائم", show: s.role === "super_admin" || s.role === "operations_manager" },
     { href: "/audit", label: "سجل التدقيق", show: can(s, "audit.view") },
     { href: "/notifications", label: "الإشعارات", show: true, badge: s.unread },
   ];
