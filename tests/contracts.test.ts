@@ -143,4 +143,26 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     expect((await admin.query("select count(*)::int n from contracts where deal_id=$1", [d3])).rows[0].n).toBe(1);
     expect(await signContract("sales2", d3)).toBeTruthy();
   });
+  it("financial approval: one button for the Finance Manager — locks the contract, closes the deal, tells Sales; twice = once", async () => {
+    const d9 = await newDeal("tele1", "sales1", "0571000009");
+    const c3 = await save("sales1", d9, contractPayload());
+    await expect(run("fin", "select app.contract_approve($1,null)", [c3])).rejects.toThrow(/not waiting/);      // still a draft
+    await run("sales1", "select app.contract_attach($1,'signed_contract','c.pdf','application/pdf',$2)", [c3, PDF]);
+    await run("sales1", "select app.contract_submit($1)", [c3]);
+    for (const w of ["sales1", "salesmgr", "tele1", "tech"]) await expect(run(w, "select app.contract_approve($1,null)", [c3])).rejects.toThrow(/not allowed/);
+    await run("fin", "select app.contract_approve($1,'تم استلام التحويل')", [c3]);
+    await run("fin", "select app.contract_approve($1,null)", [c3]);
+    const c = (await get("sales1", c3)).contract;
+    expect(c.status).toBe("approved"); expect(c.approved_by).toBe(ids.fin); expect(await stage(d9)).toBe("Financially Approved");
+    expect((await admin.query("select count(*)::int n from notifications where kind='contract_approved' and user_id=$1", [ids.sales1])).rows[0].n).toBe(1);
+    expect((await admin.query("select count(*)::int n from deal_stage_history where deal_id=$1 and to_stage='Financially Approved'", [d9])).rows[0].n).toBe(1);
+    expect((await admin.query("select reason from audit_logs where entity_type='contracts' and entity_id=$1 and new_value->>'status'='approved'", [c3])).rows[0].reason).toBe("تم استلام التحويل");
+    // locked for good
+    await expect(save("sales1", d9, contractPayload())).rejects.toThrow(/closed|locked/);
+    await expect(run("fin", "select app.contract_return($1,'x')", [c3])).rejects.toThrow(/not waiting/);
+    await expect(run("sales1", "select app.contract_attach($1,'signed_contract','y.pdf','application/pdf',$2)", [c3, PDF])).rejects.toThrow(/locked/);
+    const f = (await get("sales1", c3)).files[0];
+    expect(f.can_delete).toBe(false);
+    await expect(run("sales1", "select app.contract_file_delete($1)", [f.id])).rejects.toThrow(/closed/);
+  });
 });

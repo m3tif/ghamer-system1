@@ -773,6 +773,15 @@ export async function returnContractAction(_: FormState, fd: FormData): Promise<
   return { ok: "تم إرجاع العقد للسيلز للتعديل" };
 }
 
+export async function approveContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), note = s(fd, "note");
+  if (!UUID.test(id)) return { error: "عقد غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.contract_approve($1,$2)", [id, note || null]), note || "اعتماد مالي"); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/contracts/${id}`); revalidatePath("/contracts"); revalidatePath("/pipeline"); revalidatePath("/", "layout");
+  return { ok: "تم الاعتماد المالي للعقد" };
+}
 
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {

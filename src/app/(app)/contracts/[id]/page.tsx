@@ -5,7 +5,7 @@ import { can, requirePerm, requireSession } from "@/lib/auth";
 import { contractGet } from "@/server/data";
 import { Badge, Card, PageHeader, Table, td, btnQuiet } from "@/components/ui";
 import { ActionForm, Alert, Hidden, TextArea, inputCls } from "@/components/forms";
-import { returnContractAction, submitContractAction, uploadContractFileAction } from "@/server/actions";
+import { approveContractAction, returnContractAction, submitContractAction, uploadContractFileAction } from "@/server/actions";
 import { fmtDate, fmtDateTime, fmtSar } from "@/lib/format";
 import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, FILE_KIND, INSTALLMENT_KIND, PACKAGE, PAYMENT_METHOD } from "@/lib/labels";
 
@@ -31,6 +31,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
           {canWrite && <Link href={`/contracts/${id}/edit`} className={btnQuiet}>تعديل العقد</Link>}
           {can(s, "deals.view") && <Link href={`/deals/${c.deal_id}`} className={btnQuiet}>الصفقة</Link>}</>} />
       {sp.saved && open && <div className="mb-4"><Alert kind="ok">تم حفظ العقد. {signed.length === 0 ? "الخطوة الجاية: ارفع العقد الموقّع وابعته للمالية." : "تقدر تبعته للمالية دلوقتي."}</Alert></div>}
+      {c.status === "approved" && <div className="mb-4"><Alert kind="ok">العقد معتمد ماليًا — اعتمده {c.approved_by_name} · {fmtDateTime(c.approved_at)}</Alert></div>}
       {c.status === "returned" && <div className="mb-4"><Alert kind="error">المالية رجّعت العقد للتعديل: {c.return_reason} — {c.returned_by_name} · {fmtDateTime(c.returned_at)}</Alert></div>}
       {c.status === "submitted" && <div className="mb-4 rounded-md border border-line bg-cream px-4 py-3 text-sm">العقد عند المالية من {fmtDateTime(c.submitted_at)} (أرسله {c.submitted_by_name}). مينفعش يتعدّل لحد ما المالية تراجعه.</div>}
 
@@ -50,7 +51,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
                 {installments.map((i: any) => (<tr key={i.seq}><td className={td}>{i.seq}</td><td className={td}>{INSTALLMENT_KIND[i.kind]}</td><td className={td + " whitespace-nowrap"}>{fmtDate(i.due_date)}</td>
                   <td className={td + " whitespace-nowrap tabular-nums"}>{fmtSar(i.amount)}</td><td className={td + " text-ink-500"}>{i.note || "—"}</td></tr>))}
               </Table>)}
-            <p className="mt-3 text-xs text-ink-500">تسجيل الدفعات الفعلية واعتمادها بيتم من المالية (الخطوة الجاية في السيستم).</p>
+            
           </Card>
           <Card title="الملفات">
             {files.length === 0 ? <p className="text-sm text-ink-500">مفيش ملفات مرفوعة لسه.</p> : (
@@ -94,11 +95,18 @@ export default async function ContractPage({ params, searchParams }: { params: P
             </Card>)}
           {isFinance && c.status === "submitted" && (
             <Card title="مراجعة المالية">
+              {can(s, "finance.approve") && (
+                <div className="mb-5 border-b border-line pb-5">
+                  <ActionForm action={approveContractAction} submit="اعتماد مالي ✓" hiddenOnOk>
+                    <Hidden name="contract_id" value={id} />
+                    <p className="text-sm text-ink-500">راجع العقد والملفات ووصل الدفع، وبعدين اضغط اعتماد. بعد الاعتماد العقد بيتقفل والصفقة بتتحول لـ«معتمدة ماليًا».</p>
+                    <TextArea label="ملاحظة (اختياري)" name="note" rows={2} />
+                  </ActionForm>
+                </div>)}
               <ActionForm action={returnContractAction} submit="إرجاع العقد للسيلز للتعديل" tone="quiet" hiddenOnOk>
                 <Hidden name="contract_id" value={id} />
                 <TextArea label="سبب الإرجاع" name="reason" rows={2} required />
               </ActionForm>
-              <p className="mt-3 text-xs text-ink-500">تسجيل الدفعات والاعتماد المالي بيتضافوا في الخطوة الجاية.</p>
             </Card>)}
         </div>
       </div>
