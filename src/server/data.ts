@@ -372,3 +372,6 @@ export type Payment = { id: string; installment_seq: number | null; amount: stri
 export async function paymentList(uid: string, contractId: string) {
   return (await tx(uid, (c) => c.query("select * from app.payment_list($1)", [contractId]))).rows as Payment[];
 }
+export async function adminAttention(uid: string) {
+  return (await tx(uid, (c) => c.query("select app.admin_attention() j"))).rows[0].j as any;
+}

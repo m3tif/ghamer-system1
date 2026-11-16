@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FinanceDashboard, type FinSP } from "@/components/finance/dashboard";
+import { AdminAttention, AdminOps, AdminSources } from "@/components/admin/extras";
 import { contractList, opsAccountManagers, opsList, taskList } from "@/server/data";
 import { can, requireSession } from "@/lib/auth";
 import { dailyReport, type DailyRow, addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
@@ -19,6 +20,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const emps = can(s, "employees.view") ? await employeeList(s.userId) : [];
   const teleTeam = emps.filter((e) => e.role_code === "tele_sales" && e.is_active);
   const salesTeam = emps.filter((e) => e.role_code === "sales_rep" && e.is_active);
+  if (isAdmin) return (
+    <FinanceDashboard uid={s.userId} name={s.fullName} sp={sp} variant="admin" extra={{
+      attention: <AdminAttention uid={s.userId} />,
+      ops: <AdminOps uid={s.userId} />,
+      daily: (<section className="space-y-8"><Daily uid={s.userId} day={/^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") ? sp.day! : null} />
+        <TeleTeam uid={s.userId} month={month} team={teleTeam} /><SalesTeam uid={s.userId} month={month} team={salesTeam} /></section>),
+      analytics: <AdminSources uid={s.userId} />,
+    }} />
+  );
 
   return (
     <>

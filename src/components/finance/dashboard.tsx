@@ -53,7 +53,8 @@ function Kpi({ label, value, icon, delta, href, accent, note }: { label: string;
 }
 
 /* ───────── the dashboard ───────── */
-export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: string; sp: FinSP }) {
+export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode };
+export async function FinanceDashboard({ uid, name, sp, variant = "finance", extra }: { uid: string; name: string; sp: FinSP; variant?: "finance" | "admin"; extra?: AdminExtras }) {
   const per = readPeriod(sp);
   const q = (sp.q ?? "").slice(0, 80), cs = sp.cs && sp.cs in CONTRACT_STATUS ? sp.cs : "", emp = UUID.test(sp.emp ?? "") ? sp.emp! : "";
   const cf = D.test(sp.cf ?? "") ? sp.cf! : "", ct = D.test(sp.ct ?? "") ? sp.ct! : "", pg = Math.max(1, Number(sp.pg) || 1), size = 15;
@@ -76,14 +77,13 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
     { label: "عقود اتسجلت", v: n(k.contracts_new) }, { label: "عقود اتعتمدت", v: n(k.contracts_approved) }];
   const tele = (d.employees as any[]).filter((e) => e.role_code.startsWith("tele")), sales = (d.employees as any[]).filter((e) => e.role_code.startsWith("sales"));
 
-  return (
-    <div className="space-y-8 overflow-x-clip">
+  const headerBlock = (<>
       {/* header band */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-[#1b2a41] via-[#22314b] to-[#2c1b28] p-6 text-white shadow-[0_20px_40px_-20px_rgba(27,42,65,.6)] sm:p-7">
         <div aria-hidden className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full bg-[#b8955a]/15 blur-2xl" />
         <div className="relative flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-[#d9bf8c]">لوحة المدير المالي</p>
+            <p className="text-xs font-semibold tracking-wide text-[#d9bf8c]">{variant === "admin" ? "لوحة مدير النظام — الشركة كلها" : "لوحة المدير المالي"}</p>
             <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">أهلًا {name}</h1>
             <p className="mt-1 text-sm text-white/70">{periodTitle}: {fmtDate(d.from)} ← {fmtDate(d.to)} · بتوقيت {d.tz === "Asia/Riyadh" ? "الرياض" : d.tz} · الأرقام كلها من السيستم مباشرة</p>
           </div>
@@ -98,11 +98,13 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           </div>
         </div>
       </div>
-
+  </>);
+  const moneyBlock = (<>
       <ClientsMoney rows={money} />
-
+  </>);
+  const attentionBlock = (<>
       {/* 6. attention centre */}
-      <Section title="محتاج تدخلك" sub="من العقود الفعلية في السيستم — بتتحدث لوحدها">
+      <Section title={variant === "admin" ? "المالية — العقود والدفعات" : "محتاج تدخلك"} sub="من العقود والدفعات الفعلية في السيستم — بتتحدث لوحدها">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Panel title={`دفعات مستنية تأكيدك (${num(c.payments_pending)})`}>
             {d.attention.payments.length === 0 ? <p className="text-sm text-ink-500">مفيش دفعات مستنياك ✓</p> : (
@@ -134,7 +136,8 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           </Panel>
         </div>
       </Section>
-
+  </>);
+  const contractsBlock = (<>
       {/* 3 + 7. contracts table */}
       <Section id="contracts" title="متابعة العقود" sub="ابحث باسم العميل أو رقمه أو رقم العقد، وفلتر بالحالة والموظف وتاريخ التسجيل" right={<a href={exportHref("contracts")} className="rounded-lg border border-[#b8955a]/60 bg-white px-3 py-1.5 text-sm font-semibold text-[#8a6a35] hover:bg-[#f6efe2]">⬇ تصدير Excel (CSV)</a>}>
         <Panel>
@@ -174,7 +177,8 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
             </nav>)}
         </Panel>
       </Section>
-
+  </>);
+  const summaryBlock = (<>
       {/* 1. executive summary */}
       <Section title="الملخص التنفيذي" sub={`مقارنة بـ${prevLabel}: ${fmtDate(d.prev_from)} ← ${fmtDate(d.prev_to)}`}>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
@@ -185,13 +189,14 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           <Kpi icon="➜" label="اتحوّلوا للسيلز" value={num(k.handed)} accent="gold" delta={<Delta cur={n(k.handed)} prev={n(k.handed_prev)} label={prevLabel} />} />
           <Kpi icon="✓" label="السيلز قبلهم" value={num(k.accepted)} note={`رفض ${num(k.rejected)} · لسه مستني ${num(k.pending)}`} />
           <Kpi icon="▤" label="كل العقود المسجلة" value={num(c.total)} href={link({ cs: undefined, pg: undefined }, "#contracts")} accent="wine" note="من غير الملغية" />
-          <Kpi icon="⏳" label="عقود مستنية مراجعتك" value={num(c.submitted)} href={link({ cs: "submitted", pg: undefined }, "#contracts")} accent="wine" note={n(c.late) ? `${num(c.late)} منهم أكتر من يومين` : undefined} />
+          <Kpi icon="⏳" label={variant === "admin" ? "عقود مستنية مراجعة المالية" : "عقود مستنية مراجعتك"} value={num(c.submitted)} href={link({ cs: "submitted", pg: undefined }, "#contracts")} accent="wine" note={n(c.late) ? `${num(c.late)} منهم أكتر من يومين` : undefined} />
           <Kpi icon="★" label="عقود معتمدة" value={num(c.approved)} href={link({ cs: "approved", pg: undefined }, "#contracts")} note={`قيمتها ${fmtSar(c.value_approved)}`} />
           <Kpi icon="﷼" label="فلوس اتحصلت في الفترة" value={fmtSar(k.collected)} accent="gold" delta={<Delta cur={n(k.collected)} prev={n(k.collected_prev)} label={prevLabel} />} />
           <Kpi icon="↺" label="رجعت للتعديل / ملغية" value={`${num(c.returned)} / ${num(c.cancelled)}`} href={link({ cs: "returned", pg: undefined }, "#contracts")} note="السيستم مافيهوش «رفض» — الرفض بيبقى إرجاع للسيلز" />
         </div>
       </Section>
-
+  </>);
+  const achievementsBlock = (<>
       {/* 2. achievements */}
       <Section title="إنجازات الفترة" sub="كل مرحلة بتتعد بتاريخها هي (العميل بتاريخ دخوله، التحويل بتاريخ التحويل، العقد بتاريخ تسجيله). النِسب بين أعداد نفس الفترة.">
         <div className="grid gap-4 xl:grid-cols-[1fr_1.6fr]">
@@ -216,7 +221,8 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           </Panel>
         </div>
       </Section>
-
+  </>);
+  const employeesBlock = (<>
       {/* 4. employees */}
       <Section title="أداء الموظفين" sub="في الفترة المختارة. «ضافهم» = العملاء اللي سجّلهم بنفسه، «استلمهم» = اتوزعوا عليه من غيره — العميل الواحد مابيتعدّش مرتين. الاجتماعات = المنعقدة فعلًا. العقود = اللي هو سيلزها أو التيلي اللي جابها."
         right={<a href={exportHref("employees")} className="rounded-lg border border-[#b8955a]/60 bg-white px-3 py-1.5 text-sm font-semibold text-[#8a6a35] hover:bg-[#f6efe2]">⬇ تصدير Excel (CSV)</a>}>
@@ -248,12 +254,13 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
             </Panel>))}
         </div>
       </Section>
-
+  </>);
+  const analyticsBlock = (<>
       {/* 5. analytics */}
       <Section title="تحليلات" sub="توزيع العملاء على المراحل دلوقتي، وآخر 6 شهور">
         <div className="grid gap-4 xl:grid-cols-3">
-          <Panel title="العملاء حسب المرحلة الحالية" right={<span className="text-[11px] text-ink-500">أرقام بس — قايمة العملاء مش ضمن صلاحيات المالية</span>}>
-            <HBars rows={(d.stages as any[]).slice(0, 9).map((s) => ({ label: LEAD_STATUS[s.s] ?? s.s, value: s.n }))} />
+          <Panel title="العملاء حسب المرحلة الحالية" right={variant === "admin" ? <span className="text-[11px] text-ink-500">اضغط على أي مرحلة تفتح عملاءها</span> : <span className="text-[11px] text-ink-500">أرقام بس — قايمة العملاء مش ضمن صلاحيات المالية</span>}>
+            <HBars rows={(d.stages as any[]).slice(0, 12).map((s) => ({ label: LEAD_STATUS[s.s] ?? s.s, value: s.n, href: variant === "admin" ? `/leads?status=${encodeURIComponent(s.s)}` : undefined }))} />
           </Panel>
           <Panel title="آخر 6 شهور" className="xl:col-span-2"><MonthChart rows={d.monthly} /></Panel>
           <Panel title={`الفترة دي مقابل ${prevLabel}`} className="xl:col-span-3">
@@ -266,16 +273,42 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           </Panel>
         </div>
       </Section>
+  </>);
+
+  const isAdmin = variant === "admin";
+  return (
+    <div className="space-y-8 overflow-x-clip">
+      {headerBlock}
+      {isAdmin ? (<>
+        {extra?.attention}
+        {summaryBlock}
+        {moneyBlock}
+        {achievementsBlock}
+        {extra?.ops}
+        {attentionBlock}
+        {contractsBlock}
+        {employeesBlock}
+        {extra?.daily}
+        {analyticsBlock}
+        {extra?.analytics}
+      </>) : (<>
+        {moneyBlock}
+        {attentionBlock}
+        {contractsBlock}
+        {summaryBlock}
+        {achievementsBlock}
+        {employeesBlock}
+        {analyticsBlock}
+      </>)}
     </div>
   );
 }
-
 /* ───────── clients ranked by money: payments, when they end, time left on the contract ───────── */
 function ClientsMoney({ rows }: { rows: FinClient[] }) {
   const sum = (k: "total_amount" | "paid" | "overdue" | "remaining") => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
   const total = sum("total_amount"), paid = sum("paid"), late = sum("overdue"), left = sum("remaining");
   return (
-    <Section title="العملاء والفلوس" sub="العملاء مترتبين من الأكبر قيمة للأصغر (العقود المعتمدة واللي عند المالية). «اتحصل» = الدفعات اللي المدير المالي أكد وصولها بس. «متأخر» = اللي جه ميعاده في جدول الدفعات ولسه ماوصلش.">
+    <Section id="money" title="العملاء والفلوس" sub="العملاء مترتبين من الأكبر قيمة للأصغر (العقود المعتمدة واللي عند المالية). «اتحصل» = الدفعات اللي المدير المالي أكد وصولها بس. «متأخر» = اللي جه ميعاده في جدول الدفعات ولسه ماوصلش.">
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-2xl bg-[#1b2a41] p-4 text-white"><p className="text-xs text-white/70">إجمالي قيمة العقود</p><p className="mt-1 text-2xl font-extrabold tabular-nums">{fmtSar(total)}</p><p className="text-xs text-white/60">{rows.length} عميل</p></div>
         <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">اتحصل فعلًا</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-ok">{fmtSar(paid)}</p></div>

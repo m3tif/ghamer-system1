@@ -112,4 +112,14 @@ describe("Finance Manager dashboard — real numbers, finance-only access", () =
     await expect(run("super", "delete from payments")).rejects.toThrow(/permission denied/);
     expect((await admin.query("select count(*)::int n from audit_logs where entity_type='payments'")).rows[0].n).toBeGreaterThanOrEqual(5);
   });
+  it("admin attention: admins only, and its numbers match direct counts", async () => {
+    for (const w of ["fin", "sales1", "tele1", "techmgr", "am1", "telemgr", "salesmgr"]) await expect(run(w, "select app.admin_attention()")).rejects.toThrow(/no access/);
+    const a = (await run("super", "select app.admin_attention() j")).rows[0].j;
+    expect((await run("gm", "select app.admin_attention() j")).rows[0].j.employees_active).toBe(a.employees_active);
+    expect(a.contracts_waiting).toBe(Number((await admin.query("select count(*) n from contracts where status='submitted'")).rows[0].n));
+    expect(a.followups_overdue).toBe(Number((await admin.query("select count(*) n from follow_ups where status='open' and due_at < now()")).rows[0].n));
+    expect(a.ops_new).toBe(Number((await admin.query("select count(*) n from client_operations where status='new'")).rows[0].n));
+    expect((a.sources as any[]).reduce((x, r) => x + r.n, 0)).toBe(Number((await admin.query("select count(*) n from leads")).rows[0].n));
+    expect(Number(a.overdue_money)).toBe(0);
+  });
 });
