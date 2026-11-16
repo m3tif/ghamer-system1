@@ -38,6 +38,10 @@ export async function setupDb(dbName = "ghamer_test") {
   await mk("sales2", "sales_rep", "فهد", "salesmgr");
   await mk("fin", "finance_manager", "مدير المالية");
   await mk("tech", "technical_employee", "موظف تقني");
+  await mk("techmgr", "operations_manager", "المديرة التقنية");
+  await mk("am1", "account_manager", "أكاونت 1");
+  await mk("am2", "account_manager", "أكاونت 2");
+  await mk("designer", "designer", "ديزاينر");
 }
 
 export async function teardown() { await admin?.end(); const { closePool } = await import("../src/lib/db"); await closePool(); }

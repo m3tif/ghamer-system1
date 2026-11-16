@@ -51,6 +51,7 @@ const MAP: [RegExp, string][] = [
   [/first payment must be on or before the start date/i, "تاريخ أول دفعة لازم يكون نفس تاريخ البداية أو قبله"],
   [/contract price must be greater than zero/i, "اكتب سعر العقد (أكبر من صفر)"],
   [/package picked twice/i, "الباقة متعلّم عليها مرتين"],
+  [/invalid account manager/i, "اختار أكاونت مانجر من القايمة (لازم يكون حسابه شغّال)"],
   [/contract is locked/i, "العقد عند المالية دلوقتي ومينفعش يتعدّل. لو فيه تعديل، المالية ترجّعه الأول"],
   [/signed contract file required/i, "ارفع ملف العقد الموقّع الأول قبل الإرسال للمالية"],
   [/contract dates required/i, "اكتب تاريخ بداية ونهاية العقد"],

@@ -297,3 +297,15 @@ export async function attachmentGet(uid: string, id: string) {
 export async function broadcastList(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.broadcast_list()"))).rows as any[];
 }
+
+// ───────── Phase 3: operations queue ─────────
+export type OpsRow = { id: string; status: "new" | "assigned"; client_id: string; client_name: string; business_name: string | null; phone: string | null; store_url: string | null;
+  contract_id: string; contract_no: string; packages: string[]; start_date: string | null; end_date: string | null; duration_months: number | null; contract_notes: string | null;
+  sales_name: string | null; approved_at: string | null; account_manager_id: string | null; account_manager_name: string | null; assigned_at: string | null;
+  assigned_by_name: string | null; assign_note: string | null; created_at: string };
+export async function opsList(uid: string, status: "new" | "assigned" | null = null) {
+  return (await tx(uid, (c) => c.query("select * from app.ops_list($1)", [status]))).rows as OpsRow[];
+}
+export async function opsAccountManagers(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.ops_account_managers()"))).rows as { id: string; full_name: string; clients: number }[];
+}

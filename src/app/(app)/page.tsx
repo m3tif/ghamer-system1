@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { contractList } from "@/server/data";
+import { contractList, opsAccountManagers, opsList } from "@/server/data";
 import { can, requireSession } from "@/lib/auth";
 import { dailyReport, type DailyRow, addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, listMeetings, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
 import { Badge, Card, Empty, PageHeader, Progress, Stat, Table, td } from "@/components/ui";
@@ -28,6 +28,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {(s.role === "sales_manager" || isAdmin) && <SalesTeam uid={s.userId} month={month} team={salesTeam} />}
       {isAdmin && <Company uid={s.userId} month={month} />}
       {(s.role === "finance_manager" || s.role === "finance_employee") && <FinanceHome uid={s.userId} />}
+      {s.role === "operations_manager" && <TechManagerHome uid={s.userId} />}
+      {s.role === "account_manager" && <AccountManagerHome uid={s.userId} />}
+      {TECH_ROLES.includes(s.role) && <section className="mb-8 rounded-lg border border-line bg-white p-5"><p className="font-bold">أهلًا بيك في غامر CRM</p><p className="mt-1 text-sm text-ink-500">التاسكات اللي الأكاونت مانجر هيبعتهالك هتظهر هنا قريب.</p></section>}
       {!["tele_sales", "sales_rep", "tele_sales_manager", "sales_manager", "super_admin", "general_manager", "finance_manager", "finance_employee"].includes(s.role) && (
         <Empty title="لا توجد لوحة لدورك في هذه المرحلة" hint="وحدات المالية والتشغيل والمهام تُضاف في المراحل القادمة." />
       )}
@@ -36,6 +39,35 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 }
 
 /** Finance: what is waiting for them right now (payments and approvals are added in the next steps of Phase 2). */
+const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "content_creator", "media_buyer", "technical_employee", "technical_team_leader"];
+
+async function TechManagerHome({ uid }: { uid: string }) {
+  const [waiting, assigned, ams] = await Promise.all([opsList(uid, "new"), opsList(uid, "assigned"), opsAccountManagers(uid)]);
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 text-lg font-bold">العملاء المعتمدين ماليًا</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat href="/operations" label="مستنيين تحويل لأكاونت مانجر" value={waiting.length} tone={waiting.length ? "bad" : undefined} />
+        <Stat href="/operations?tab=assigned" label="اتحوّلوا" value={assigned.length} />
+      </div>
+      {ams.length > 0 && (
+        <div className="mt-4"><Card title="العملاء مع كل أكاونت مانجر">
+          <ul className="divide-y divide-line text-sm">{ams.map((a) => <li key={a.id} className="flex justify-between py-2"><span>{a.full_name}</span><span className="font-semibold tabular-nums">{a.clients}</span></li>)}</ul>
+        </Card></div>)}
+    </section>
+  );
+}
+
+async function AccountManagerHome({ uid }: { uid: string }) {
+  const mine = await opsList(uid, null);
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 text-lg font-bold">عملائي</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat href="/operations" label="العملاء المسندين ليك" value={mine.length} /></div>
+    </section>
+  );
+}
+
 async function FinanceHome({ uid }: { uid: string }) {
   const [waiting, returned, all] = await Promise.all([contractList(uid, { status: "submitted" }), contractList(uid, { status: "returned" }), contractList(uid, {})]);
   return (

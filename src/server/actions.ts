@@ -785,6 +785,18 @@ export async function approveContractAction(_: FormState, fd: FormData): Promise
   return { ok: "تم الاعتماد المالي للعقد" };
 }
 
+// ───────── Phase 3: Technical Manager hands an approved client to an Account Manager ─────────
+export async function assignOpsAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "ops_id"), am = s(fd, "account_manager"), note = s(fd, "note");
+  if (!UUID.test(id)) return { error: "عميل غير صالح" };
+  if (!UUID.test(am)) return { error: "اختار الأكاونت مانجر", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.ops_assign($1,$2,$3)", [id, am, note || null])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath("/operations"); revalidatePath("/");
+  return { ok: "تم تحويل العميل للأكاونت مانجر" };
+}
+
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
