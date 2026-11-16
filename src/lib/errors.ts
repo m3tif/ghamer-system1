@@ -64,6 +64,8 @@ const MAP: [RegExp, string][] = [
   [/comment required/i, "اكتب التعليق"],
   [/item label required/i, "اكتب البند"],
   [/task is not waiting for the client/i, "التاسك مش مستني موافقة العميل"],
+  [/packages required/i, "حدّد باقة واحدة على الأقل للعميل الأول"],
+  [/packages come from the contract/i, "باقات العميل ده جاية من عقده"],
   [/contract is locked/i, "العقد عند المالية دلوقتي ومينفعش يتعدّل. لو فيه تعديل، المالية ترجّعه الأول"],
   [/signed contract file required/i, "ارفع ملف العقد الموقّع الأول قبل الإرسال للمالية"],
   [/contract dates required/i, "اكتب تاريخ بداية ونهاية العقد"],

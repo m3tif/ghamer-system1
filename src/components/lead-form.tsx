@@ -24,7 +24,7 @@ export function Toast({ t }: { t: NonNullable<FormState["toast"]> }) {
   );
 }
 
-export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: string }) {
+export function LeadForm({ legacy = false, tz = "", packages = [] }: { legacy?: boolean; tz?: string; packages?: { code: string; name_ar: string }[] }) {
   const [state, action, pending] = useActionState(createLeadAction, {} as FormState);
   const [rid, setRid] = useState(uuid);
   const [status, setStatus] = useState("New Lead");
@@ -104,6 +104,12 @@ export function LeadForm({ legacy = false, tz = "" }: { legacy?: boolean; tz?: s
               <input id="call_notes" name="call_notes" autoComplete="off" defaultValue={d("call_notes")} className={inputCls} /></div>
           </>)}
         </section>
+        {legacy && (
+          <section className="space-y-4 rounded-lg border border-line bg-white p-5">
+            <CheckGroup label="الباقات (اختياري — المدير التقني يقدر يحددها أو يعدّلها)" name="packages" options={packages.map((x) => ({ value: x.code, label: x.name_ar }))} />
+            <div><label className="mb-1 block text-sm font-medium" htmlFor="call_notes">ملاحظات للمدير التقني (اختياري)</label>
+              <textarea id="call_notes" name="call_notes" rows={2} defaultValue={d("call_notes")} className={inputCls} placeholder="مثال: عميل من 2024، شغالين معاه سوشيال بس" /></div>
+          </section>)}
         <details className="rounded-lg border border-line bg-white" open={Boolean(d("store_url") || d("business_name") || d("alt_phone"))}>
           <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">تفاصيل إضافية (اختياري، يمكن استكمالها لاحقًا)</summary>
           <div className="grid gap-4 border-t border-line p-5 md:grid-cols-2 xl:grid-cols-3">

@@ -46,6 +46,11 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
         </div>)}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-6">
+          {ops?.is_existing && (
+            <Card title="عميل قائم — الباقات">
+              <div className="flex flex-wrap gap-1.5">{(ops.packages as string[]).length ? (ops.packages as string[]).map((p) => <span key={p} className="rounded-md border border-burgundy-600/30 bg-burgundy-600/5 px-2 py-0.5 text-xs font-medium">✓ {p}</span>) : <span className="text-sm text-ink-500">لسه ماتحددتش.</span>}</div>
+              {ops.start_date && <p className="mt-2 text-sm text-ink-500">{fmtDate(ops.start_date)} ← {ops.end_date ? fmtDate(ops.end_date) : "—"}</p>}
+            </Card>)}
           <Card title="العقود">
             {d.contracts.length === 0 ? <p className="text-sm text-ink-500">مفيش عقود.</p> : (
               <ul className="space-y-3 text-sm">{(d.contracts as any[]).map((k) => (

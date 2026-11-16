@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract } from "./helpers";
+import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract, register } from "./helpers";
 
 const dealOf = async (lead: string) => (await admin.query("select id from deals where lead_id=$1", [lead])).rows[0].id as string;
 const list = async (who: string, status: string | null = null) => (await run(who, "select * from app.ops_list($1)", [status])).rows;
@@ -64,5 +64,28 @@ describe("Phase 3 — approved clients go to the Technical Manager, who hands th
     const r = (await admin.query("select code, name_ar from roles where code in ('seo_specialist','ui_designer','developer','designer','content_creator','media_buyer') order by code")).rows;
     expect(r.length).toBe(6);
     expect((await admin.query("select name_ar from roles where code='operations_manager'")).rows[0].name_ar).toBe("المدير التقني");
+  });
+  it("an existing client goes straight to the Technical Manager; she sets the packages, then hands it to an Account Manager", async () => {
+    await expect(register("sales1", { ...leadPayload({ name: "قائم", phone: "0572000099" }), mode: "existing" })).rejects.toThrow(/not allowed/);
+    const r = await register("super", { ...leadPayload({ name: "عميل قديم", phone: "0572000099" }), mode: "existing", call_notes: "شغالين معاه من 2024" });
+    expect(r.status).toBe("created"); expect(r.lead_id).toBeNull();
+    const q = (await run("techmgr", "select * from app.ops_list('new')")).rows.find((x: any) => x.client_name === "عميل قديم");
+    expect(q.is_existing).toBe(true); expect(q.packages).toEqual([]); expect(q.contract_no).toBeNull(); expect(q.contract_notes).toBe("شغالين معاه من 2024");
+    expect((await admin.query("select count(*)::int n from notifications where kind='ops_new' and user_id=$1 and title='عميل قائم جديد'", [ids.techmgr])).rows[0].n).toBe(1);
+    await expect(run("techmgr", "select app.ops_assign($1,$2,null)", [q.id, ids.am1])).rejects.toThrow(/packages required/);
+    await expect(run("am1", "select app.ops_set_packages($1,$2,null,null)", [q.id, ["seo"]])).rejects.toThrow(/not allowed/);
+    await expect(run("techmgr", "select app.ops_set_packages($1,$2,null,null)", [q.id, []])).rejects.toThrow(/packages required/);
+    await expect(run("techmgr", "select app.ops_set_packages($1,$2,null,null)", [q.id, ["paid_ads"]])).rejects.toThrow(/invalid service/);
+    await run("techmgr", "select app.ops_set_packages($1,$2,'2026-01-01','2026-12-31')", [q.id, ["full_service", "seo"]]);
+    await run("techmgr", "select app.ops_set_packages($1,$2,'2026-01-01','2026-12-31')", [q.id, ["full_service"]]);
+    await run("techmgr", "select app.ops_assign($1,$2,null)", [q.id, ids.am2]);
+    const mine = (await run("am2", "select * from app.ops_list(null)")).rows.find((x: any) => x.id === q.id);
+    expect(mine.packages).toEqual(["باقة خدمة كاملة"]); expect(String(mine.start_date).length).toBeGreaterThan(0);
+    expect((await run("am2", "select * from app.ops_steps($1)", [q.id])).rows.length).toBe(10);
+    // a client with a contract cannot get packages this way
+    const op = (await run("techmgr", "select id from app.ops_list(null) where not is_existing")).rows[0].id;
+    await expect(run("techmgr", "select app.ops_set_packages($1,$2,null,null)", [op, ["seo"]])).rejects.toThrow(/come from the contract/);
+    // the same phone cannot be added again
+    expect((await register("super", { ...leadPayload({ name: "تكرار", phone: "0572000099" }), mode: "existing" })).status).toBe("duplicate");
   });
 });

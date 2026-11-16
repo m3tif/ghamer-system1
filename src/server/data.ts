@@ -302,7 +302,7 @@ export async function broadcastList(uid: string) {
 export type OpsRow = { id: string; status: "new" | "assigned"; client_id: string; client_name: string; business_name: string | null; phone: string | null; store_url: string | null;
   contract_id: string; contract_no: string; packages: string[]; start_date: string | null; end_date: string | null; duration_months: number | null; contract_notes: string | null;
   sales_name: string | null; approved_at: string | null; account_manager_id: string | null; account_manager_name: string | null; assigned_at: string | null;
-  assigned_by_name: string | null; assign_note: string | null; created_at: string };
+  assigned_by_name: string | null; assign_note: string | null; created_at: string; is_existing: boolean };
 export async function opsList(uid: string, status: "new" | "assigned" | null = null) {
   return (await tx(uid, (c) => c.query("select * from app.ops_list($1)", [status]))).rows as OpsRow[];
 }
@@ -343,4 +343,7 @@ export type OpsStep = { template_id: string; service_name: string; stage: string
   needs_client: boolean; estimated_hours: string | null; task_id: string | null; task_status: string | null; assignee_name: string | null };
 export async function opsSteps(uid: string, opsId: string) {
   return (await tx(uid, (c) => c.query("select * from app.ops_steps($1)", [opsId]))).rows as OpsStep[];
+}
+export async function opsPackages(uid: string, opsId: string) {
+  return ((await tx(uid, (c) => c.query("select app.ops_packages($1) p", [opsId]))).rows[0]?.p ?? []) as string[];
 }

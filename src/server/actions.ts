@@ -97,6 +97,7 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
     country: s(fd, "country") || "SA", city: s(fd, "city"), contact_person: s(fd, "contact_person"), source: s(fd, "source"),
     required_services: fd.getAll("services").map(String), lead_status: status, call_notes: s(fd, "call_notes"),
     next_followup_at: next, followup_reason: s(fd, "followup_reason"), ...cp.payload,
+    packages: legacy ? fd.getAll("packages").map(String).filter((x) => /^[a-z0-9_]{2,40}$/.test(x)) : [],
   };
   let res: any;
   try { res = (await tx(sess.userId, (c) => c.query("select app.register_lead($1::jsonb) r", [JSON.stringify(payload)]))).rows[0].r; }
@@ -106,7 +107,7 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
       attempted: { name: s(fd, "name"), business_name: s(fd, "business_name"), phone: s(fd, "phone"), store: s(fd, "store_url") } } };
   }
   revalidatePath("/leads");
-  if (legacy) redirect("/");
+  if (legacy) redirect("/operations?added=1");
   if (s(fd, "intent") === "open") redirect(`/leads/${res.lead_id}`);
   const count: number = res.month_count ?? 0, goal: number | null = res.goal == null ? null : Number(res.goal), ach: string[] = res.new_achievements ?? [];
   const e = encourage(count, goal, ach);
@@ -846,6 +847,18 @@ export async function clientOkTaskAction(_: FormState, fd: FormData): Promise<Fo
 export async function clientNoTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_client($1,false,$2)", "تم إرجاع التاسك للموظف بتعديل العميل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل اللي العميل طلبه"; }); }
 export async function commentTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_comment($1,$2)", "تم إضافة التعليق", (fd) => { const b = s(fd, "body"); return b ? [b.slice(0, 2000)] : "اكتب التعليق"; }); }
 
+
+export async function setOpsPackagesAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id"), codes = fd.getAll("packages").map(String).filter((x) => /^[a-z0-9_]{2,40}$/.test(x)), st = s(fd, "start_date"), en = s(fd, "end_date");
+  if (!UUID.test(ops)) return { error: "عميل غير صالح" };
+  if (codes.length === 0) return { error: "علّم على باقة واحدة على الأقل", values: vals(fd) };
+  if ((st && !DATE.test(st)) || (en && !DATE.test(en))) return { error: "تاريخ غير صالح", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.ops_set_packages($1,$2,$3,$4)", [ops, codes, st || null, en || null])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath("/operations"); revalidatePath(`/operations/${ops}`);
+  return { ok: "تم حفظ الباقات" };
+}
 
 // ───────── Phase 3: onboarding, templates, task files ─────────
 const OB_FIELDS = ["goals", "audience", "brand_identity", "competitors", "products", "channels", "kpis", "priorities", "links", "plan"] as const;
