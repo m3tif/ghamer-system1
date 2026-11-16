@@ -707,19 +707,20 @@ export async function saveContractAction(_: FormState, fd: FormData): Promise<Fo
   if (!UUID.test(deal)) return { error: "صفقة غير صالحة" };
   let p: any;
   try { p = JSON.parse(s(fd, "payload")); } catch { return { error: "بيانات العقد غير صالحة" }; }
-  const items = (Array.isArray(p.items) ? p.items : []).map((i: any) => ({ service: String(i.service ?? ""), description: String(i.description ?? "").slice(0, 500), amount: money(i.amount) }))
-    .filter((i: any) => i.service || i.amount);
+  const items = (Array.isArray(p.items) ? p.items : []).map((i: any) => ({ service: String(i.service ?? ""), description: String(i.description ?? "").slice(0, 500) }))
+    .filter((i: any) => i.service);
+  const total = money(p.total);
   const installments = (Array.isArray(p.installments) ? p.installments : []).map((i: any) => ({ kind: String(i.kind ?? "installment"), due_date: String(i.due_date ?? ""), amount: money(i.amount), note: String(i.note ?? "").slice(0, 300) }))
     .filter((i: any) => i.due_date || i.amount);
-  if (items.length === 0) return { error: "اختار باقة واحدة على الأقل واكتب سعرها" };
-  if (items.some((i: any) => !i.service || !(i.amount > 0))) return { error: "اكتب سعر كل باقة معلّم عليها (أكبر من صفر)" };
+  if (items.length === 0) return { error: "علّم على باقة واحدة على الأقل" };
+  if (!(total > 0)) return { error: "اكتب سعر العقد (أكبر من صفر)" };
   if (installments.some((i: any) => !DATE.test(i.due_date) || !(i.amount > 0))) return { error: "كل دفعة محتاجة مبلغ وتاريخ" };
   if (installments.length && DATE.test(String(p.start_date ?? "")) && installments[0].due_date > String(p.start_date)) return { error: "تاريخ أول دفعة لازم يكون نفس تاريخ البداية أو قبله" };
   for (const k of ["start_date", "end_date", "agreed_at"]) if (p[k] && !DATE.test(String(p[k]))) return { error: "تاريخ غير صالح" };
   const discount = 0;   // no discount / VAT in contracts
   if (p.payment_method && !["tabby", "tamara", "bank_transfer"].includes(String(p.payment_method))) return { error: "اختر طريقة الدفع: تابي أو تمارا أو تحويل بنكي" };
   const payload = { package: String(p.package ?? "monthly"), duration_months: p.duration_months ? String(Math.trunc(Number(p.duration_months))) : "", start_date: p.start_date ?? "", end_date: p.end_date ?? "",
-    agreed_at: p.agreed_at ?? "", discount, payment_method: String(p.payment_method ?? ""), payment_terms: String(p.payment_terms ?? "").slice(0, 2000), notes: String(p.notes ?? "").slice(0, 4000), items, installments };
+    agreed_at: p.agreed_at ?? "", discount, payment_method: String(p.payment_method ?? ""), payment_terms: String(p.payment_terms ?? "").slice(0, 2000), notes: String(p.notes ?? "").slice(0, 4000), total, items, installments };
   let id: string;
   try { id = (await tx(sess.userId, (c) => c.query("select app.contract_save($1,$2::jsonb) id", [deal, JSON.stringify(payload)]))).rows[0].id; }
   catch (e) { return { error: mapError(e) }; }

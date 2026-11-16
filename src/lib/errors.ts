@@ -49,6 +49,8 @@ const MAP: [RegExp, string][] = [
   [/file cannot be deleted/i, "العقد مقفول ومينفعش يتمسح منه ملفات"],
   [/file delete not allowed/i, "اللي رفع الملف بس (أو مدير النظام) هو اللي يقدر يمسحه"],
   [/first payment must be on or before the start date/i, "تاريخ أول دفعة لازم يكون نفس تاريخ البداية أو قبله"],
+  [/contract price must be greater than zero/i, "اكتب سعر العقد (أكبر من صفر)"],
+  [/package picked twice/i, "الباقة متعلّم عليها مرتين"],
   [/contract is locked/i, "العقد عند المالية دلوقتي ومينفعش يتعدّل. لو فيه تعديل، المالية ترجّعه الأول"],
   [/signed contract file required/i, "ارفع ملف العقد الموقّع الأول قبل الإرسال للمالية"],
   [/contract dates required/i, "اكتب تاريخ بداية ونهاية العقد"],

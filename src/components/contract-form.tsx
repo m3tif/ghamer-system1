@@ -7,7 +7,7 @@ import type { FormState } from "@/lib/form";
 
 type Item = { service: string; description: string; amount: string };
 type Inst = { kind: string; due_date: string; amount: string; note: string };
-export type ContractInitial = { package: string; duration_months: string; start_date: string; end_date: string; agreed_at: string; discount: string;
+export type ContractInitial = { total: string; package: string; duration_months: string; start_date: string; end_date: string; agreed_at: string; discount: string;
   payment_method: string; payment_terms: string; notes: string; items: Item[]; installments: Inst[] };
 
 const num = (v: string) => { const n = Number(String(v).replace(/[,٬\s]/g, "")); return Number.isFinite(n) ? n : 0; };
@@ -23,8 +23,7 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
   const set = <K extends keyof ContractInitial>(k: K, v: ContractInitial[K]) => setF((o) => ({ ...o, [k]: v }));
   const setInst = (i: number, p: Partial<Inst>) => set("installments", f.installments.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
-  const sum = r2(f.items.reduce((a, x) => a + num(x.amount), 0));
-  const total = sum;
+  const total = r2(num(f.total));
   const instSum = r2(f.installments.reduce((a, x) => a + num(x.amount), 0));
   const instOff = f.installments.length > 0 && instSum !== total;
   const payload = useMemo(() => JSON.stringify(f), [f]);
@@ -36,7 +35,6 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
   // packages are tick boxes: ticking one adds it to the contract and opens its price box
   const picked = (code: string) => f.items.findIndex((x) => x.service === code);
   const toggle = (code: string, on: boolean) => set("items", on ? [...f.items, { service: code, description: "", amount: "" }] : f.items.filter((x) => x.service !== code));
-  const setItemBy = (code: string, p: Partial<Item>) => set("items", f.items.map((x) => (x.service === code ? { ...x, ...p } : x)));
 
   // number of payments: choosing N opens N rows (amount + date), split equally, one month apart, starting on the start date
   const count = Math.max(1, f.installments.length);
@@ -57,23 +55,19 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
 
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="mb-1 font-bold">الباقات</h2>
-        <p className="mb-3 text-xs text-ink-500">علّم على الباقات اللي العميل اتفق عليها واكتب سعر كل واحدة. قيمة العقد = مجموع الباقات.</p>
-        <div className="space-y-2">
-          {services.map((sv) => { const i = picked(sv.code), it = f.items[i]; return (
-            <div key={sv.code} className={`rounded-md border p-2.5 ${it ? "border-burgundy-600/40 bg-burgundy-600/5" : "border-line"}`}>
-              <label className="flex cursor-pointer items-center gap-2 font-medium">
-                <input type="checkbox" checked={!!it} onChange={(e) => toggle(sv.code, e.target.checked)} className="h-4 w-4 accent-burgundy-600" />{sv.name_ar}</label>
-              {it && (
-                <div className="mt-2 grid gap-2 md:grid-cols-[10rem_1fr]">
-                  <input aria-label={`سعر ${sv.name_ar}`} value={it.amount} onChange={(e) => setItemBy(sv.code, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="السعر" className={inputCls + " tabular-nums"} required />
-                  <input aria-label={`تفاصيل ${sv.name_ar}`} value={it.description} onChange={(e) => setItemBy(sv.code, { description: e.target.value })} placeholder="تفاصيل (اختياري)" maxLength={500} className={inputCls} />
-                </div>)}
-            </div>); })}
+        <p className="mb-3 text-xs text-ink-500">علّم على الباقات اللي العميل اتفق عليها، واكتب سعر العقد كله مرة واحدة تحت.</p>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {services.map((sv) => { const on = picked(sv.code) >= 0; return (
+            <label key={sv.code} className={`flex cursor-pointer items-center gap-2 rounded-md border p-2.5 font-medium ${on ? "border-burgundy-600/40 bg-burgundy-600/5" : "border-line"}`}>
+              <input type="checkbox" checked={on} onChange={(e) => toggle(sv.code, e.target.checked)} className="h-4 w-4 accent-burgundy-600" />{sv.name_ar}</label>); })}
         </div>
-        {f.items.length === 0 && <p className="mt-2 text-sm text-warn">اختار باقة واحدة على الأقل.</p>}
-        <dl className="mt-4 max-w-md rounded-md bg-cream/60 p-3 text-sm" aria-live="polite">
-          <div className="flex justify-between text-base font-bold"><dt>قيمة العقد (اللي العميل هيدفعه)</dt><dd className="tabular-nums">{sar(total)}</dd></div>
-        </dl>
+        {f.items.length === 0 && <p className="mt-2 text-sm text-warn">علّم على باقة واحدة على الأقل.</p>}
+        <div className="mt-4 max-w-xs">
+          <label className={lbl} htmlFor="total">سعر العقد (اللي العميل هيدفعه) <span className="text-burgundy-600">*</span></label>
+          <div className="flex items-center gap-2">
+            <input id="total" value={f.total} onChange={(e) => set("total", e.target.value)} inputMode="decimal" dir="ltr" placeholder="مثال: 8000" className={inputCls + " tabular-nums text-lg font-bold"} required />
+            <span className="text-sm text-ink-500">ريال</span></div>
+        </div>
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">

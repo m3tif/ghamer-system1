@@ -38,9 +38,8 @@ export default async function ContractPage({ params, searchParams }: { params: P
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-6">
           <Card title="الباقات المتعاقد عليها">
-            <Table head={["الباقة", "التفاصيل", "السعر"]}>
-              {items.map((i: any, k: number) => (<tr key={k}><td className={td + " font-medium"}>{i.service_name}</td><td className={td + " text-ink-500"}>{i.description || "—"}</td><td className={td + " whitespace-nowrap tabular-nums"}>{fmtSar(i.amount)}</td></tr>))}
-            </Table>
+            <div className="flex flex-wrap gap-2">{items.map((i: any, k: number) => (
+              <span key={k} className="rounded-md border border-burgundy-600/30 bg-burgundy-600/5 px-3 py-1.5 text-sm font-medium">✓ {i.service_name}{i.amount != null ? ` — ${fmtSar(i.amount)}` : ""}{i.description ? ` (${i.description})` : ""}</span>))}</div>
             <dl className="mt-4 max-w-md text-sm">
               <div className="flex justify-between text-base font-bold"><dt>قيمة العقد</dt><dd className="tabular-nums">{fmtSar(c.total_amount)}</dd></div>
             </dl>

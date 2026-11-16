@@ -180,4 +180,15 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     expect(g.items.map((x: any) => x.service_name)).toEqual(["باقة إنشاء المتجر", "باقة انفلونسر"]);
     await expect(save("sales1", d, { ...two("2027-03-01", "2027-04-01"), items: [{ service: "paid_ads", description: "", amount: 8000 }] })).rejects.toThrow(/invalid service/);
   });
+  it("one price for the whole contract: packages are only ticked", async () => {
+    const d = await newDeal("tele1", "sales1", "0571000011");
+    const base = { ...contractPayload({ start: "2027-03-01" }), items: [{ service: "seo" }, { service: "social_media" }] };
+    await expect(save("sales1", d, { ...base, total: 0 })).rejects.toThrow(/contract price must be greater/);
+    await expect(save("sales1", d, { ...base, total: 5000, items: [{ service: "seo" }, { service: "seo" }] })).rejects.toThrow(/picked twice/);
+    const id = await save("sales1", d, { ...base, total: 7000, installments: [{ kind: "down_payment", due_date: "2027-03-01", amount: 4000 }, { due_date: "2027-04-01", amount: 3000 }] });
+    const g = await get("sales1", id);
+    expect(Number(g.contract.total_amount)).toBe(7000);
+    expect(g.items.map((x: any) => [x.service_name, x.amount])).toEqual([["باقة سيو", null], ["باقة سوشيال", null]]);
+    await expect(save("sales1", d, { ...base, total: 7000, installments: [{ due_date: "2027-03-01", amount: 1000 }] })).rejects.toThrow(/add up/);
+  });
 });
