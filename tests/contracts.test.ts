@@ -42,7 +42,7 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     await expect(save("sales1", deal, contractPayload({ amount: 1000, installments: [{ due_date: "2027-01-01", amount: 400 }, { due_date: "2027-02-01", amount: 500 }] }))).rejects.toThrow(/add up/);
     // an edit replaces the lines, keeps the same contract and number
     const again = await save("sales1", deal, { ...contractPayload({ amount: 6900, discount: 0, installments: [{ kind: "down_payment", due_date: "2027-01-01", amount: 5000 }, { due_date: "2027-02-01", amount: 4600 }] }),
-      items: [{ service: "social_media", amount: 6900 }, { service: "paid_ads", description: "إدارة إعلانات", amount: 2700 }] });
+      items: [{ service: "social_media", amount: 6900 }, { service: "media", description: "تصوير منتجات", amount: 2700 }] });
     expect(again).toBe(id);
     const j = await get("sales1", id);
     expect(j.items.length).toBe(2); expect(j.installments.length).toBe(2); expect(Number(j.contract.total_amount)).toBe(9600);
@@ -164,5 +164,20 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     const f = (await get("sales1", c3)).files[0];
     expect(f.can_delete).toBe(false);
     await expect(run("sales1", "select app.contract_file_delete($1)", [f.id])).rejects.toThrow(/closed/);
+  });
+  it("packages are the 7 agency packages; the first payment is on the start date or before it, never after", async () => {
+    const pk = (await run("sales1", "select code from services where is_active order by sort")).rows.map((r: any) => r.code);
+    expect(pk).toEqual(["store_create", "store_edit", "full_service", "seo", "media", "social_media", "influencer"]);
+    const d = await newDeal("tele1", "sales1", "0571000010");
+    const two = (a: string, b: string) => ({ ...contractPayload({ amount: 8000, start: "2027-03-01" }),
+      items: [{ service: "store_create", description: "", amount: 5000 }, { service: "influencer", description: "", amount: 3000 }],
+      installments: [{ kind: "down_payment", due_date: a, amount: 6000 }, { kind: "installment", due_date: b, amount: 2000 }] });
+    await expect(save("sales1", d, two("2027-03-02", "2027-04-01"))).rejects.toThrow(/first payment must be on or before/);
+    const id = await save("sales1", d, two("2027-02-20", "2027-04-01"));        // paid before work starts: fine
+    await save("sales1", d, two("2027-03-01", "2027-04-01"));                    // same day: fine
+    const g = await get("sales1", id);
+    expect(Number(g.contract.total_amount)).toBe(8000);
+    expect(g.items.map((x: any) => x.service_name)).toEqual(["باقة إنشاء المتجر", "باقة انفلونسر"]);
+    await expect(save("sales1", d, { ...two("2027-03-01", "2027-04-01"), items: [{ service: "paid_ads", description: "", amount: 8000 }] })).rejects.toThrow(/invalid service/);
   });
 });

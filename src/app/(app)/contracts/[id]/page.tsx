@@ -7,7 +7,7 @@ import { Badge, Card, PageHeader, Table, td, btnQuiet } from "@/components/ui";
 import { ActionForm, Alert, Hidden, TextArea, inputCls } from "@/components/forms";
 import { approveContractAction, returnContractAction, submitContractAction, uploadContractFileAction } from "@/server/actions";
 import { fmtDate, fmtDateTime, fmtSar } from "@/lib/format";
-import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, FILE_KIND, INSTALLMENT_KIND, PACKAGE, PAYMENT_METHOD } from "@/lib/labels";
+import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, FILE_KIND, INSTALLMENT_KIND, PAYMENT_METHOD } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 const kb = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} ميجا` : `${Math.max(1, Math.round(n / 1024))} ك.ب`);
@@ -37,8 +37,8 @@ export default async function ContractPage({ params, searchParams }: { params: P
 
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-6">
-          <Card title="الخدمات المتعاقد عليها">
-            <Table head={["الخدمة", "الوصف", "السعر"]}>
+          <Card title="الباقات المتعاقد عليها">
+            <Table head={["الباقة", "التفاصيل", "السعر"]}>
               {items.map((i: any, k: number) => (<tr key={k}><td className={td + " font-medium"}>{i.service_name}</td><td className={td + " text-ink-500"}>{i.description || "—"}</td><td className={td + " whitespace-nowrap tabular-nums"}>{fmtSar(i.amount)}</td></tr>))}
             </Table>
             <dl className="mt-4 max-w-md text-sm">
@@ -79,7 +79,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
           <Card title="بيانات العقد">
             <dl className="space-y-2 text-sm">
               {([["العميل", c.client_name], ["النشاط", c.business_name], ["رقم الجوال", c.phone], ["المتجر", c.store_url], ["السيلز", c.sales_name], ["التلي سيلز (مصدر العميل)", c.tele_name],
-                ["الباقة", PACKAGE[c.package]], ["المدة", c.duration_months ? `${c.duration_months} شهر` : null], ["تاريخ البداية", c.start_date ? fmtDate(c.start_date) : null], ["تاريخ النهاية", c.end_date ? fmtDate(c.end_date) : null],
+                ["المدة", c.duration_months ? `${c.duration_months} شهر` : null], ["تاريخ البداية", c.start_date ? fmtDate(c.start_date) : null], ["تاريخ النهاية", c.end_date ? fmtDate(c.end_date) : null],
                 ["تاريخ الاتفاق", c.agreed_at ? fmtDate(c.agreed_at) : null], ["طريقة الدفع", c.payment_method ? PAYMENT_METHOD[c.payment_method] : null], ["شروط الدفع", c.payment_terms], ["ملاحظات", c.notes],
                 ["أنشأه", `${c.created_by_name} · ${fmtDateTime(c.created_at)}`]] as const).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3"><dt className="shrink-0 text-ink-500">{k}</dt><dd className="break-words text-end" dir="auto">{v || "—"}</dd></div>))}

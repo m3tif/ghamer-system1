@@ -22,8 +22,8 @@ export default async function NewContract({ searchParams }: { searchParams: Prom
     <>
       <PageHeader title={`عقد جديد — ${data.deal.client_name}`} sub={`${data.deal.business_name ?? ""} · السيلز: ${data.deal.owner_name}`} />
       <ContractForm dealId={dealId} services={services} initial={{
-        package: "monthly", duration_months: "1", start_date: "", end_date: "", agreed_at: "", discount: "", payment_method: "", payment_terms: "", notes: "",
-        items: (wanted.length ? wanted : [""]).map((c) => ({ service: c, description: "", amount: "" })), installments: [] }} />
+        package: "custom", duration_months: "1", start_date: "", end_date: "", agreed_at: "", discount: "", payment_method: "", payment_terms: "", notes: "",
+        items: wanted.map((c) => ({ service: c, description: "", amount: "" })), installments: [] }} />
     </>
   );
 }

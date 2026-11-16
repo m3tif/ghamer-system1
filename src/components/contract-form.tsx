@@ -2,7 +2,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveContractAction } from "@/server/actions";
 import { Alert, SubmitButton, inputCls } from "@/components/forms";
-import { INSTALLMENT_KIND, PACKAGE, PACKAGE_MONTHS, PAYMENT_METHOD } from "@/lib/labels";
+import { PAYMENT_METHOD } from "@/lib/labels";
 import type { FormState } from "@/lib/form";
 
 type Item = { service: string; description: string; amount: string };
@@ -16,12 +16,11 @@ const sar = (n: number) => new Intl.NumberFormat("ar-SA-u-nu-latn", { minimumFra
 const addMonths = (d: string, m: number) => { const [y, mo, da] = d.split("-").map(Number); const t = new Date(Date.UTC(y, mo - 1 + m, da)); t.setUTCDate(t.getUTCDate() - 1); return t.toISOString().slice(0, 10); };
 const lbl = "mb-1 block text-sm font-medium";
 
-/** The contract form. No discount and no VAT: the contract value is the sum of its services. */
+/** The contract form. Packages are tick boxes; no discount and no VAT: the contract value is the sum of the ticked packages. */
 export function ContractForm({ dealId, services, initial }: { dealId: string; services: { code: string; name_ar: string }[]; initial: ContractInitial }) {
   const [state, action, pending] = useActionState(saveContractAction, {} as FormState);
   const [f, setF] = useState(initial);
   const set = <K extends keyof ContractInitial>(k: K, v: ContractInitial[K]) => setF((o) => ({ ...o, [k]: v }));
-  const setItem = (i: number, p: Partial<Item>) => set("items", f.items.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const setInst = (i: number, p: Partial<Inst>) => set("installments", f.installments.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
   const sum = r2(f.items.reduce((a, x) => a + num(x.amount), 0));
@@ -30,20 +29,26 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
   const instOff = f.installments.length > 0 && instSum !== total;
   const payload = useMemo(() => JSON.stringify(f), [f]);
 
-  const pickPackage = (p: string) => {
-    const m = PACKAGE_MONTHS[p];
-    setF((o) => ({ ...o, package: p, duration_months: m ? String(m) : o.duration_months, end_date: m && o.start_date ? addMonths(o.start_date, m) : o.end_date }));
-  };
-  const pickStart = (d: string) => setF((o) => ({ ...o, start_date: d, end_date: d && num(o.duration_months) > 0 ? addMonths(d, num(o.duration_months)) : o.end_date }));
+  const pickStart = (d: string) => setF((o) => ({ ...o, start_date: d, end_date: d && num(o.duration_months) > 0 ? addMonths(d, num(o.duration_months)) : o.end_date,
+    installments: o.installments.map((x, i) => (i === 0 && (!x.due_date || x.due_date === o.start_date || x.due_date > d) ? { ...x, due_date: d } : x)) }));
   const pickMonths = (m: string) => setF((o) => ({ ...o, duration_months: m, end_date: o.start_date && num(m) > 0 ? addMonths(o.start_date, num(m)) : o.end_date }));
-  const split = (n: number) => {   // n equal instalments, one month apart, the last one takes the rounding difference
-    if (!(total > 0)) return;
-    const start = f.start_date || new Date().toISOString().slice(0, 10), each = Math.floor((total / n) * 100) / 100;
-    set("installments", Array.from({ length: n }, (_, i) => {
-      const [y, mo, da] = start.split("-").map(Number); const due = new Date(Date.UTC(y, mo - 1 + i, da)).toISOString().slice(0, 10);
-      return { kind: n === 1 ? "full" : i === 0 ? "down_payment" : "installment", due_date: due, amount: String(i === n - 1 ? r2(total - each * (n - 1)) : each), note: "" };
-    }));
+
+  // packages are tick boxes: ticking one adds it to the contract and opens its price box
+  const picked = (code: string) => f.items.findIndex((x) => x.service === code);
+  const toggle = (code: string, on: boolean) => set("items", on ? [...f.items, { service: code, description: "", amount: "" }] : f.items.filter((x) => x.service !== code));
+  const setItemBy = (code: string, p: Partial<Item>) => set("items", f.items.map((x) => (x.service === code ? { ...x, ...p } : x)));
+
+  // number of payments: choosing N opens N rows (amount + date), split equally, one month apart, starting on the start date
+  const count = Math.max(1, f.installments.length);
+  const plusMonths = (d: string, m: number) => { if (!d) return ""; const [y, mo, da] = d.split("-").map(Number); return new Date(Date.UTC(y, mo - 1 + m, da)).toISOString().slice(0, 10); };
+  const makeRows = (n: number, keepDates = true): Inst[] => {
+    const each = total > 0 ? Math.floor((total / n) * 100) / 100 : 0;
+    return Array.from({ length: n }, (_, i) => ({ kind: n === 1 ? "full" : i === 0 ? "down_payment" : "installment",
+      due_date: (keepDates && f.installments[i]?.due_date) || plusMonths(f.start_date, i),
+      amount: total > 0 ? String(i === n - 1 ? r2(total - each * (n - 1)) : each) : "", note: "" }));
   };
+  const pickCount = (n: number) => set("installments", n <= 1 ? [] : makeRows(n, false));
+  const firstLate = f.installments.length > 0 && !!f.start_date && !!f.installments[0].due_date && f.installments[0].due_date > f.start_date;
 
   return (
     <form action={action} className="space-y-6">
@@ -51,20 +56,21 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
       {state.error && <Alert kind="error">{state.error}</Alert>}
 
       <section className="rounded-lg border border-line bg-white p-4">
-        <h2 className="mb-1 font-bold">الخدمات والأسعار</h2>
-        <p className="mb-3 text-xs text-ink-500">اكتب سعر كل خدمة. قيمة العقد = مجموع الخدمات.</p>
+        <h2 className="mb-1 font-bold">الباقات</h2>
+        <p className="mb-3 text-xs text-ink-500">علّم على الباقات اللي العميل اتفق عليها واكتب سعر كل واحدة. قيمة العقد = مجموع الباقات.</p>
         <div className="space-y-2">
-          {f.items.map((it, i) => (
-            <div key={i} className="grid gap-2 rounded-md border border-line/70 p-2 md:grid-cols-[14rem_1fr_10rem_auto] md:border-0 md:p-0">
-              <select aria-label={`الخدمة ${i + 1}`} value={it.service} onChange={(e) => setItem(i, { service: e.target.value })} className={inputCls} required>
-                <option value="">اختر الخدمة</option>{services.map((s) => <option key={s.code} value={s.code}>{s.name_ar}</option>)}</select>
-              <input aria-label={`وصف الخدمة ${i + 1}`} value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="وصف مختصر (اختياري)" maxLength={500} className={inputCls} />
-              <input aria-label={`سعر الخدمة ${i + 1}`} value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="السعر" className={inputCls + " tabular-nums"} required />
-              <button type="button" onClick={() => set("items", f.items.filter((_, j) => j !== i))} disabled={f.items.length === 1}
-                className="rounded-md border border-line px-3 py-2 text-sm text-bad hover:bg-bad/5 disabled:opacity-40">حذف</button>
-            </div>))}
+          {services.map((sv) => { const i = picked(sv.code), it = f.items[i]; return (
+            <div key={sv.code} className={`rounded-md border p-2.5 ${it ? "border-burgundy-600/40 bg-burgundy-600/5" : "border-line"}`}>
+              <label className="flex cursor-pointer items-center gap-2 font-medium">
+                <input type="checkbox" checked={!!it} onChange={(e) => toggle(sv.code, e.target.checked)} className="h-4 w-4 accent-burgundy-600" />{sv.name_ar}</label>
+              {it && (
+                <div className="mt-2 grid gap-2 md:grid-cols-[10rem_1fr]">
+                  <input aria-label={`سعر ${sv.name_ar}`} value={it.amount} onChange={(e) => setItemBy(sv.code, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="السعر" className={inputCls + " tabular-nums"} required />
+                  <input aria-label={`تفاصيل ${sv.name_ar}`} value={it.description} onChange={(e) => setItemBy(sv.code, { description: e.target.value })} placeholder="تفاصيل (اختياري)" maxLength={500} className={inputCls} />
+                </div>)}
+            </div>); })}
         </div>
-        <button type="button" onClick={() => set("items", [...f.items, { service: "", description: "", amount: "" }])} className="mt-3 rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">+ إضافة خدمة</button>
+        {f.items.length === 0 && <p className="mt-2 text-sm text-warn">اختار باقة واحدة على الأقل.</p>}
         <dl className="mt-4 max-w-md rounded-md bg-cream/60 p-3 text-sm" aria-live="polite">
           <div className="flex justify-between text-base font-bold"><dt>قيمة العقد (اللي العميل هيدفعه)</dt><dd className="tabular-nums">{sar(total)}</dd></div>
         </dl>
@@ -73,8 +79,6 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="mb-3 font-bold">مدة العقد</h2>
         <div className="grid gap-3 md:grid-cols-4">
-          <div><label className={lbl} htmlFor="package">الباقة</label>
-            <select id="package" value={f.package} onChange={(e) => pickPackage(e.target.value)} className={inputCls}>{Object.entries(PACKAGE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
           <div><label className={lbl} htmlFor="months">المدة بالشهور</label>
             <input id="months" type="number" min={1} max={120} value={f.duration_months} onChange={(e) => pickMonths(e.target.value)} className={inputCls} /></div>
           <div><label className={lbl} htmlFor="start">تاريخ البداية <span className="text-burgundy-600">*</span></label>
@@ -88,30 +92,34 @@ export function ContractForm({ dealId, services, initial }: { dealId: string; se
 
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="mb-1 font-bold">الدفع</h2>
-        <p className="mb-3 text-xs text-ink-500">لو مكتبتش أقساط، العقد هيتسجل دفعة واحدة كاملة بتاريخ البداية.</p>
+        <p className="mb-3 text-xs text-ink-500">اختار عدد الدفعات وهتتفتحلك خانة لكل دفعة (المبلغ والتاريخ). أول دفعة تاريخها نفس تاريخ البداية أو قبله.</p>
         <div className="mb-3 grid gap-3 md:grid-cols-[14rem_1fr]">
           <div><label className={lbl} htmlFor="method">طريقة الدفع</label>
             <select id="method" value={f.payment_method} onChange={(e) => set("payment_method", e.target.value)} className={inputCls}><option value="">—</option>{Object.entries(PAYMENT_METHOD).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
           <div><label className={lbl} htmlFor="terms">شروط الدفع</label>
             <input id="terms" value={f.payment_terms} onChange={(e) => set("payment_terms", e.target.value)} maxLength={2000} className={inputCls} placeholder="مثال: 50% مقدم والباقي بعد شهر" /></div>
         </div>
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm"><span className="text-ink-500">تقسيم سريع:</span>
-          {[1, 2, 3, 4, 6, 12].map((n) => <button key={n} type="button" onClick={() => split(n)} className="rounded-md border border-line bg-white px-2.5 py-1 hover:bg-cream">{n === 1 ? "دفعة واحدة" : `${n} دفعات`}</button>)}</div>
-        <div className="space-y-2">
-          {f.installments.map((it, i) => (
-            <div key={i} className="grid gap-2 rounded-md border border-line/70 p-2 md:grid-cols-[9rem_11rem_10rem_1fr_auto] md:border-0 md:p-0">
-              <select aria-label={`نوع الدفعة ${i + 1}`} value={it.kind} onChange={(e) => setInst(i, { kind: e.target.value })} className={inputCls}>{Object.entries(INSTALLMENT_KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-              <input aria-label={`تاريخ استحقاق الدفعة ${i + 1}`} type="date" value={it.due_date} onChange={(e) => setInst(i, { due_date: e.target.value })} className={inputCls} required />
-              <input aria-label={`مبلغ الدفعة ${i + 1}`} value={it.amount} onChange={(e) => setInst(i, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="المبلغ" className={inputCls + " tabular-nums"} required />
-              <input aria-label={`ملاحظة الدفعة ${i + 1}`} value={it.note} onChange={(e) => setInst(i, { note: e.target.value })} placeholder="ملاحظة (اختياري)" maxLength={300} className={inputCls} />
-              <button type="button" onClick={() => set("installments", f.installments.filter((_, j) => j !== i))} className="rounded-md border border-line px-3 py-2 text-sm text-bad hover:bg-bad/5">حذف</button>
-            </div>))}
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <div><label className={lbl} htmlFor="count">عدد الدفعات</label>
+            <select id="count" value={count} onChange={(e) => pickCount(Number(e.target.value))} className={inputCls + " w-44"}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "دفعة واحدة" : n === 2 ? "دفعتين" : `${n} دفعات`}</option>)}</select></div>
+          {f.installments.length > 1 && <button type="button" onClick={() => set("installments", makeRows(f.installments.length))} className="rounded-md border border-line bg-white px-3 py-2 text-sm hover:bg-cream">وزّع المبلغ بالتساوي</button>}
         </div>
-        <button type="button" onClick={() => set("installments", [...f.installments, { kind: f.installments.length ? "installment" : "down_payment", due_date: f.start_date, amount: "", note: "" }])}
-          className="mt-3 rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">+ إضافة دفعة</button>
+        {f.installments.length === 0 ? (
+          <p className="text-sm text-ink-500">دفعة واحدة بكامل المبلغ {total > 0 ? `(${sar(total)})` : ""} بتاريخ البداية.</p>
+        ) : (
+          <div className="space-y-2">
+            {f.installments.map((it, i) => (
+              <div key={i} className="grid items-center gap-2 rounded-md border border-line/70 p-2 md:grid-cols-[7rem_10rem_11rem] md:border-0 md:p-0">
+                <span className="text-sm font-medium">{i === 0 ? "الدفعة الأولى" : i === 1 ? "الدفعة التانية" : `الدفعة ${i + 1}`}</span>
+                <input aria-label={`مبلغ الدفعة ${i + 1}`} value={it.amount} onChange={(e) => setInst(i, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="المبلغ" className={inputCls + " tabular-nums"} required />
+                <input aria-label={`تاريخ الدفعة ${i + 1}`} type="date" value={it.due_date} max={i === 0 && f.start_date ? f.start_date : undefined} onChange={(e) => setInst(i, { due_date: e.target.value })} className={inputCls} required />
+              </div>))}
+          </div>)}
+        {firstLate && <p className="mt-3 text-sm font-semibold text-bad" role="alert">تاريخ الدفعة الأولى لازم يكون نفس تاريخ البداية ({f.start_date}) أو قبله.</p>}
         {f.installments.length > 0 && (
           <p className={`mt-3 text-sm ${instOff ? "font-semibold text-bad" : "text-ok"}`} role={instOff ? "alert" : undefined}>
-            مجموع الدفعات {sar(instSum)} {instOff ? `— لازم يساوي الإجمالي ${sar(total)} (الفرق ${sar(r2(total - instSum))})` : "= إجمالي العقد ✓"}</p>)}
+            مجموع الدفعات {sar(instSum)} {instOff ? `— لازم يساوي قيمة العقد ${sar(total)} (الفرق ${sar(r2(total - instSum))})` : "= قيمة العقد ✓"}</p>)}
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">

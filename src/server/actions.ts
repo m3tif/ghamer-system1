@@ -711,9 +711,10 @@ export async function saveContractAction(_: FormState, fd: FormData): Promise<Fo
     .filter((i: any) => i.service || i.amount);
   const installments = (Array.isArray(p.installments) ? p.installments : []).map((i: any) => ({ kind: String(i.kind ?? "installment"), due_date: String(i.due_date ?? ""), amount: money(i.amount), note: String(i.note ?? "").slice(0, 300) }))
     .filter((i: any) => i.due_date || i.amount);
-  if (items.length === 0) return { error: "أضف خدمة واحدة على الأقل بسعرها" };
-  if (items.some((i: any) => !i.service || !(i.amount > 0))) return { error: "كل خدمة محتاجة اختيار من القايمة وسعر أكبر من صفر" };
-  if (installments.some((i: any) => !DATE.test(i.due_date) || !(i.amount > 0))) return { error: "كل قسط محتاج مبلغ وتاريخ استحقاق" };
+  if (items.length === 0) return { error: "اختار باقة واحدة على الأقل واكتب سعرها" };
+  if (items.some((i: any) => !i.service || !(i.amount > 0))) return { error: "اكتب سعر كل باقة معلّم عليها (أكبر من صفر)" };
+  if (installments.some((i: any) => !DATE.test(i.due_date) || !(i.amount > 0))) return { error: "كل دفعة محتاجة مبلغ وتاريخ" };
+  if (installments.length && DATE.test(String(p.start_date ?? "")) && installments[0].due_date > String(p.start_date)) return { error: "تاريخ أول دفعة لازم يكون نفس تاريخ البداية أو قبله" };
   for (const k of ["start_date", "end_date", "agreed_at"]) if (p[k] && !DATE.test(String(p[k]))) return { error: "تاريخ غير صالح" };
   const discount = 0;   // no discount / VAT in contracts
   if (p.payment_method && !["tabby", "tamara", "bank_transfer"].includes(String(p.payment_method))) return { error: "اختر طريقة الدفع: تابي أو تمارا أو تحويل بنكي" };
