@@ -715,8 +715,8 @@ export async function saveContractAction(_: FormState, fd: FormData): Promise<Fo
   if (items.some((i: any) => !i.service || !(i.amount > 0))) return { error: "كل خدمة محتاجة اختيار من القايمة وسعر أكبر من صفر" };
   if (installments.some((i: any) => !DATE.test(i.due_date) || !(i.amount > 0))) return { error: "كل قسط محتاج مبلغ وتاريخ استحقاق" };
   for (const k of ["start_date", "end_date", "agreed_at"]) if (p[k] && !DATE.test(String(p[k]))) return { error: "تاريخ غير صالح" };
-  const discount = p.discount ? money(p.discount) : 0;
-  if (!(discount >= 0)) return { error: "الخصم غير صالح" };
+  const discount = 0;   // no discount / VAT in contracts
+  if (p.payment_method && !["tabby", "tamara", "bank_transfer"].includes(String(p.payment_method))) return { error: "اختر طريقة الدفع: تابي أو تمارا أو تحويل بنكي" };
   const payload = { package: String(p.package ?? "monthly"), duration_months: p.duration_months ? String(Math.trunc(Number(p.duration_months))) : "", start_date: p.start_date ?? "", end_date: p.end_date ?? "",
     agreed_at: p.agreed_at ?? "", discount, payment_method: String(p.payment_method ?? ""), payment_terms: String(p.payment_terms ?? "").slice(0, 2000), notes: String(p.notes ?? "").slice(0, 4000), items, installments };
   let id: string;
@@ -729,7 +729,7 @@ export async function saveContractAction(_: FormState, fd: FormData): Promise<Fo
 const FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 export async function uploadContractFileAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  const id = s(fd, "contract_id"), kind = s(fd, "kind") === "signed_contract" ? "signed_contract" : "other";
+  const id = s(fd, "contract_id"), kind = ["signed_contract", "payment_receipt"].includes(s(fd, "kind")) ? s(fd, "kind") : "other";
   const f = fd.get("file");
   if (!UUID.test(id)) return { error: "عقد غير صالح" };
   if (!(f instanceof File) || f.size === 0) return { error: "اختر الملف الأول" };
@@ -739,7 +739,7 @@ export async function uploadContractFileAction(_: FormState, fd: FormData): Prom
   try { await tx(sess.userId, (c) => c.query("select app.contract_attach($1,$2,$3,$4,$5)", [id, kind, f.name, f.type, bytes])); }
   catch (e) { return { error: mapError(e) }; }
   revalidatePath(`/contracts/${id}`);
-  return { ok: kind === "signed_contract" ? "تم رفع العقد الموقّع" : "تم رفع الملف" };
+  return { ok: kind === "signed_contract" ? "تم رفع العقد الموقّع" : kind === "payment_receipt" ? "تم رفع وصل الدفع" : "تم رفع الملف" };
 }
 
 export async function submitContractAction(_: FormState, fd: FormData): Promise<FormState> {

@@ -33,7 +33,7 @@ export default async function Contracts({ searchParams }: { searchParams: Promis
       {rows.length === 0 ? <Empty title={sp.q || status ? "لا توجد عقود بهذه الشروط" : "لا توجد عقود بعد"} hint={isSales ? "افتح الصفقة من «خط المبيعات» واضغط «إنشاء عقد»." : undefined} /> : (
         <>
           <p className="mb-2 text-xs text-ink-500">{total} عقد</p>
-          <Table head={["رقم العقد", "العميل", "السيلز", "الإجمالي (شامل الضريبة)", "البداية", "النهاية", "الحالة", "الموقّع"]}>
+          <Table head={["رقم العقد", "العميل", "السيلز", "قيمة العقد", "البداية", "النهاية", "الحالة", "الموقّع"]}>
             {rows.map((c: any) => (
               <tr key={c.id}>
                 <td className={td + " whitespace-nowrap font-medium"}><Link href={`/contracts/${c.id}`} className="text-burgundy-700 hover:underline" dir="ltr">{c.contract_no}</Link></td>

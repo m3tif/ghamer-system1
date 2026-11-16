@@ -16,8 +16,8 @@ const sar = (n: number) => new Intl.NumberFormat("ar-SA-u-nu-latn", { minimumFra
 const addMonths = (d: string, m: number) => { const [y, mo, da] = d.split("-").map(Number); const t = new Date(Date.UTC(y, mo - 1 + m, da)); t.setUTCDate(t.getUTCDate() - 1); return t.toISOString().slice(0, 10); };
 const lbl = "mb-1 block text-sm font-medium";
 
-/** The contract form. Prices are FINAL prices (VAT inside); the summary shows how the total splits into value + VAT. */
-export function ContractForm({ dealId, services, vat, initial }: { dealId: string; services: { code: string; name_ar: string }[]; vat: number; initial: ContractInitial }) {
+/** The contract form. No discount and no VAT: the contract value is the sum of its services. */
+export function ContractForm({ dealId, services, initial }: { dealId: string; services: { code: string; name_ar: string }[]; initial: ContractInitial }) {
   const [state, action, pending] = useActionState(saveContractAction, {} as FormState);
   const [f, setF] = useState(initial);
   const set = <K extends keyof ContractInitial>(k: K, v: ContractInitial[K]) => setF((o) => ({ ...o, [k]: v }));
@@ -25,8 +25,7 @@ export function ContractForm({ dealId, services, vat, initial }: { dealId: strin
   const setInst = (i: number, p: Partial<Inst>) => set("installments", f.installments.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
   const sum = r2(f.items.reduce((a, x) => a + num(x.amount), 0));
-  const total = r2(sum - num(f.discount));
-  const net = r2(total / (1 + vat)), vatAmt = r2(total - net);
+  const total = sum;
   const instSum = r2(f.installments.reduce((a, x) => a + num(x.amount), 0));
   const instOff = f.installments.length > 0 && instSum !== total;
   const payload = useMemo(() => JSON.stringify(f), [f]);
@@ -53,30 +52,22 @@ export function ContractForm({ dealId, services, vat, initial }: { dealId: strin
 
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="mb-1 font-bold">الخدمات والأسعار</h2>
-        <p className="mb-3 text-xs text-ink-500">اكتب <b>السعر النهائي</b> لكل خدمة (شامل ضريبة القيمة المضافة). السيستم بيطلّع الضريبة من جواه لوحده.</p>
+        <p className="mb-3 text-xs text-ink-500">اكتب سعر كل خدمة. قيمة العقد = مجموع الخدمات.</p>
         <div className="space-y-2">
           {f.items.map((it, i) => (
             <div key={i} className="grid gap-2 rounded-md border border-line/70 p-2 md:grid-cols-[14rem_1fr_10rem_auto] md:border-0 md:p-0">
               <select aria-label={`الخدمة ${i + 1}`} value={it.service} onChange={(e) => setItem(i, { service: e.target.value })} className={inputCls} required>
                 <option value="">اختر الخدمة</option>{services.map((s) => <option key={s.code} value={s.code}>{s.name_ar}</option>)}</select>
               <input aria-label={`وصف الخدمة ${i + 1}`} value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="وصف مختصر (اختياري)" maxLength={500} className={inputCls} />
-              <input aria-label={`سعر الخدمة ${i + 1}`} value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="السعر النهائي" className={inputCls + " tabular-nums"} required />
+              <input aria-label={`سعر الخدمة ${i + 1}`} value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} inputMode="decimal" dir="ltr" placeholder="السعر" className={inputCls + " tabular-nums"} required />
               <button type="button" onClick={() => set("items", f.items.filter((_, j) => j !== i))} disabled={f.items.length === 1}
                 className="rounded-md border border-line px-3 py-2 text-sm text-bad hover:bg-bad/5 disabled:opacity-40">حذف</button>
             </div>))}
         </div>
         <button type="button" onClick={() => set("items", [...f.items, { service: "", description: "", amount: "" }])} className="mt-3 rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">+ إضافة خدمة</button>
-        <div className="mt-4 grid gap-3 md:grid-cols-[12rem_1fr]">
-          <div><label className={lbl} htmlFor="discount">خصم (ريال)</label>
-            <input id="discount" value={f.discount} onChange={(e) => set("discount", e.target.value)} inputMode="decimal" dir="ltr" className={inputCls + " tabular-nums"} placeholder="0" /></div>
-          <dl className="rounded-md bg-cream/60 p-3 text-sm" aria-live="polite">
-            <div className="flex justify-between"><dt>مجموع الخدمات</dt><dd className="tabular-nums">{sar(sum)}</dd></div>
-            {num(f.discount) > 0 && <div className="flex justify-between"><dt>الخصم</dt><dd className="tabular-nums">− {sar(num(f.discount))}</dd></div>}
-            <div className="mt-1 flex justify-between border-t border-line pt-1 text-base font-bold"><dt>الإجمالي النهائي (اللي العميل هيدفعه)</dt><dd className="tabular-nums">{sar(total)}</dd></div>
-            <div className="mt-1 flex justify-between text-xs text-ink-500"><dt>منه قيمة الخدمات قبل الضريبة</dt><dd className="tabular-nums">{sar(net)}</dd></div>
-            <div className="flex justify-between text-xs text-ink-500"><dt>ومنه ضريبة القيمة المضافة ({Math.round(vat * 100)}%)</dt><dd className="tabular-nums">{sar(vatAmt)}</dd></div>
-          </dl>
-        </div>
+        <dl className="mt-4 max-w-md rounded-md bg-cream/60 p-3 text-sm" aria-live="polite">
+          <div className="flex justify-between text-base font-bold"><dt>قيمة العقد (اللي العميل هيدفعه)</dt><dd className="tabular-nums">{sar(total)}</dd></div>
+        </dl>
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">

@@ -20,11 +20,11 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     id = await save("sales1", deal, contractPayload({ amount: 11500 }));
     expect(await stage(deal)).toBe("Contract Pending");
   });
-  it("prices are final: the VAT is taken from inside them; number, Tele credit and totals are stored", async () => {
+  it("no VAT and no discount: contract value = sum of services; number, Tele credit and totals are stored", async () => {
     const c = (await get("sales1", id)).contract;
     expect(c.contract_no).toMatch(/^GH-\d{4}-0001$/);
-    expect(Number(c.total_amount)).toBe(11500); expect(Number(c.net_amount)).toBe(10000); expect(Number(c.vat_amount)).toBe(1500);
-    expect(Number(c.vat_rate)).toBe(0.15); expect(c.prices_include_vat).toBe(true);
+    expect(Number(c.total_amount)).toBe(11500); expect(Number(c.net_amount)).toBe(11500); expect(Number(c.vat_amount)).toBe(0);
+    expect(Number(c.vat_rate)).toBe(0); expect(Number(c.discount_amount)).toBe(0);
     expect(c.sales_owner_id).toBe(ids.sales1); expect(c.tele_sales_id).toBe(ids.tele1);
     expect(c.start_date).toBe("2027-01-01"); expect(c.end_date).toBe("2027-03-31");     // 3 months
     expect(c.status).toBe("draft");
@@ -33,7 +33,11 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     await expect(save("sales1", deal, { ...contractPayload(), items: [] })).rejects.toThrow(/at least one service/);
     await expect(save("sales1", deal, { ...contractPayload(), items: [{ service: "social_media", amount: 0 }] })).rejects.toThrow(/greater than zero/);
     await expect(save("sales1", deal, { ...contractPayload(), items: [{ service: "nope", amount: 5 }] })).rejects.toThrow(/invalid service/);
-    await expect(save("sales1", deal, contractPayload({ amount: 1000, discount: 1000 }))).rejects.toThrow(/invalid discount/);
+    // a discount sent by an old form is ignored; only Tabby / Tamara / bank transfer are accepted
+    const disc = await save("sales1", deal, contractPayload({ amount: 1000, discount: 300 }));
+    expect(Number((await get("sales1", disc)).contract.total_amount)).toBe(1000);
+    await expect(save("sales1", deal, { ...contractPayload(), payment_method: "cash" })).rejects.toThrow(/check constraint|violates/);
+    for (const m of ["tabby", "tamara", "bank_transfer"]) await save("sales1", deal, { ...contractPayload(), payment_method: m });
     await expect(save("sales1", deal, { ...contractPayload(), end_date: "2026-01-01" })).rejects.toThrow(/end date is before/);
     await expect(save("sales1", deal, contractPayload({ amount: 1000, installments: [{ due_date: "2027-01-01", amount: 400 }, { due_date: "2027-02-01", amount: 500 }] }))).rejects.toThrow(/add up/);
     // an edit replaces the lines, keeps the same contract and number
@@ -70,6 +74,11 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     // locked while it is with Finance
     await expect(save("sales1", deal, contractPayload())).rejects.toThrow(/locked/);
     await expect(run("sales1", "select app.contract_attach($1,'signed_contract','y.pdf','application/pdf',$2)", [id, PDF])).rejects.toThrow(/locked/);
+    // the payment receipt can still be added while the contract is with Finance — by Sales or Finance, not by others
+    await run("sales1", "select app.contract_attach($1,'payment_receipt','وصل.pdf','application/pdf',$2)", [id, PDF]);
+    await run("fin", "select app.contract_attach($1,'payment_receipt','وصل البنك.pdf','application/pdf',$2)", [id, PDF]);
+    await expect(run("sales2", "select app.contract_attach($1,'payment_receipt','x.pdf','application/pdf',$2)", [id, PDF])).rejects.toThrow(/no access/);
+    expect((await get("fin", id)).files.filter((f: any) => f.kind === "payment_receipt").length).toBe(2);
     await expect(run("sales1", "select app.move_deal_stage($1,'Negotiation',null,null,null)", [deal])).rejects.toThrow(/locked/);
     await expect(run("sales1", "select app.move_deal_stage($1,'Lost','سبب',null,null)", [deal])).rejects.toThrow(/locked/);
   });
