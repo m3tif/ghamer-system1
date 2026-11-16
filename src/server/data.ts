@@ -266,8 +266,8 @@ export async function hasManualOrder(uid: string): Promise<boolean> {
 
 /** The newest unread "what's new" notice for the signed-in user (one-time pop-up). */
 export async function pendingRelease(uid: string) {
-  return (await tx(uid, (c) => c.query("select id, title, body, link from notifications where read_at is null and kind = 'system' and dedupe_key like 'release:%' order by created_at desc limit 1"))).rows[0] as
-    { id: string; title: string; body: string | null; link: string | null } | undefined;
+  return (await tx(uid, (c) => c.query("select * from app.my_pending_notice()"))).rows[0] as
+    { id: string; title: string; body: string | null; link: string | null; sender: string | null } | undefined;
 }
 
 // ───────── Phase 2: contracts ─────────
@@ -374,4 +374,7 @@ export async function paymentList(uid: string, contractId: string) {
 }
 export async function adminAttention(uid: string) {
   return (await tx(uid, (c) => c.query("select app.admin_attention() j"))).rows[0].j as any;
+}
+export async function broadcastRecipients(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.broadcast_recipients()"))).rows as { id: string; full_name: string; role_name: string }[];
 }

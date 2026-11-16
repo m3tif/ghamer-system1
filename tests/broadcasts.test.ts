@@ -35,4 +35,26 @@ describe("admin messages to employees", () => {
     expect((await run("tele1", "select count(*)::int n from broadcasts")).rows[0].n).toBe(0);
     expect((await admin.query("select count(*)::int n from audit_logs where entity_type='broadcasts' and action='INSERT'")).rows[0].n).toBe(3);
   });
+  it("the Technical Manager and Account Managers message the technical and operations teams only, and the pop-up shows who sent it", async () => {
+    const notice = async (w: string) => (await run(w, "select * from app.my_pending_notice()")).rows[0];
+    for (const aud of ["all", "tele", "sales", "finance"]) await expect(run("techmgr", "select app.broadcast_send('x','y',$1,null,null)", [aud])).rejects.toThrow(/not allowed/);
+    await expect(run("designer", "select app.broadcast_send('x','y','tech',null,null)")).rejects.toThrow(/not allowed/);
+    const n = (await run("techmgr", "select app.broadcast_send('اجتماع الفريق','الساعة 3','tech',null,null) n")).rows[0].n;
+    const techCount = (await admin.query("select count(*)::int n from users u join roles r on r.id=u.role_id where u.is_active and app._tech_ops_role(r.code) and r.code not in ('operations_manager','account_manager')")).rows[0].n;
+    expect(n).toBe(techCount);
+    const d = await notice("designer");
+    expect(d.title).toBe("اجتماع الفريق"); expect(d.sender).toBe("المديرة التقنية — المدير التقني");
+    expect((await pending("sales1")).some((x: any) => x.title === "اجتماع الفريق")).toBe(false);
+    // an Account Manager picking someone outside the teams reaches nobody
+    await expect(run("am1", "select app.broadcast_send('x','y','selected',$1::uuid[],null)", [[ids.sales1]])).rejects.toThrow(/no recipients/);
+    await run("am1", "select app.broadcast_send('للأكاونت','رسالة','ops',null,null)");
+    expect((await pending("am2")).some((x: any) => x.title === "للأكاونت")).toBe(true);
+    expect((await pending("techmgr")).some((x: any) => x.title === "للأكاونت")).toBe(true);
+    // each sees what they sent; the admin sees all; admin messages still show «from the admin»
+    expect((await run("am1", "select * from app.broadcast_list()")).rows.map((r: any) => r.title)).toEqual(["للأكاونت"]);
+    expect((await run("super", "select * from app.broadcast_list()")).rows.length).toBeGreaterThanOrEqual(5);
+    expect((await run("am1", "select * from app.broadcast_recipients()")).rows.some((r: any) => r.id === ids.sales1)).toBe(false);
+    await run("super", "select app.broadcast_send('من الإدارة','x','tech',null,null)");
+    expect((await notice("designer")).sender).toBeNull();
+  });
 });

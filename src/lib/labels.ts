@@ -84,7 +84,7 @@ export const PACKAGE_MONTHS: Record<string, number | null> = { monthly: 1, quart
 export const PAYMENT_METHOD: Record<string, string> = { tabby: "تابي", tamara: "تمارا", bank_transfer: "تحويل بنكي" };
 export const INSTALLMENT_KIND: Record<string, string> = { down_payment: "مقدم", installment: "قسط", full: "دفعة كاملة" };
 export const FILE_KIND: Record<string, string> = { signed_contract: "العقد الموقّع", payment_receipt: "وصل الدفع", other: "مستند آخر" };
-export const AUDIENCE: Record<string, string> = { all: "كل الموظفين", tele: "التلي سيلز", sales: "السيلز", finance: "المالية", selected: "موظفين محددين" };
+export const AUDIENCE: Record<string, string> = { all: "كل الموظفين", tele: "التلي سيلز", sales: "السيلز", finance: "المالية", tech: "الفريق التقني", ops: "الأكاونت مانجر والمدير التقني", selected: "موظفين محددين" };
 
 // ───────── Phase 3: tasks ─────────
 export const TASK_STATUS: Record<string, string> = { todo: "لسه مابدأش", in_progress: "شغّال عليه", paused: "متوقف", submitted: "مستني مراجعة", changes_requested: "مطلوب تعديل", client_review: "مستني موافقة العميل", approved: "معتمد ✓" };

@@ -981,7 +981,7 @@ export async function decidePaymentAction(_: FormState, fd: FormData): Promise<F
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
-  if (sess.role !== "super_admin") return { error: "إرسال الرسائل لمدير النظام فقط" };
+  if (!["super_admin", "operations_manager", "account_manager"].includes(sess.role)) return { error: "مش مسموح لك تبعت رسائل" };
   const title = s(fd, "title"), body = s(fd, "body"), audience = s(fd, "audience") || "all", req = s(fd, "request_id");
   const picked = fd.getAll("employees").map(String).filter((x) => UUID.test(x));
   if (!title) return { error: "اكتب عنوان الرسالة", values: vals(fd) };

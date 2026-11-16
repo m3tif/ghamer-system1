@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { broadcastList, employeeList } from "@/server/data";
+import { broadcastList, broadcastRecipients } from "@/server/data";
 import { Card, Empty, PageHeader, Table, td } from "@/components/ui";
 import { BroadcastForm } from "@/components/broadcast-form";
 import { fmtDateTime } from "@/lib/format";
@@ -11,14 +11,15 @@ export const dynamic = "force-dynamic";
 
 export default async function Messages() {
   const s = await requireSession();
-  if (s.role !== "super_admin") notFound();
-  const [sent, emps] = await Promise.all([broadcastList(s.userId), employeeList(s.userId)]);
-  const active = (emps as any[]).filter((e) => e.is_active && e.id !== s.userId).map((e) => ({ id: e.id, full_name: e.full_name, role: e.role_name_ar }));
+  if (!["super_admin", "operations_manager", "account_manager"].includes(s.role)) notFound();
+  const admin = s.role === "super_admin";
+  const [sent, emps] = await Promise.all([broadcastList(s.userId), broadcastRecipients(s.userId)]);
+  const active = emps.map((e) => ({ id: e.id, full_name: e.full_name, role: e.role_name }));
   return (
     <>
-      <PageHeader title="رسائل للموظفين" sub="اكتب رسالة تظهر للموظف في نافذة أول ما يفتح السيستم، ولحد ما يدوس الزرار. وبتفضل في إشعاراته." />
+      <PageHeader title="رسائل للموظفين" sub={admin ? "اكتب رسالة تظهر للموظف في نافذة أول ما يفتح السيستم، ولحد ما يدوس الزرار. وبتفضل في إشعاراته." : "ابعت رسالة للفريق التقني أو الأكاونت مانجر — بتظهرلهم في نافذة أول ما يفتحوا السيستم، وباسمك."} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,460px)_1fr]">
-        <Card title="رسالة جديدة"><BroadcastForm employees={active} /></Card>
+        <Card title="رسالة جديدة"><BroadcastForm employees={active} audiences={admin ? undefined : ["tech", "ops", "selected"]} /></Card>
         <Card title="الرسائل المرسلة">
           {sent.length === 0 ? <Empty title="لم ترسل أي رسالة من هنا بعد" /> : (
             <Table head={["الرسالة", "لمين", "شافوها", "وقت الإرسال"]}>
