@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Tasks({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const s = await requireSession();
-  const manager = can(s, "tasks.manage");
+  const manager = can(s, "tasks.manage") || s.role === "general_manager";
   if (!manager && !can(s, "tasks.view_own")) notFound();
   const all = await taskList(s.userId, manager ? "all" : "mine");
   const f = (await searchParams).f ?? "open";
@@ -21,7 +21,9 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<{ 
   const rows = all.filter(cur[2]);
   return (
     <>
-      <PageHeader title={manager ? "التاسكات" : "تاسكاتي"} sub={manager ? "كل تاسكات عملائك. التاسكات بتتعمل من صفحة العميل." : "التاسكات اللي اتبعتتلك. افتح التاسك عشان تشغّل العدّاد وتسلّم."} />
+      <PageHeader title={manager ? "التاسكات" : "تاسكاتي"} sub={manager ? "كل تاسكات عملائك. التاسكات بتتعمل من صفحة العميل." : "التاسكات اللي اتبعتتلك. افتح التاسك عشان تشغّل العدّاد وتسلّم."}
+        actions={<>{["super_admin", "operations_manager"].includes(s.role) && <Link href="/tasks/templates" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">قوالب التاسكات</Link>}
+          {["super_admin", "general_manager", "operations_manager"].includes(s.role) && <Link href="/tasks/performance" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">أداء الفريق</Link>}</>} />
       <div className="mb-5 flex flex-wrap gap-2">
         {filters.map(([k, label, fn]) => (
           <Link key={k} href={`/tasks?f=${k}`} className={`rounded-md px-3 py-1.5 text-sm font-medium ${k === cur[0] ? "bg-burgundy-600 text-white" : "border border-line bg-white hover:bg-cream"}`}>{label} ({all.filter(fn).length})</Link>))}

@@ -841,6 +841,82 @@ export async function rejectTaskAction(_: FormState, fd: FormData): Promise<Form
 export async function commentTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_comment($1,$2)", "تم إضافة التعليق", (fd) => { const b = s(fd, "body"); return b ? [b.slice(0, 2000)] : "اكتب التعليق"; }); }
 
 
+// ───────── Phase 3: onboarding, templates, task files ─────────
+const OB_FIELDS = ["goals", "audience", "brand_identity", "competitors", "products", "channels", "kpis", "priorities", "links", "plan"] as const;
+export async function saveOnboardingAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id");
+  if (!UUID.test(ops)) return { error: "عميل غير صالح" };
+  const link = s(fd, "kickoff_link");
+  if (link && !/^https?:\/\/\S+$/i.test(link)) return { error: "رابط الاجتماع لازم يبدأ بـ https://", values: vals(fd) };
+  const p: Record<string, string> = { kickoff_at: s(fd, "kickoff_at") ? (parseLocal(s(fd, "kickoff_at")) ?? "") : "", kickoff_link: link };
+  for (const k of OB_FIELDS) p[k] = s(fd, k).slice(0, k === "plan" ? 8000 : 4000);
+  try { await tx(sess.userId, (c) => c.query("select app.onboarding_save($1,$2::jsonb)", [ops, JSON.stringify(p)])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath(`/operations/${ops}`);
+  return { ok: "تم حفظ بيانات الاستلام" };
+}
+export async function addOnboardingItemAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id"), seed = s(fd, "seed") === "1", label = s(fd, "label");
+  if (!UUID.test(ops)) return { error: "عميل غير صالح" };
+  if (!seed && label.length < 2) return { error: "اكتب البند" };
+  try { await tx(sess.userId, (c) => c.query("select app.onboarding_item_add($1,$2)", [ops, seed ? null : label.slice(0, 200)])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/operations/${ops}`);
+  return { ok: seed ? "تم إضافة القايمة الجاهزة" : "تم إضافة البند" };
+}
+export async function setOnboardingItemAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id"), item = s(fd, "item_id");
+  if (!UUID.test(ops) || !UUID.test(item)) return { error: "بند غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.onboarding_item_set($1,$2)", [item, s(fd, "done") === "1"])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/operations/${ops}`);
+  return {};
+}
+export async function saveTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const p = { title: s(fd, "title").slice(0, 200), service: s(fd, "service"), description: s(fd, "description").slice(0, 4000), estimated_hours: s(fd, "estimated_hours") };
+  if (p.title.length < 2) return { error: "اكتب عنوان القالب", values: vals(fd) };
+  if (p.estimated_hours && !(Number(p.estimated_hours) > 0 && Number(p.estimated_hours) <= 1000)) return { error: "الساعات المتوقعة رقم أكبر من صفر", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.task_template_save($1::jsonb)", [JSON.stringify(p)])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath("/tasks/templates");
+  return { ok: "تم إضافة القالب" };
+}
+export async function setTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "template_id");
+  if (!UUID.test(id)) return { error: "قالب غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.task_template_set($1,$2)", [id, s(fd, "active") === "1"])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath("/tasks/templates");
+  return {};
+}
+export async function uploadTaskFileAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "task_id"), f = fd.get("file");
+  if (!UUID.test(id)) return { error: "تاسك غير صالح" };
+  if (!(f instanceof File) || f.size === 0) return { error: "اختر الملف الأول" };
+  if (f.size > 4 * 1024 * 1024) return { error: "الملف أكبر من 4 ميجا. للملفات الكبيرة حط رابط درايف في التسليم" };
+  if (!FILE_TYPES.includes(f.type)) return { error: "نوع الملف غير مدعوم. المسموح: PDF أو صورة (JPG / PNG / WEBP)" };
+  const bytes = Buffer.from(await f.arrayBuffer());
+  try { await tx(sess.userId, (c) => c.query("select app.task_attach($1,$2,$3,$4)", [id, f.name, f.type, bytes])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/tasks/${id}`);
+  return { ok: "تم رفع الملف" };
+}
+export async function deleteTaskFileAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "task_id"), file = s(fd, "file_id");
+  if (!UUID.test(id) || !UUID.test(file)) return { error: "ملف غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.task_file_delete($1)", [file]), "حذف ملف مرفوع بالغلط"); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath(`/tasks/${id}`);
+  return { ok: "تم مسح الملف" };
+}
+
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();

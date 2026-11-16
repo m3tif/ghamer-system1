@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract } from "./helpers";
+import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract, PDF } from "./helpers";
 
 const dealOf = async (lead: string) => (await admin.query("select id from deals where lead_id=$1", [lead])).rows[0].id as string;
 const save = async (who: string, ops: string, task: string | null, p: any) => (await run(who, "select app.task_save($1,$2,$3::jsonb) id", [ops, task, JSON.stringify(p)])).rows[0].id as string;
@@ -100,5 +100,64 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     expect((await admin.query("select count(*)::int n from notifications where kind='task_comment' and user_id=$1", [ids.am1])).rows[0].n).toBe(1);
     expect((await get("am1", t2)).comments.length).toBe(1);
     expect((await admin.query("select count(*)::int n from audit_logs where entity_type='tasks' and entity_id=$1", [task])).rows[0].n).toBeGreaterThanOrEqual(6);
+  });
+  it("onboarding: the client's Account Manager writes the brief, kickoff and checklist; others only read or see nothing", async () => {
+    const ob = async (w: string) => (await run(w, "select app.onboarding_get($1) j", [ops])).rows[0]?.j;
+    await expect(run("am2", "select app.onboarding_save($1,$2::jsonb)", [ops, "{}"])).rejects.toThrow(/not allowed/);
+    await expect(run("designer", "select app.onboarding_item_add($1,'x y')", [ops])).rejects.toThrow(/not allowed/);
+    await run("am1", "select app.onboarding_save($1,$2::jsonb)", [ops, JSON.stringify({ kickoff_at: "2027-01-03T10:00:00Z", goals: "زيادة المبيعات", brand_identity: "ألوان دافية" })]);
+    await run("am1", "select app.onboarding_save($1,$2::jsonb)", [ops, JSON.stringify({ kickoff_at: "2027-01-03T10:00:00Z", goals: "زيادة المبيعات 30%", brand_identity: "ألوان دافية" })]);
+    await run("am1", "select app.onboarding_item_add($1,null)", [ops]);
+    await run("am1", "select app.onboarding_item_add($1,null)", [ops]);                 // standard list only once
+    await run("am1", "select app.onboarding_item_add($1,'ملف المنتجات')", [ops]);
+    const g = await ob("techmgr");
+    expect(g.brief.goals).toBe("زيادة المبيعات 30%"); expect(g.items.length).toBe(8); expect(g.can_edit).toBe(true);
+    await run("am1", "select app.onboarding_item_set($1,true)", [g.items[0].id]);
+    await expect(run("designer", "select app.onboarding_item_set($1,true)", [g.items[1].id])).rejects.toThrow(/not allowed/);
+    expect((await ob("am1")).items.filter((x: any) => x.done).length).toBe(1);
+    for (const w of ["am2", "designer", "sales1"]) expect(await ob(w)).toBeNull();
+    expect((await get("designer", t2)).brief.brand_identity).toBe("ألوان دافية");       // the employee sees the brief through his task
+  });
+  it("task templates: only the Technical Manager writes them; whoever writes tasks can use them", async () => {
+    await expect(run("am1", "select app.task_template_save($1::jsonb)", [JSON.stringify({ title: "قالب" })])).rejects.toThrow(/not allowed/);
+    const id = (await run("techmgr", "select app.task_template_save($1::jsonb) id", [JSON.stringify({ title: "تدقيق سيو أولي", service: "seo", estimated_hours: 4 })])).rows[0].id;
+    expect((await run("am1", "select * from app.task_template_list(false)")).rows.map((r: any) => r.title)).toEqual(["تدقيق سيو أولي"]);
+    expect((await run("designer", "select * from app.task_template_list(true)")).rows.length).toBe(0);
+    await run("techmgr", "select app.task_template_set($1,false)", [id]);
+    expect((await run("am1", "select * from app.task_template_list(false)")).rows.length).toBe(0);
+    expect((await run("techmgr", "select * from app.task_template_list(true)")).rows.length).toBe(1);
+  });
+  it("files on a task: the assignee or the manager uploads; only people who see the task download; the uploader deletes", async () => {
+    await expect(run("seo", "select app.task_attach($1,'a.pdf','application/pdf',$2)", [t2, PDF])).rejects.toThrow(/not allowed/);
+    await expect(run("designer", "select app.task_attach($1,'a.pdf','application/pdf',$2)", [t2, Buffer.from("<html>")])).rejects.toThrow(/unsupported file type/);
+    const f = (await run("designer", "select app.task_attach($1,'تصميم.pdf','application/pdf',$2) id", [t2, PDF])).rows[0].id;
+    expect((await get("am1", t2)).files.length).toBe(1);
+    for (const w of ["designer", "am1", "techmgr", "super"]) expect((await run(w, "select filename from app.attachment_get($1)", [f])).rows.length).toBe(1);
+    for (const w of ["seo", "am2", "sales1", "fin"]) expect((await run(w, "select filename from app.attachment_get($1)", [f])).rows.length).toBe(0);
+    await expect(run("am1", "select app.task_file_delete($1)", [f])).rejects.toThrow(/not the uploader/);
+    await expect(run("designer", "select app.task_attach($1,'a.pdf','application/pdf',$2)", [task, PDF])).rejects.toThrow(/closed/);
+    await run("designer", "select app.task_file_delete($1)", [f]);
+    expect((await get("am1", t2)).files.length).toBe(0);
+  });
+  it("team performance for the Technical Manager and admins only", async () => {
+    const rows = (await run("techmgr", "select * from app.tech_performance(null)")).rows;
+    const d = rows.find((r: any) => r.employee_id === ids.designer);
+    expect(d.assigned).toBe(3); expect(d.approved).toBe(1); expect(d.open_now).toBe(2); expect(d.late_now).toBe(1); expect(d.revisions).toBe(1);
+    expect(d.on_time_base).toBe(1); expect(d.minutes).toBeGreaterThanOrEqual(90);
+    for (const w of ["am1", "designer", "sales1", "fin"]) expect((await run(w, "select * from app.tech_performance(null)")).rows.length).toBe(0);
+    expect((await run("gm", "select * from app.tech_performance(null)")).rows.length).toBeGreaterThan(0);
+  });
+  it("360° client file: one file for the whole journey; money only for admins and Finance; closed to everyone else", async () => {
+    const cid = (await admin.query("select client_id from client_operations where id=$1", [ops])).rows[0].client_id;
+    const c360 = async (w: string) => (await run(w, "select app.client_360($1) j", [cid])).rows[0].j;
+    const a = await c360("super");
+    expect(a.client.name).toBe("متجر الورد"); expect(a.client.creator).toBe("سارة"); expect(a.show_money).toBe(true);
+    expect(Number(a.contracts[0].total)).toBe(9000); expect(a.contracts[0].packages).toEqual(["باقة سيو", "باقة ميديا"]);
+    expect(a.ops[0].account_manager).toBe("أكاونت 1"); expect(a.ops[0].tasks_all).toBe(3); expect(a.ops[0].tasks_done).toBe(1);
+    const kinds = a.timeline.map((e: any) => e.kind);
+    for (const k of ["client_created", "stage", "contract_created", "contract_approved", "ops_assigned", "task_created", "task_approved", "kickoff"]) expect(kinds).toContain(k);
+    for (const w of ["techmgr", "am1"]) { const j = await c360(w); expect(j.show_money).toBe(false); expect(j.contracts[0].total).toBeNull(); expect(j.tasks.length).toBe(3); }
+    expect((await c360("fin")).show_money).toBe(true);
+    for (const w of ["am2", "designer", "sales1", "sales2", "tele1"]) expect(await c360(w)).toBeNull();
   });
 });

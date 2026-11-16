@@ -6,6 +6,10 @@ import { Badge, Card, PageHeader } from "@/components/ui";
 import { ActionForm, Alert, Field, Hidden, TextArea } from "@/components/forms";
 import { TaskForm } from "@/components/task-form";
 import { TaskTimer } from "@/components/task-timer";
+import { uploadTaskFileAction } from "@/server/actions";
+import { DeleteFile } from "@/components/delete-file";
+import { BRIEF_FIELDS } from "@/components/onboarding-card";
+import { inputCls } from "@/components/forms";
 import { addTaskTimeAction, approveTaskAction, commentTaskAction, pauseTaskAction, rejectTaskAction, startTaskAction, submitTaskAction } from "@/server/actions";
 import { fmtDate, fmtDateTime, fmtMins } from "@/lib/format";
 import { TASK_PRIORITY, TASK_STATUS, TASK_STATUS_TONE } from "@/lib/labels";
@@ -73,6 +77,23 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
                   <ActionForm action={rejectTaskAction} submit="طلب تعديل" tone="quiet" hiddenOnOk><Hidden name="task_id" value={id} /><TextArea label="التعديل المطلوب" name="note" rows={2} required /></ActionForm>
                 </div>)}
             </Card>)}
+
+          <Card title={`ملفات (${t.files.length})`}>
+            {t.files.length > 0 && <ul className="mb-4 divide-y divide-line text-sm">{(t.files as any[]).map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><a href={`/files/${f.id}`} target="_blank" rel="noopener noreferrer" className="font-medium text-burgundy-700 underline">{f.filename}</a>
+                <span className="flex items-center gap-3 text-xs text-ink-500"><span>{Math.max(1, Math.round(Number(f.size_bytes) / 1024))} ك.ب · {f.by} · {fmtDateTime(f.at)}</span>{f.can_delete && <DeleteFile taskId={id} fileId={f.id} name={f.filename} />}</span></li>))}</ul>}
+            {(mine || t.can_manage) && t.status !== "approved" ? (
+              <ActionForm action={uploadTaskFileAction} submit="رفع الملف" tone="quiet" className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <Hidden name="task_id" value={id} />
+                <div><label htmlFor="file" className="mb-1 block text-sm font-medium">ملف (مرجع أو تسليم)</label>
+                  <input id="file" name="file" type="file" required accept="application/pdf,image/jpeg,image/png,image/webp" className={inputCls + " file:me-3 file:rounded file:border-0 file:bg-cream file:px-3 file:py-1 file:text-sm"} />
+                  <p className="mt-1 text-xs text-ink-500">PDF أو صورة — لحد 4 ميجا. الملفات الكبيرة حطها على درايف وابعت الرابط في التسليم.</p></div>
+              </ActionForm>) : t.files.length === 0 ? <p className="text-sm text-ink-500">مفيش ملفات.</p> : null}
+          </Card>
+
+          {t.brief && BRIEF_FIELDS.some(([k]) => t.brief[k]) && (
+            <Card title="بريف العميل"><details className="text-sm"><summary className="cursor-pointer font-medium text-burgundy-700">اعرض البريف (الهوية، الجمهور، الروابط…)</summary>
+              <dl className="mt-3 space-y-3">{BRIEF_FIELDS.filter(([k]) => t.brief[k]).map(([k, label]) => <div key={k}><dt className="text-ink-500">{label}</dt><dd className="whitespace-pre-wrap">{t.brief[k]}</dd></div>)}</dl></details></Card>)}
 
           <Card title={`التعليقات (${t.comments.length})`}>
             {t.comments.length > 0 && <ul className="mb-4 space-y-3 text-sm">{(t.comments as any[]).map((c, i) => (

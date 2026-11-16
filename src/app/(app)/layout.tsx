@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/meetings", label: "الاجتماعات", show: can(s, "meetings.view") },
     { href: "/pipeline", label: "خط المبيعات", show: can(s, "deals.view") },
     { href: "/operations", label: s.role === "account_manager" ? "عملائي" : "العملاء المعتمدين", show: can(s, "ops.view") },
-    { href: "/tasks", label: can(s, "tasks.manage") ? "التاسكات" : "تاسكاتي", show: can(s, "tasks.manage") || can(s, "tasks.view_own") },
+    { href: "/tasks", label: can(s, "tasks.manage") ? "التاسكات" : "تاسكاتي", show: can(s, "tasks.manage") || can(s, "tasks.view_own") || s.role === "general_manager" },
     { href: "/contracts", label: "العقود", show: can(s, "contracts.view") && s.role !== "operations_manager" },
     { href: "/distribution", label: "توزيع العملاء", show: can(s, "leads.distribute") },
     { href: "/bulk-distribution", label: "استيراد وتوزيع العملاء", show: can(s, "leads.bulk_distribute") },

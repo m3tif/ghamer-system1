@@ -28,6 +28,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
     <>
       <PageHeader title={`عقد ${c.contract_no}`} sub={`${c.client_name}${c.business_name ? " · " + c.business_name : ""}`}
         actions={<><Badge tone={CONTRACT_STATUS_TONE[c.status]}>{CONTRACT_STATUS[c.status]}</Badge>
+          {["super_admin", "general_manager", "finance_manager", "finance_employee"].includes(s.role) && <Link href={`/clients/${c.client_id}`} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">الملف الكامل 360°</Link>}
           {canWrite && <Link href={`/contracts/${id}/edit`} className={btnQuiet}>تعديل العقد</Link>}
           {can(s, "deals.view") && <Link href={`/deals/${c.deal_id}`} className={btnQuiet}>الصفقة</Link>}</>} />
       {sp.saved && open && <div className="mb-4"><Alert kind="ok">تم حفظ العقد. {signed.length === 0 ? "الخطوة الجاية: ارفع العقد الموقّع وابعته للمالية." : "تقدر تبعته للمالية دلوقتي."}</Alert></div>}

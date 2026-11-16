@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
-import { opsList, servicesList, taskAssignees, taskList } from "@/server/data";
+import { onboardingGet, opsList, servicesList, taskAssignees, taskList, taskTemplates } from "@/server/data";
+import { OnboardingCards } from "@/components/onboarding-card";
+import { TemplatePicker } from "@/components/template-picker";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { TaskForm } from "@/components/task-form";
 import { TaskTable } from "@/components/task-table";
@@ -17,13 +19,15 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
   const r = (await opsList(s.userId, null)).find((x) => x.id === id);
   if (!r) notFound();
   const manage = can(s, "tasks.manage") && (s.role !== "account_manager" || r.account_manager_id === s.userId);
-  const [tasks, assignees, services] = await Promise.all([taskList(s.userId, "all", id), manage ? taskAssignees(s.userId) : Promise.resolve([]), manage ? servicesList(s.userId) : Promise.resolve([])]);
+  const [tasks, assignees, services, templates, onboarding] = await Promise.all([taskList(s.userId, "all", id), manage ? taskAssignees(s.userId) : Promise.resolve([]), manage ? servicesList(s.userId) : Promise.resolve([]),
+    manage ? taskTemplates(s.userId) : Promise.resolve([]), onboardingGet(s.userId, id)]);
   const done = tasks.filter((t) => t.status === "approved").length, mins = tasks.reduce((a, t) => a + t.minutes, 0);
   const row = (k: string, v: React.ReactNode) => (<div className="flex justify-between gap-3"><dt className="shrink-0 text-ink-500">{k}</dt><dd className="min-w-0 break-words text-end" dir="auto">{v || "—"}</dd></div>);
   return (
     <>
       <PageHeader title={r.client_name} sub={r.business_name ?? undefined}
         actions={<>{r.status === "new" ? <Badge tone="warn">مستني تحويل</Badge> : <Badge tone="ok">مع {r.account_manager_name}</Badge>}
+          <Link href={`/clients/${r.client_id}`} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">الملف الكامل 360°</Link>
           <Link href="/operations" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">رجوع</Link></>} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
@@ -32,7 +36,8 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
           </Card>
           {manage && (assignees.length === 0
             ? <div className="rounded-md border border-warn/40 bg-warn/5 px-4 py-3 text-sm">مفيش موظفين تقنيين عندهم حسابات شغّالة لسه. مدير النظام يضيفهم من «الموظفون» (ديزاينر، SEO، مبرمج…).</div>
-            : <Card title="تاسك جديد"><TaskForm opsId={id} assignees={assignees} services={services} /></Card>)}
+            : <Card title="تاسك جديد"><TemplatePicker templates={templates} /><TaskForm opsId={id} assignees={assignees} services={services} /></Card>)}
+          {onboarding && <OnboardingCards opsId={id} data={onboarding} />}
         </div>
         <div className="min-w-0">
           <Card title="بيانات العميل">
