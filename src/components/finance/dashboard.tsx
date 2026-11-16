@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { financeContracts, financeDashboard, financeEmployees } from "@/server/data";
+import { financeClients, financeContracts, financeDashboard, financeEmployees, type FinClient } from "@/server/data";
 import { readPeriod } from "@/lib/period";
 import { fmtDate, fmtDateTime, fmtSar } from "@/lib/format";
-import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, LEAD_STATUS } from "@/lib/labels";
+import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, INSTALLMENT_KIND, LEAD_STATUS } from "@/lib/labels";
 import { Badge } from "@/components/ui";
 import { DailyChart, HBars, MonthChart } from "@/components/finance/charts";
 
@@ -57,8 +57,8 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
   const per = readPeriod(sp);
   const q = (sp.q ?? "").slice(0, 80), cs = sp.cs && sp.cs in CONTRACT_STATUS ? sp.cs : "", emp = UUID.test(sp.emp ?? "") ? sp.emp! : "";
   const cf = D.test(sp.cf ?? "") ? sp.cf! : "", ct = D.test(sp.ct ?? "") ? sp.ct! : "", pg = Math.max(1, Number(sp.pg) || 1), size = 15;
-  const [d, rows, emps] = await Promise.all([financeDashboard(uid, per.from, per.to),
-    financeContracts(uid, { q, status: cs, emp, from: cf, to: ct, limit: size, offset: (pg - 1) * size }), financeEmployees(uid)]);
+  const [d, rows, emps, money] = await Promise.all([financeDashboard(uid, per.from, per.to),
+    financeContracts(uid, { q, status: cs, emp, from: cf, to: ct, limit: size, offset: (pg - 1) * size }), financeEmployees(uid), financeClients(uid)]);
   const k = d.kpi, c = d.contracts, total = n(rows[0]?.total);
   const prevLabel = per.key === "today" ? "امبارح" : per.key === "month" ? "نفس الفترة اللي قبلها" : "الفترة اللي قبلها";
   const keep = { p: per.key === "month" ? undefined : per.key, from: per.key === "custom" ? per.from : undefined, to: per.key === "custom" ? per.to : undefined };
@@ -99,46 +99,7 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
         </div>
       </div>
 
-      {/* 1. executive summary */}
-      <Section title="الملخص التنفيذي" sub={`مقارنة بـ${prevLabel}: ${fmtDate(d.prev_from)} ← ${fmtDate(d.prev_to)}`}>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          <Kpi icon="👥" label="عملاء دخلوا في الفترة" value={num(k.added)} delta={<Delta cur={n(k.added)} prev={n(k.added_prev)} label={prevLabel} />} />
-          <Kpi icon="☀" label="عملاء دخلوا النهارده" value={num(k.added_today)} accent="gold" />
-          <Kpi icon="∑" label="كل العملاء من أول السيستم" value={num(k.total_clients)} />
-          <Kpi icon="⇄" label="عملاء اتوزعوا على الموظفين" value={num(k.distributed)} delta={<Delta cur={n(k.distributed)} prev={n(k.distributed_prev)} label={prevLabel} />} />
-          <Kpi icon="➜" label="اتحوّلوا للسيلز" value={num(k.handed)} accent="gold" delta={<Delta cur={n(k.handed)} prev={n(k.handed_prev)} label={prevLabel} />} />
-          <Kpi icon="✓" label="السيلز قبلهم" value={num(k.accepted)} note={`رفض ${num(k.rejected)} · لسه مستني ${num(k.pending)}`} />
-          <Kpi icon="▤" label="كل العقود المسجلة" value={num(c.total)} href={link({ cs: undefined, pg: undefined }, "#contracts")} accent="wine" note="من غير الملغية" />
-          <Kpi icon="⏳" label="عقود مستنية مراجعتك" value={num(c.submitted)} href={link({ cs: "submitted", pg: undefined }, "#contracts")} accent="wine" note={n(c.late) ? `${num(c.late)} منهم أكتر من يومين` : undefined} />
-          <Kpi icon="★" label="عقود معتمدة" value={num(c.approved)} href={link({ cs: "approved", pg: undefined }, "#contracts")} note={`قيمتها ${fmtSar(c.value_approved)}`} />
-          <Kpi icon="↺" label="رجعت للتعديل / ملغية" value={`${num(c.returned)} / ${num(c.cancelled)}`} href={link({ cs: "returned", pg: undefined }, "#contracts")} note="السيستم مافيهوش «رفض» — الرفض بيبقى إرجاع للسيلز" />
-        </div>
-      </Section>
-
-      {/* 2. achievements */}
-      <Section title="إنجازات الفترة" sub="كل مرحلة بتتعد بتاريخها هي (العميل بتاريخ دخوله، التحويل بتاريخ التحويل، العقد بتاريخ تسجيله). النِسب بين أعداد نفس الفترة.">
-        <div className="grid gap-4 xl:grid-cols-[1fr_1.6fr]">
-          <Panel title="مراحل الشغل">
-            <ol className="space-y-3">
-              {funnel.map((f, i) => (
-                <li key={f.label}>
-                  <div className="flex items-baseline justify-between gap-2"><span className="text-sm font-medium">{i + 1}. {f.label}</span><span className="text-xl font-extrabold tabular-nums text-[#1b2a41]">{num(f.v)}</span></div>
-                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-cream-dark/70"><div className="h-full rounded-full bg-gradient-to-l from-[#1b2a41] to-[#4a5d7c]" style={{ width: `${funnel[0].v ? Math.max(2, (f.v / Math.max(...funnel.map((x) => x.v), 1)) * 100) : 0}%` }} /></div>
-                  {i > 0 && <p className="mt-0.5 text-[11px] text-ink-500">نسبة من المرحلة اللي قبلها: <b className="text-[#8a6a35]">{pct(f.v, funnel[i - 1].v)}</b></p>}
-                </li>))}
-            </ol>
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 text-sm">
-              <div>عملاء وصلوا لاجتماع<br /><Delta cur={n(k.meeting_leads)} prev={n(k.meeting_leads_prev)} label={prevLabel} /></div>
-              <div>عقود اتسجلت<br /><Delta cur={n(k.contracts_new)} prev={n(k.contracts_new_prev)} label={prevLabel} /></div>
-              <div>عقود اتعتمدت<br /><Delta cur={n(k.contracts_approved)} prev={n(k.contracts_approved_prev)} label={prevLabel} /></div>
-              <div>قيمة المعتمد {fmtSar(k.approved_value)}<br /><Delta cur={n(k.approved_value)} prev={n(k.approved_value_prev)} label={prevLabel} /></div>
-            </div>
-          </Panel>
-          <Panel title="يوم بيوم" right={<span className="text-xs text-ink-500">مرّر على أي يوم تشوف أرقامه</span>}>
-            <DailyChart rows={d.daily} contractsHref={(day) => link({ cf: day, ct: day, cs: undefined, pg: undefined }, "#contracts")} />
-          </Panel>
-        </div>
-      </Section>
+      <ClientsMoney rows={money} />
 
       {/* 6. attention centre */}
       <Section title="محتاج تدخلك" sub="من العقود الفعلية في السيستم — بتتحدث لوحدها">
@@ -206,6 +167,47 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
         </Panel>
       </Section>
 
+      {/* 1. executive summary */}
+      <Section title="الملخص التنفيذي" sub={`مقارنة بـ${prevLabel}: ${fmtDate(d.prev_from)} ← ${fmtDate(d.prev_to)}`}>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <Kpi icon="👥" label="عملاء دخلوا في الفترة" value={num(k.added)} delta={<Delta cur={n(k.added)} prev={n(k.added_prev)} label={prevLabel} />} />
+          <Kpi icon="☀" label="عملاء دخلوا النهارده" value={num(k.added_today)} accent="gold" />
+          <Kpi icon="∑" label="كل العملاء من أول السيستم" value={num(k.total_clients)} />
+          <Kpi icon="⇄" label="عملاء اتوزعوا على الموظفين" value={num(k.distributed)} delta={<Delta cur={n(k.distributed)} prev={n(k.distributed_prev)} label={prevLabel} />} />
+          <Kpi icon="➜" label="اتحوّلوا للسيلز" value={num(k.handed)} accent="gold" delta={<Delta cur={n(k.handed)} prev={n(k.handed_prev)} label={prevLabel} />} />
+          <Kpi icon="✓" label="السيلز قبلهم" value={num(k.accepted)} note={`رفض ${num(k.rejected)} · لسه مستني ${num(k.pending)}`} />
+          <Kpi icon="▤" label="كل العقود المسجلة" value={num(c.total)} href={link({ cs: undefined, pg: undefined }, "#contracts")} accent="wine" note="من غير الملغية" />
+          <Kpi icon="⏳" label="عقود مستنية مراجعتك" value={num(c.submitted)} href={link({ cs: "submitted", pg: undefined }, "#contracts")} accent="wine" note={n(c.late) ? `${num(c.late)} منهم أكتر من يومين` : undefined} />
+          <Kpi icon="★" label="عقود معتمدة" value={num(c.approved)} href={link({ cs: "approved", pg: undefined }, "#contracts")} note={`قيمتها ${fmtSar(c.value_approved)}`} />
+          <Kpi icon="↺" label="رجعت للتعديل / ملغية" value={`${num(c.returned)} / ${num(c.cancelled)}`} href={link({ cs: "returned", pg: undefined }, "#contracts")} note="السيستم مافيهوش «رفض» — الرفض بيبقى إرجاع للسيلز" />
+        </div>
+      </Section>
+
+      {/* 2. achievements */}
+      <Section title="إنجازات الفترة" sub="كل مرحلة بتتعد بتاريخها هي (العميل بتاريخ دخوله، التحويل بتاريخ التحويل، العقد بتاريخ تسجيله). النِسب بين أعداد نفس الفترة.">
+        <div className="grid gap-4 xl:grid-cols-[1fr_1.6fr]">
+          <Panel title="مراحل الشغل">
+            <ol className="space-y-3">
+              {funnel.map((f, i) => (
+                <li key={f.label}>
+                  <div className="flex items-baseline justify-between gap-2"><span className="text-sm font-medium">{i + 1}. {f.label}</span><span className="text-xl font-extrabold tabular-nums text-[#1b2a41]">{num(f.v)}</span></div>
+                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-cream-dark/70"><div className="h-full rounded-full bg-gradient-to-l from-[#1b2a41] to-[#4a5d7c]" style={{ width: `${funnel[0].v ? Math.max(2, (f.v / Math.max(...funnel.map((x) => x.v), 1)) * 100) : 0}%` }} /></div>
+                  {i > 0 && <p className="mt-0.5 text-[11px] text-ink-500">نسبة من المرحلة اللي قبلها: <b className="text-[#8a6a35]">{pct(f.v, funnel[i - 1].v)}</b></p>}
+                </li>))}
+            </ol>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 text-sm">
+              <div>عملاء وصلوا لاجتماع<br /><Delta cur={n(k.meeting_leads)} prev={n(k.meeting_leads_prev)} label={prevLabel} /></div>
+              <div>عقود اتسجلت<br /><Delta cur={n(k.contracts_new)} prev={n(k.contracts_new_prev)} label={prevLabel} /></div>
+              <div>عقود اتعتمدت<br /><Delta cur={n(k.contracts_approved)} prev={n(k.contracts_approved_prev)} label={prevLabel} /></div>
+              <div>قيمة المعتمد {fmtSar(k.approved_value)}<br /><Delta cur={n(k.approved_value)} prev={n(k.approved_value_prev)} label={prevLabel} /></div>
+            </div>
+          </Panel>
+          <Panel title="يوم بيوم" right={<span className="text-xs text-ink-500">مرّر على أي يوم تشوف أرقامه</span>}>
+            <DailyChart rows={d.daily} contractsHref={(day) => link({ cf: day, ct: day, cs: undefined, pg: undefined }, "#contracts")} />
+          </Panel>
+        </div>
+      </Section>
+
       {/* 4. employees */}
       <Section title="أداء الموظفين" sub="في الفترة المختارة. «ضافهم» = العملاء اللي سجّلهم بنفسه، «استلمهم» = اتوزعوا عليه من غيره — العميل الواحد مابيتعدّش مرتين. الاجتماعات = المنعقدة فعلًا. العقود = اللي هو سيلزها أو التيلي اللي جابها."
         right={<a href={exportHref("employees")} className="rounded-lg border border-[#b8955a]/60 bg-white px-3 py-1.5 text-sm font-semibold text-[#8a6a35] hover:bg-[#f6efe2]">⬇ تصدير Excel (CSV)</a>}>
@@ -256,5 +258,56 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
         </div>
       </Section>
     </div>
+  );
+}
+
+/* ───────── clients ranked by money: payments, when they end, time left on the contract ───────── */
+function ClientsMoney({ rows }: { rows: FinClient[] }) {
+  const sum = (k: "total_amount" | "due_so_far" | "remaining") => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
+  const total = sum("total_amount"), due = sum("due_so_far"), left = sum("remaining");
+  return (
+    <Section title="العملاء والفلوس" sub="العملاء مترتبين من الأكبر قيمة للأصغر (العقود المعتمدة واللي عند المالية). «اتستحق» و«باقي» حسب جدول الدفعات في العقد وتاريخ النهارده — السيستم لسه مابيسجلش الدفع الفعلي.">
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-[#1b2a41] p-4 text-white"><p className="text-xs text-white/70">إجمالي قيمة العقود</p><p className="mt-1 text-2xl font-extrabold tabular-nums">{fmtSar(total)}</p><p className="text-xs text-white/60">{rows.length} عميل</p></div>
+        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">اتستحق لحد النهارده</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-[#8a6a35]">{fmtSar(due)}</p></div>
+        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">باقي في الدفعات الجاية</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-burgundy-700">{fmtSar(left)}</p></div>
+      </div>
+      {rows.length === 0 ? <Panel><p className="py-6 text-center text-sm text-ink-500">مفيش عقود معتمدة أو عند المالية لسه.</p></Panel> : (
+        <div className="space-y-3">{rows.map((r, i) => {
+          const tot = Number(r.total_amount) || 0, paidPct = tot ? Math.min(100, (Number(r.due_so_far) / tot) * 100) : 0;
+          const timePct = r.days_total && r.days_left != null ? Math.min(100, Math.max(0, ((r.days_total - r.days_left) / r.days_total) * 100)) : 0;
+          const ended = r.days_left === 0, notStarted = r.start_date && new Date(r.start_date) > new Date();
+          return (
+            <details key={r.contract_id} className="group rounded-2xl border border-[#e7dfcf] bg-white shadow-[0_1px_2px_rgba(27,42,65,.04),0_8px_24px_-16px_rgba(27,42,65,.18)] open:border-[#b8955a]/60">
+              <summary className="grid cursor-pointer list-none gap-3 p-4 md:grid-cols-[2.2rem_1.4fr_1fr_1.3fr_1.3fr_1rem] md:items-center">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-extrabold ${i === 0 ? "bg-[#b8955a] text-[#1b2a41]" : i < 3 ? "bg-[#1b2a41] text-white" : "bg-cream text-ink-500"}`}>{i + 1}</span>
+                <span className="min-w-0"><span className="block truncate font-bold text-[#1b2a41]">{r.client_name}</span>
+                  <span className="block truncate text-xs text-ink-500">{r.packages ?? "—"}{r.status !== "approved" && <> · <span className="font-semibold text-warn">{CONTRACT_STATUS[r.status]}</span></>}</span></span>
+                <span><span className="block text-lg font-extrabold tabular-nums text-[#1b2a41]">{fmtSar(r.total_amount)}</span><span className="text-xs text-ink-500">{r.inst_count ? `${r.inst_count} ${r.inst_count === 1 ? "دفعة" : "دفعات"}` : "مفيش جدول دفعات"}</span></span>
+                <span className="min-w-0">
+                  <span className="flex justify-between text-xs"><span className="text-ink-500">اتستحق {fmtSar(r.due_so_far)}</span><b className="text-burgundy-700">باقي {fmtSar(r.remaining)}</b></span>
+                  <span className="mt-1 block h-2 overflow-hidden rounded-full bg-cream-dark/70"><span className="block h-full rounded-full bg-[#b8955a]" style={{ width: `${paidPct}%` }} /></span>
+                  <span className="mt-1 block text-[11px] text-ink-500">{r.next_due ? `الدفعة الجاية ${fmtDate(r.next_due)} — ${fmtSar(r.next_amount)}` : r.inst_count ? "كل الدفعات اتستحقت" : "—"}{r.last_due ? ` · الدفعات بتخلص ${fmtDate(r.last_due)}` : ""}</span>
+                </span>
+                <span className="min-w-0">
+                  <span className="flex justify-between text-xs"><span className="text-ink-500">{r.start_date ? `${fmtDate(r.start_date)} ← ${r.end_date ? fmtDate(r.end_date) : "—"}` : "مفيش تواريخ"}</span>
+                    <b className={ended ? "text-bad" : "text-[#1b2a41]"}>{r.days_left == null ? "" : ended ? "العقد خلص" : notStarted ? "لسه مابدأش" : `باقي ${r.days_left} يوم`}</b></span>
+                  <span className="mt-1 block h-2 overflow-hidden rounded-full bg-cream-dark/70"><span className="block h-full rounded-full bg-[#1b2a41]" style={{ width: `${timePct}%` }} /></span>
+                  <span className="mt-1 block text-[11px] text-ink-500">{notStarted && r.days_left != null && r.days_total ? `مدته ${r.days_total} يوم — بيبدأ ${fmtDate(r.start_date)}` : r.days_total ? `عدّى ${Math.round(timePct)}% من مدة العقد` : ""}</span>
+                </span>
+                <span aria-hidden className="hidden text-ink-300 transition group-open:rotate-180 md:block">⌄</span>
+              </summary>
+              <div className="border-t border-line/70 px-4 py-3">
+                {r.schedule.length === 0 ? <p className="text-sm text-ink-500">العقد مالوش جدول دفعات (دفعة واحدة بتاريخ البداية بتتعمل لما يتبعت للمالية).</p> : (
+                  <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{r.schedule.map((p) => (
+                    <li key={p.seq} className={`rounded-xl border px-3 py-2 text-sm ${p.due ? "border-[#b8955a]/50 bg-[#fbf8f2]" : "border-line"}`}>
+                      <span className="flex justify-between gap-2"><span className="font-semibold">{p.seq}. {INSTALLMENT_KIND[p.kind] ?? p.kind}</span><span className="font-bold tabular-nums">{fmtSar(p.amount)}</span></span>
+                      <span className="text-xs text-ink-500">{fmtDate(p.due_date)} · {p.due ? "اتستحقت" : "جاية"}</span>
+                    </li>))}</ol>)}
+                <Link href={`/contracts/${r.contract_id}`} className="mt-3 inline-block text-xs font-semibold text-burgundy-700 underline" dir="auto">فتح العقد {r.contract_no}</Link>
+              </div>
+            </details>);
+        })}</div>)}
+    </Section>
   );
 }

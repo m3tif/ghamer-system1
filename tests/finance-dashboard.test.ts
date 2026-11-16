@@ -65,4 +65,13 @@ describe("Finance Manager dashboard — real numbers, finance-only access", () =
     expect(d.days).toBe(10); expect(d.prev_to).toBe("2019-12-31"); expect(d.prev_from).toBe("2019-12-22"); expect(d.kpi.added).toBe(0); expect(d.daily.length).toBe(10);
     await expect(dash("fin", "2020-01-01", "2022-01-01")).rejects.toThrow(/period too long/);
   });
+  it("clients ranked by money with their payment schedule and time left; finance only", async () => {
+    const r = (await run("fin", "select * from app.finance_clients()")).rows;
+    expect(r.length).toBe(1);
+    expect(Number(r[0].total_amount)).toBe(12000); expect(r[0].inst_count).toBe(1);
+    expect(Number(r[0].due_so_far)).toBe(0); expect(Number(r[0].remaining)).toBe(12000);
+    expect(String(r[0].next_due)).toMatch(/2027|Jan 01 2027/); expect(r[0].schedule.length).toBe(1);
+    expect(r[0].days_total).toBeGreaterThan(0); expect(r[0].days_left).toBeGreaterThan(0);
+    for (const w of ["sales1", "tele1", "techmgr", "am1"]) expect((await run(w, "select * from app.finance_clients()")).rows.length).toBe(0);
+  });
 });

@@ -361,3 +361,9 @@ export async function financeContracts(uid: string, f: { q?: string; status?: st
 export async function financeEmployees(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.finance_employees()"))).rows as { id: string; full_name: string; role_name: string }[];
 }
+export type FinClient = { contract_id: string; contract_no: string; client_name: string; business_name: string | null; status: string; packages: string | null; total_amount: string;
+  start_date: string | null; end_date: string | null; days_total: number | null; days_left: number | null; inst_count: number; due_so_far: string; remaining: string;
+  next_due: string | null; next_amount: string | null; last_due: string | null; schedule: { seq: number; kind: string; due_date: string; amount: string; due: boolean }[] };
+export async function financeClients(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.finance_clients()"))).rows as FinClient[];
+}
