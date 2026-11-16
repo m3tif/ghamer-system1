@@ -446,6 +446,9 @@ export async function quickEditAction(_: FormState, fd: FormData): Promise<FormS
         await c.query("update leads set has_whatsapp = $2 where id = $1 and has_whatsapp is distinct from $2", [id, w === "yes" ? true : w === "no" ? false : null]);
       }
       if (!r.rowCount) throw new Error("no access");
+      // the client's name, from the same dialog (empty = keep the current name)
+      const newName = s(fd, "name").slice(0, 200);
+      if (newName) await c.query("update clients set name = $2 where id = (select client_id from leads where id = $1) and name is distinct from $2", [id, newName]);
       // "notes" is a NEW note: added to the history; the older notes stay as they are
       if (notes) await c.query("select app.add_lead_note($1,$2,'note')", [id, notes]);
       if (newStatus !== cur.lead_status)

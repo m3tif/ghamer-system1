@@ -49,6 +49,8 @@ export function QuickEdit({ lead, children, className = "", followupLabel }: { l
     <Dialog trigger={children} title={`تعديل: ${lead.name}`} triggerClass={className} tone="quiet">
       <ActionForm action={quickEditAction} submit="حفظ" className="grid gap-4 md:grid-cols-2">
         <Hidden name="lead_id" value={lead.id} />
+        <Field label="اسم العميل" name="name" defaultValue={lead.name === "بدون اسم" ? "" : lead.name} placeholder="اكتب اسم العميل" />
+        <div className="hidden md:block" />
         {locked
           ? <div><p className="mb-1 text-sm font-medium">الحالة</p><p className="rounded-md bg-cream px-3 py-2 text-sm">{LEAD_STATUS[lead.lead_status]} <span className="text-xs text-ink-500">(يديرها مسار السيلز)</span></p></div>
           : <SelectField label="الحالة" name="status" defaultValue={lead.lead_status} options={EDIT_STATUS.map((k) => ({ value: k, label: LEAD_STATUS[k] }))} />}
