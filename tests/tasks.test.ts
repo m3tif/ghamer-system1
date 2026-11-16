@@ -170,7 +170,7 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     let st = await steps("am1");
     expect(st.length).toBe(10);
     expect(st[0].title).toBe("اختيار المنصة المناسبة للمتجر"); expect(st[0].role_code).toBe("seo_specialist"); expect(st[0].needs_client).toBe(true);
-    expect(st[9].role_code).toBe("social_media_manager"); expect(st.every((x: any) => x.task_id === null)).toBe(true);
+    expect(st[9].role_code).toBe("social_media_manager"); expect(st[3].role_code).toBe("branding_designer"); expect(st.every((x: any) => x.task_id === null)).toBe(true);
     expect((await steps("am2")).length).toBe(0); expect((await steps("seo")).length).toBe(0);
     const tk = await save("am1", o2, null, { title: st[0].title, assignee: ids.seo, template: st[0].template_id, needs_client: true });
     st = await steps("am1");

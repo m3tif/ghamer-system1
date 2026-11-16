@@ -39,7 +39,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 }
 
 /** Finance: what is waiting for them right now (payments and approvals are added in the next steps of Phase 2). */
-const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "content_creator", "media_buyer", "social_media_manager", "technical_employee", "technical_team_leader"];
+const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "branding_designer", "content_creator", "media_buyer", "social_media_manager", "technical_employee", "technical_team_leader"];
 
 async function TechManagerHome({ uid }: { uid: string }) {
   const [waiting, assigned, ams] = await Promise.all([opsList(uid, "new"), opsList(uid, "assigned"), opsAccountManagers(uid)]);
