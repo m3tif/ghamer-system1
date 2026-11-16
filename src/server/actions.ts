@@ -797,6 +797,50 @@ export async function assignOpsAction(_: FormState, fd: FormData): Promise<FormS
   return { ok: "تم تحويل العميل للأكاونت مانجر" };
 }
 
+// ───────── Phase 3: tasks ─────────
+export async function saveTaskAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id"), task = s(fd, "task_id");
+  if (!UUID.test(ops) || (task && !UUID.test(task))) return { error: "بيانات غير صالحة" };
+  const p = { title: s(fd, "title").slice(0, 200), description: s(fd, "description").slice(0, 4000), assignee: s(fd, "assignee"), service: s(fd, "service"), priority: s(fd, "priority") || "normal",
+    start_date: s(fd, "start_date"), due_date: s(fd, "due_date"), estimated_hours: s(fd, "estimated_hours") };
+  if (p.title.length < 2) return { error: "اكتب عنوان التاسك", values: vals(fd) };
+  if (!UUID.test(p.assignee)) return { error: "اختار الموظف اللي هينفذ التاسك", values: vals(fd) };
+  if (!["low", "normal", "high", "urgent"].includes(p.priority)) return { error: "أولوية غير صالحة", values: vals(fd) };
+  for (const k of ["start_date", "due_date"] as const) if (p[k] && !DATE.test(p[k])) return { error: "تاريخ غير صالح", values: vals(fd) };
+  if (p.estimated_hours && !(Number(p.estimated_hours) > 0 && Number(p.estimated_hours) <= 1000)) return { error: "الساعات المتوقعة رقم أكبر من صفر", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.task_save($1,$2,$3::jsonb)", [ops, task || null, JSON.stringify(p)])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath(`/operations/${ops}`); revalidatePath("/tasks"); if (task) revalidatePath(`/tasks/${task}`); revalidatePath("/");
+  return { ok: task ? "تم حفظ التعديل" : "تم إنشاء التاسك وإرساله للموظف" };
+}
+async function taskStep(fd: FormData, sql: string, okMsg: string, extra: (fd: FormData) => unknown[] | string = () => []): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "task_id");
+  if (!UUID.test(id)) return { error: "تاسك غير صالح" };
+  const more = extra(fd);
+  if (typeof more === "string") return { error: more, values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query(sql, [id, ...more])); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath(`/tasks/${id}`); revalidatePath("/tasks"); revalidatePath("/operations", "layout"); revalidatePath("/");
+  return { ok: okMsg };
+}
+export async function startTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_start($1)", "بدأ العدّاد"); }
+export async function pauseTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_pause($1)", "العدّاد وقف"); }
+export async function addTaskTimeAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_add_time($1,$2,$3)", "تم إضافة الوقت", (fd) => {
+  const m = Number(s(fd, "minutes")), why = s(fd, "reason");
+  if (!Number.isInteger(m) || m < 1 || m > 720) return "اكتب عدد الدقايق (من 1 لـ 720)";
+  if (!why) return "اكتب سبب إضافة الوقت يدوي";
+  return [m, why]; }); }
+export async function submitTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_submit($1,$2,$3)", "تم تسليم التاسك للمراجعة", (fd) => {
+  const link = s(fd, "link");
+  if (!/^https?:\/\/\S+$/i.test(link)) return "حط رابط التسليم (يبدأ بـ https://)";
+  return [link, s(fd, "note") || null]; }); }
+export async function approveTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,true,$2)", "تم اعتماد التاسك", (fd) => [s(fd, "note") || null]); }
+export async function rejectTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,false,$2)", "تم إرجاع التاسك للموظف للتعديل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل المطلوب"; }); }
+export async function commentTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_comment($1,$2)", "تم إضافة التعليق", (fd) => { const b = s(fd, "body"); return b ? [b.slice(0, 2000)] : "اكتب التعليق"; }); }
+
+
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();

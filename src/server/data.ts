@@ -309,3 +309,17 @@ export async function opsList(uid: string, status: "new" | "assigned" | null = n
 export async function opsAccountManagers(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.ops_account_managers()"))).rows as { id: string; full_name: string; clients: number }[];
 }
+
+// ───────── Phase 3: tasks ─────────
+export type TaskRow = { id: string; ops_id: string; client_name: string; title: string; service_name: string | null; assignee_id: string; assignee_name: string; role_name: string | null;
+  priority: string; status: string; start_date: string | null; due_date: string | null; estimated_hours: string | null; minutes: number; running: boolean; late: boolean; revisions: number;
+  created_by_name: string | null; account_manager_name: string | null; submitted_at: string | null; created_at: string };
+export async function taskList(uid: string, scope: "mine" | "all" = "all", opsId: string | null = null) {
+  return (await tx(uid, (c) => c.query("select * from app.task_list($1,$2)", [scope, opsId]))).rows as TaskRow[];
+}
+export async function taskGet(uid: string, id: string) {
+  return (await tx(uid, (c) => c.query("select app.task_get($1) j", [id]))).rows[0]?.j as any | null;
+}
+export async function taskAssignees(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.task_assignees()"))).rows as { id: string; full_name: string; role_name: string; open_tasks: number }[];
+}

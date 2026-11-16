@@ -48,7 +48,7 @@ function ClientCard({ r, ams, assigner }: { r: OpsRow; ams: { id: string; full_n
   return (
     <section className="min-w-0 rounded-lg border border-line bg-white p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div><h2 className="text-lg font-bold">{r.client_name}</h2>{r.business_name && <p className="text-sm text-ink-500">{r.business_name}</p>}</div>
+        <div><h2 className="text-lg font-bold"><Link href={`/operations/${r.id}`} className="underline decoration-burgundy-600/40 hover:text-burgundy-700">{r.client_name}</Link></h2>{r.business_name && <p className="text-sm text-ink-500">{r.business_name}</p>}</div>
         {r.status === "new" ? <Badge tone="warn">مستني تحويل</Badge> : <Badge tone="ok">مع {r.account_manager_name}</Badge>}
       </div>
       <div className="mb-3 flex flex-wrap gap-1.5">{r.packages.map((p) => <span key={p} className="rounded-md border border-burgundy-600/30 bg-burgundy-600/5 px-2 py-0.5 text-xs font-medium">✓ {p}</span>)}</div>
@@ -62,9 +62,10 @@ function ClientCard({ r, ams, assigner }: { r: OpsRow; ams: { id: string; full_n
         {r.status === "assigned" && row("اتحوّل", `${r.assigned_by_name ?? ""} · ${r.assigned_at ? fmtDateTime(r.assigned_at) : ""}`)}
         {r.assign_note && row("ملاحظة التحويل", r.assign_note)}
       </dl>
+      <div className="mt-4"><Link href={`/operations/${r.id}`} className="inline-flex rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">ملف العميل والتاسكات</Link></div>
       {assigner && ams.length > 0 && (
         <div className="mt-4 border-t border-line pt-4">
-          <ActionForm action={assignOpsAction} submit={r.status === "new" ? "تحويل للأكاونت مانجر" : "تغيير الأكاونت مانجر"} tone={r.status === "new" ? undefined : "quiet"}>
+          <ActionForm action={assignOpsAction} submit={r.status === "new" ? "تحويل للأكاونت مانجر" : "تغيير الأكاونت مانجر"} tone="quiet">
             <Hidden name="ops_id" value={r.id} />
             <SelectField label="الأكاونت مانجر" name="account_manager" required empty="اختار" options={ams.filter((a) => a.id !== r.account_manager_id).map((a) => ({ value: a.id, label: `${a.full_name} (${a.clients} عميل)` }))} />
             <TextArea label="ملاحظة للأكاونت (اختياري)" name="note" rows={2} />

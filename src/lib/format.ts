@@ -62,3 +62,6 @@ export const fmtSar = (v: string | number | null | undefined) => {
   const n = Number(v);
   return new Intl.NumberFormat("ar-SA-u-nu-latn", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n) + " ر.س";
 };
+
+/** minutes → "2 س 15 د" */
+export const fmtMins = (m: number | string | null | undefined) => { const n = Math.max(0, Math.round(Number(m) || 0)); const h = Math.floor(n / 60), r = n % 60; return h ? `${h} س${r ? ` ${r} د` : ""}` : `${r} د`; };

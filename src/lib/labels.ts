@@ -85,3 +85,8 @@ export const PAYMENT_METHOD: Record<string, string> = { tabby: "تابي", tamar
 export const INSTALLMENT_KIND: Record<string, string> = { down_payment: "مقدم", installment: "قسط", full: "دفعة كاملة" };
 export const FILE_KIND: Record<string, string> = { signed_contract: "العقد الموقّع", payment_receipt: "وصل الدفع", other: "مستند آخر" };
 export const AUDIENCE: Record<string, string> = { all: "كل الموظفين", tele: "التلي سيلز", sales: "السيلز", finance: "المالية", selected: "موظفين محددين" };
+
+// ───────── Phase 3: tasks ─────────
+export const TASK_STATUS: Record<string, string> = { todo: "لسه مابدأش", in_progress: "شغّال عليه", paused: "متوقف", submitted: "مستني مراجعة", changes_requested: "مطلوب تعديل", approved: "معتمد ✓" };
+export const TASK_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { todo: "neutral", in_progress: "brand", paused: "neutral", submitted: "warn", changes_requested: "bad", approved: "ok" };
+export const TASK_PRIORITY: Record<string, string> = { low: "منخفضة", normal: "عادية", high: "مهمة", urgent: "عاجلة" };
