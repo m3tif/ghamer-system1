@@ -37,6 +37,7 @@ export async function setupDb(dbName = "ghamer_test") {
   await mk("sales1", "sales_rep", "خالد", "salesmgr");
   await mk("sales2", "sales_rep", "فهد", "salesmgr");
   await mk("fin", "finance_manager", "مدير المالية");
+  await mk("finemp", "finance_employee", "موظف المالية");
   await mk("tech", "technical_employee", "موظف تقني");
   await mk("techmgr", "operations_manager", "المديرة التقنية");
   await mk("am1", "account_manager", "أكاونت 1");

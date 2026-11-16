@@ -951,6 +951,33 @@ export async function deleteTaskFileAction(_: FormState, fd: FormData): Promise<
   return { ok: "تم مسح الملف" };
 }
 
+// ───────── payments that actually arrived (Finance records, Finance Manager confirms) ─────────
+export async function recordPaymentAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), amount = money(s(fd, "amount")), paid = s(fd, "paid_at"), method = s(fd, "method");
+  if (!UUID.test(id)) return { error: "عقد غير صالح" };
+  if (!(amount > 0)) return { error: "اكتب مبلغ الدفعة", values: vals(fd) };
+  if (!DATE.test(paid)) return { error: "اختار تاريخ الدفعة", values: vals(fd) };
+  if (!["tabby", "tamara", "bank_transfer"].includes(method)) return { error: "اختار طريقة الدفع", values: vals(fd) };
+  const rid = s(fd, "request_id"), rec = s(fd, "receipt_id"), seq = s(fd, "installment_seq");
+  const p = { amount, paid_at: paid, method, reference: s(fd, "reference").slice(0, 200), note: s(fd, "note").slice(0, 1000), receipt_id: UUID.test(rec) ? rec : "",
+    installment_seq: /^\d{1,3}$/.test(seq) ? seq : "", request_id: UUID.test(rid) ? rid : "", verify: s(fd, "verify") === "1" };
+  try { await tx(sess.userId, (c) => c.query("select app.payment_record($1,$2::jsonb)", [id, JSON.stringify(p)]), "تسجيل دفعة"); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath(`/contracts/${id}`); revalidatePath("/");
+  return { ok: p.verify ? "تم تسجيل الدفعة وتأكيدها" : "تم تسجيل الدفعة — مستنية تأكيد المدير المالي" };
+}
+export async function decidePaymentAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "contract_id"), pay = s(fd, "payment_id"), ok = s(fd, "ok") === "1", why = s(fd, "reason");
+  if (!UUID.test(id) || !UUID.test(pay)) return { error: "دفعة غير صالحة" };
+  if (!ok && !why) return { error: "اكتب سبب الرفض", values: vals(fd) };
+  try { await tx(sess.userId, (c) => c.query("select app.payment_decide($1,$2,$3)", [pay, ok, why || null]), why || "تأكيد دفعة"); }
+  catch (e) { return { error: mapError(e), values: vals(fd) }; }
+  revalidatePath(`/contracts/${id}`); revalidatePath("/");
+  return { ok: ok ? "الدفعة اتأكدت" : "الدفعة اترفضت" };
+}
+
 // ───────── admin messages to employees ─────────
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();

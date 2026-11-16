@@ -2,7 +2,8 @@ import { DeleteFile } from "@/components/delete-file";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
-import { contractGet } from "@/server/data";
+import { contractGet, paymentList } from "@/server/data";
+import { PaymentsCard } from "@/components/payments-card";
 import { Badge, Card, PageHeader, Table, td, btnQuiet } from "@/components/ui";
 import { ActionForm, Alert, Hidden, TextArea, inputCls } from "@/components/forms";
 import { approveContractAction, returnContractAction, submitContractAction, uploadContractFileAction } from "@/server/actions";
@@ -19,6 +20,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
   const data = await contractGet(s.userId, id);
   if (!data) notFound();
   const { contract: c, items, installments, files } = data;
+  const payments = await paymentList(s.userId, id);
   const open = ["draft", "returned"].includes(c.status);
   const canWrite = c.can_write && open;
   const signed = files.filter((f: any) => f.kind === "signed_contract");
@@ -53,6 +55,9 @@ export default async function ContractPage({ params, searchParams }: { params: P
               </Table>)}
             
           </Card>
+          <PaymentsCard contractId={id} total={Number(c.total_amount)} method={c.payment_method} payments={payments} installments={installments}
+            receipts={files.filter((f: any) => f.kind === "payment_receipt").map((f: any) => ({ id: f.id, filename: f.filename }))}
+            canRecord={can(s, "finance.record")} canVerify={can(s, "finance.verify")} open={["submitted", "approved", "returned"].includes(c.status)} />
           <Card title="الملفات">
             {files.length === 0 ? <p className="text-sm text-ink-500">مفيش ملفات مرفوعة لسه.</p> : (
               <ul className="divide-y divide-line text-sm">{files.map((f: any) => (

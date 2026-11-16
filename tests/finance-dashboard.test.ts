@@ -74,4 +74,42 @@ describe("Finance Manager dashboard — real numbers, finance-only access", () =
     expect(r[0].days_total).toBeGreaterThan(0); expect(r[0].days_left).toBeGreaterThan(0);
     for (const w of ["sales1", "tele1", "techmgr", "am1"]) expect((await run(w, "select * from app.finance_clients()")).rows.length).toBe(0);
   });
+  it("payments: Finance records what arrived, the Finance Manager confirms; only confirmed money counts; never more than the contract", async () => {
+    const rec = (who: string, p: any) => run(who, "select app.payment_record($1,$2::jsonb) id", [c1, JSON.stringify(p)]).then((r) => r.rows[0].id as string);
+    const base = { amount: 5000, paid_at: "2026-01-10", method: "bank_transfer", reference: "TRX-1" };
+    for (const w of ["sales1", "tele1", "techmgr", "am1"]) await expect(rec(w, base)).rejects.toThrow(/not allowed/);
+    await expect(rec("finemp", { ...base, amount: 0 })).rejects.toThrow(/amount must be greater/);
+    await expect(rec("finemp", { ...base, paid_at: "2999-01-01" })).rejects.toThrow(/invalid payment date/);
+    await expect(rec("finemp", { ...base, method: "cash" })).rejects.toThrow(/invalid payment method/);
+    await expect(rec("finemp", { ...base, amount: 12001 })).rejects.toThrow(/exceed the contract value/);
+    const req = "11111111-2222-3333-4444-555555555555";
+    const p1 = await rec("finemp", { ...base, request_id: req });
+    expect(await rec("finemp", { ...base, request_id: req })).toBe(p1);                              // pressed twice = one payment
+    expect((await admin.query("select count(*)::int n from payments")).rows[0].n).toBe(1);
+    let cl = (await run("fin", "select * from app.finance_clients()")).rows[0];
+    expect(Number(cl.paid)).toBe(0); expect(cl.pending_payments).toBe(1); expect(Number(cl.remaining)).toBe(12000);
+    expect((await admin.query("select count(*)::int n from notifications where kind='payment_recorded' and user_id=$1", [ids.fin])).rows[0].n).toBe(1);
+    await expect(run("finemp", "select app.payment_decide($1,true,null)", [p1])).rejects.toThrow(/not allowed/);
+    await run("fin", "select app.payment_decide($1,true,null)", [p1]);
+    await run("fin", "select app.payment_decide($1,true,null)", [p1]);
+    await expect(run("fin", "select app.payment_decide($1,false,'x')", [p1])).rejects.toThrow(/already decided/);
+    cl = (await run("fin", "select * from app.finance_clients()")).rows[0];
+    expect(Number(cl.paid)).toBe(5000); expect(Number(cl.remaining)).toBe(7000); expect(cl.pending_payments).toBe(0);
+    // rejected payments do not count; the Finance Manager can record and confirm in one step
+    const p2 = await rec("finemp", { ...base, amount: 3000, reference: "TRX-2" });
+    await expect(run("fin", "select app.payment_decide($1,false,'')", [p2])).rejects.toThrow(/reason required/);
+    await run("fin", "select app.payment_decide($1,false,'التحويل مش موجود في البنك')", [p2]);
+    await rec("fin", { ...base, amount: 7000, reference: "TRX-3", verify: true });
+    await expect(rec("fin", { ...base, amount: 1, verify: true })).rejects.toThrow(/exceed the contract value/);
+    cl = (await run("fin", "select * from app.finance_clients()")).rows[0];
+    expect(Number(cl.paid)).toBe(12000); expect(Number(cl.remaining)).toBe(0);
+    const d = await dash("fin", "2026-01-01", "2026-01-31");
+    expect(Number(d.kpi.collected)).toBe(12000); expect(Number(d.contracts.collected_all)).toBe(12000);
+    // who sees the list: Finance and the Sales owner; not others. Nobody writes the table directly.
+    expect((await run("sales1", "select * from app.payment_list($1)", [c1])).rows.length).toBe(3);
+    expect((await run("sales2", "select * from app.payment_list($1)", [c1])).rows.length).toBe(0);
+    await expect(run("fin", "update payments set amount = 1")).rejects.toThrow(/permission denied/);
+    await expect(run("super", "delete from payments")).rejects.toThrow(/permission denied/);
+    expect((await admin.query("select count(*)::int n from audit_logs where entity_type='payments'")).rows[0].n).toBeGreaterThanOrEqual(5);
+  });
 });

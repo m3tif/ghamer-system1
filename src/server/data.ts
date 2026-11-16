@@ -363,7 +363,12 @@ export async function financeEmployees(uid: string) {
 }
 export type FinClient = { contract_id: string; contract_no: string; client_name: string; business_name: string | null; status: string; packages: string | null; total_amount: string;
   start_date: string | null; end_date: string | null; days_total: number | null; days_left: number | null; inst_count: number; due_so_far: string; remaining: string;
-  next_due: string | null; next_amount: string | null; last_due: string | null; schedule: { seq: number; kind: string; due_date: string; amount: string; due: boolean }[] };
+  next_due: string | null; next_amount: string | null; last_due: string | null; schedule: { seq: number; kind: string; due_date: string; amount: string; due: boolean }[]; paid: string; overdue: string; pending_payments: number };
 export async function financeClients(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.finance_clients()"))).rows as FinClient[];
+}
+export type Payment = { id: string; installment_seq: number | null; amount: string; paid_at: string; method: string; reference: string | null; note: string | null; receipt_id: string | null;
+  receipt_name: string | null; status: "pending" | "verified" | "rejected"; recorded_by: string; recorded_at: string; verified_by: string | null; verified_at: string | null; reject_reason: string | null };
+export async function paymentList(uid: string, contractId: string) {
+  return (await tx(uid, (c) => c.query("select * from app.payment_list($1)", [contractId]))).rows as Payment[];
 }

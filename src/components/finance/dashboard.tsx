@@ -103,8 +103,16 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
 
       {/* 6. attention centre */}
       <Section title="محتاج تدخلك" sub="من العقود الفعلية في السيستم — بتتحدث لوحدها">
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Panel title={`مستنية مراجعة (${num(c.submitted)})`}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Panel title={`دفعات مستنية تأكيدك (${num(c.payments_pending)})`}>
+            {d.attention.payments.length === 0 ? <p className="text-sm text-ink-500">مفيش دفعات مستنياك ✓</p> : (
+              <ul className="divide-y divide-line text-sm">{d.attention.payments.map((w: any) => (
+                <li key={w.id} className="flex items-center justify-between gap-2 py-2">
+                  <Link href={`/contracts/${w.contract_id}`} className="min-w-0"><span className="block truncate font-semibold text-burgundy-700 underline">{w.client_name}</span><span className="text-xs text-ink-500">{w.recorded_by} · {fmtDate(w.paid_at)}</span></Link>
+                  <span className="shrink-0 text-xs font-bold tabular-nums">{fmtSar(w.amount)}</span>
+                </li>))}</ul>)}
+          </Panel>
+          <Panel title={`عقود مستنية مراجعة (${num(c.submitted)})`}>
             {d.attention.waiting.length === 0 ? <p className="text-sm text-ink-500">مفيش عقود مستنياك ✓</p> : (
               <ul className="divide-y divide-line text-sm">{d.attention.waiting.map((w: any) => (
                 <li key={w.id} className="flex items-center justify-between gap-2 py-2">
@@ -169,7 +177,7 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
 
       {/* 1. executive summary */}
       <Section title="الملخص التنفيذي" sub={`مقارنة بـ${prevLabel}: ${fmtDate(d.prev_from)} ← ${fmtDate(d.prev_to)}`}>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
           <Kpi icon="👥" label="عملاء دخلوا في الفترة" value={num(k.added)} delta={<Delta cur={n(k.added)} prev={n(k.added_prev)} label={prevLabel} />} />
           <Kpi icon="☀" label="عملاء دخلوا النهارده" value={num(k.added_today)} accent="gold" />
           <Kpi icon="∑" label="كل العملاء من أول السيستم" value={num(k.total_clients)} />
@@ -179,6 +187,7 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
           <Kpi icon="▤" label="كل العقود المسجلة" value={num(c.total)} href={link({ cs: undefined, pg: undefined }, "#contracts")} accent="wine" note="من غير الملغية" />
           <Kpi icon="⏳" label="عقود مستنية مراجعتك" value={num(c.submitted)} href={link({ cs: "submitted", pg: undefined }, "#contracts")} accent="wine" note={n(c.late) ? `${num(c.late)} منهم أكتر من يومين` : undefined} />
           <Kpi icon="★" label="عقود معتمدة" value={num(c.approved)} href={link({ cs: "approved", pg: undefined }, "#contracts")} note={`قيمتها ${fmtSar(c.value_approved)}`} />
+          <Kpi icon="﷼" label="فلوس اتحصلت في الفترة" value={fmtSar(k.collected)} accent="gold" delta={<Delta cur={n(k.collected)} prev={n(k.collected_prev)} label={prevLabel} />} />
           <Kpi icon="↺" label="رجعت للتعديل / ملغية" value={`${num(c.returned)} / ${num(c.cancelled)}`} href={link({ cs: "returned", pg: undefined }, "#contracts")} note="السيستم مافيهوش «رفض» — الرفض بيبقى إرجاع للسيلز" />
         </div>
       </Section>
@@ -263,18 +272,19 @@ export async function FinanceDashboard({ uid, name, sp }: { uid: string; name: s
 
 /* ───────── clients ranked by money: payments, when they end, time left on the contract ───────── */
 function ClientsMoney({ rows }: { rows: FinClient[] }) {
-  const sum = (k: "total_amount" | "due_so_far" | "remaining") => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
-  const total = sum("total_amount"), due = sum("due_so_far"), left = sum("remaining");
+  const sum = (k: "total_amount" | "paid" | "overdue" | "remaining") => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
+  const total = sum("total_amount"), paid = sum("paid"), late = sum("overdue"), left = sum("remaining");
   return (
-    <Section title="العملاء والفلوس" sub="العملاء مترتبين من الأكبر قيمة للأصغر (العقود المعتمدة واللي عند المالية). «اتستحق» و«باقي» حسب جدول الدفعات في العقد وتاريخ النهارده — السيستم لسه مابيسجلش الدفع الفعلي.">
-      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <Section title="العملاء والفلوس" sub="العملاء مترتبين من الأكبر قيمة للأصغر (العقود المعتمدة واللي عند المالية). «اتحصل» = الدفعات اللي المدير المالي أكد وصولها بس. «متأخر» = اللي جه ميعاده في جدول الدفعات ولسه ماوصلش.">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-2xl bg-[#1b2a41] p-4 text-white"><p className="text-xs text-white/70">إجمالي قيمة العقود</p><p className="mt-1 text-2xl font-extrabold tabular-nums">{fmtSar(total)}</p><p className="text-xs text-white/60">{rows.length} عميل</p></div>
-        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">اتستحق لحد النهارده</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-[#8a6a35]">{fmtSar(due)}</p></div>
-        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">باقي في الدفعات الجاية</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-burgundy-700">{fmtSar(left)}</p></div>
+        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">اتحصل فعلًا</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-ok">{fmtSar(paid)}</p></div>
+        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">متأخر على العملاء</p><p className={`mt-1 text-2xl font-extrabold tabular-nums ${late ? "text-bad" : "text-[#1b2a41]"}`}>{fmtSar(late)}</p></div>
+        <div className="rounded-2xl border border-[#e7dfcf] bg-white p-4"><p className="text-xs text-ink-500">باقي لسه</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-burgundy-700">{fmtSar(left)}</p></div>
       </div>
       {rows.length === 0 ? <Panel><p className="py-6 text-center text-sm text-ink-500">مفيش عقود معتمدة أو عند المالية لسه.</p></Panel> : (
         <div className="space-y-3">{rows.map((r, i) => {
-          const tot = Number(r.total_amount) || 0, paidPct = tot ? Math.min(100, (Number(r.due_so_far) / tot) * 100) : 0;
+          const tot = Number(r.total_amount) || 0, paidPct = tot ? Math.min(100, (Number(r.paid) / tot) * 100) : 0, duePct = tot ? Math.min(100, (Number(r.due_so_far) / tot) * 100) : 0;
           const timePct = r.days_total && r.days_left != null ? Math.min(100, Math.max(0, ((r.days_total - r.days_left) / r.days_total) * 100)) : 0;
           const ended = r.days_left === 0, notStarted = r.start_date && new Date(r.start_date) > new Date();
           return (
@@ -285,8 +295,9 @@ function ClientsMoney({ rows }: { rows: FinClient[] }) {
                   <span className="block truncate text-xs text-ink-500">{r.packages ?? "—"}{r.status !== "approved" && <> · <span className="font-semibold text-warn">{CONTRACT_STATUS[r.status]}</span></>}</span></span>
                 <span><span className="block text-lg font-extrabold tabular-nums text-[#1b2a41]">{fmtSar(r.total_amount)}</span><span className="text-xs text-ink-500">{r.inst_count ? `${r.inst_count} ${r.inst_count === 1 ? "دفعة" : "دفعات"}` : "مفيش جدول دفعات"}</span></span>
                 <span className="min-w-0">
-                  <span className="flex justify-between text-xs"><span className="text-ink-500">اتستحق {fmtSar(r.due_so_far)}</span><b className="text-burgundy-700">باقي {fmtSar(r.remaining)}</b></span>
-                  <span className="mt-1 block h-2 overflow-hidden rounded-full bg-cream-dark/70"><span className="block h-full rounded-full bg-[#b8955a]" style={{ width: `${paidPct}%` }} /></span>
+                  <span className="flex justify-between text-xs"><span className="text-ok">اتحصل {fmtSar(r.paid)}</span><b className="text-burgundy-700">باقي {fmtSar(r.remaining)}</b></span>
+                  <span className="relative mt-1 block h-2 overflow-hidden rounded-full bg-cream-dark/70"><span className="absolute inset-y-0 right-0 block rounded-full bg-[#b8955a]/40" style={{ width: `${duePct}%` }} /><span className="absolute inset-y-0 right-0 block rounded-full bg-ok" style={{ width: `${paidPct}%` }} /></span>
+                  {(Number(r.overdue) > 0 || r.pending_payments > 0) && <span className="mt-1 flex flex-wrap gap-1.5">{Number(r.overdue) > 0 && <Badge tone="bad">متأخر {fmtSar(r.overdue)}</Badge>}{r.pending_payments > 0 && <Badge tone="warn">{r.pending_payments} دفعة مستنية تأكيد</Badge>}</span>}
                   <span className="mt-1 block text-[11px] text-ink-500">{r.next_due ? `الدفعة الجاية ${fmtDate(r.next_due)} — ${fmtSar(r.next_amount)}` : r.inst_count ? "كل الدفعات اتستحقت" : "—"}{r.last_due ? ` · الدفعات بتخلص ${fmtDate(r.last_due)}` : ""}</span>
                 </span>
                 <span className="min-w-0">

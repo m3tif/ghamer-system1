@@ -91,3 +91,5 @@ export const TASK_STATUS: Record<string, string> = { todo: "لسه مابدأش"
 export const TASK_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { todo: "neutral", in_progress: "brand", paused: "neutral", submitted: "warn", changes_requested: "bad", client_review: "warn", approved: "ok" };
 export const TASK_PRIORITY: Record<string, string> = { low: "منخفضة", normal: "عادية", high: "مهمة", urgent: "عاجلة" };
 export const TECH_ROLE: Record<string, string> = { seo_specialist: "SEO", ui_designer: "UI", developer: "مبرمج", designer: "ديزاينر", branding_designer: "براندينج ديزاينر", content_creator: "كونتنت كريتور", media_buyer: "ميديا باير", social_media_manager: "سوشيال ميديا مانجر" };
+export const PAYMENT_STATUS: Record<string, string> = { pending: "مستنية تأكيد", verified: "اتأكدت ✓", rejected: "اترفضت" };
+export const PAYMENT_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { pending: "warn", verified: "ok", rejected: "bad" };
