@@ -28,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/duplicates", label: "مراجعة التكرار", show: can(s, "duplicates.review") || can(s, "duplicates.request") },
     { href: "/visibility", label: "إخفاء وإظهار البيانات", show: s.role === "super_admin" || s.role === "general_manager" },
     { href: "/import", label: "استيراد البيانات السابقة", show: can(s, "import.own") || can(s, "import.any") },
+    { href: "/messages", label: "رسائل للموظفين", show: s.role === "super_admin" },
     { href: "/employees", label: "الموظفون", show: can(s, "employees.view") },
     { href: "/clients/existing", label: "إضافة عميل قائم", show: can(s, "employees.manage") },
     { href: "/audit", label: "سجل التدقيق", show: can(s, "audit.view") },

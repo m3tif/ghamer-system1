@@ -762,3 +762,21 @@ export async function returnContractAction(_: FormState, fd: FormData): Promise<
   revalidatePath(`/contracts/${id}`); revalidatePath("/contracts"); revalidatePath("/pipeline");
   return { ok: "تم إرجاع العقد للسيلز للتعديل" };
 }
+
+
+// ───────── admin messages to employees ─────────
+export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  if (sess.role !== "super_admin") return { error: "إرسال الرسائل لمدير النظام فقط" };
+  const title = s(fd, "title"), body = s(fd, "body"), audience = s(fd, "audience") || "all", req = s(fd, "request_id");
+  const picked = fd.getAll("employees").map(String).filter((x) => UUID.test(x));
+  if (!title) return { error: "اكتب عنوان الرسالة", values: vals(fd) };
+  if (!body) return { error: "اكتب نص الرسالة", values: vals(fd) };
+  if (title.length > 120 || body.length > 2000) return { error: "الرسالة طويلة: العنوان لحد 120 حرف والنص لحد 2000", values: vals(fd) };
+  if (audience === "selected" && picked.length === 0) return { error: "اختر موظف واحد على الأقل", values: vals(fd) };
+  let n: number;
+  try { n = (await tx(sess.userId, (c) => c.query("select app.broadcast_send($1,$2,$3,$4::uuid[],$5) n", [title, body, audience, picked, UUID.test(req) ? req : null]))).rows[0].n; }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/messages");
+  return { ok: `تم إرسال الرسالة إلى ${n} موظف. هتظهرلهم أول ما يفتحوا السيستم.` };
+}

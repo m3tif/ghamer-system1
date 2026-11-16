@@ -292,3 +292,8 @@ export async function vatRate(uid: string) {
 export async function attachmentGet(uid: string, id: string) {
   return (await tx(uid, (c) => c.query("select * from app.attachment_get($1)", [id]))).rows[0] as { filename: string; mime_type: string; content: Buffer } | undefined;
 }
+
+// ───────── admin messages to employees ─────────
+export async function broadcastList(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.broadcast_list()"))).rows as any[];
+}

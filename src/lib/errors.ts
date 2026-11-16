@@ -63,6 +63,8 @@ const MAP: [RegExp, string][] = [
   [/too many files/i, "وصلت للحد الأقصى من الملفات على العقد (20)"],
   [/contract is not waiting for Finance/i, "العقد مش في انتظار المالية"],
   [/contract is cancelled/i, "العقد ملغي"],
+  [/no recipients/i, "مفيش موظفين نشطين في الاختيار ده"],
+  [/message text required/i, "اكتب عنوان ونص الرسالة"],
   [/cannot change own status/i, "لا يمكنك تغيير حالة حسابك بنفسك"],
 ];
 export function mapError(e: unknown): string {

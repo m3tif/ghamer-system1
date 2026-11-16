@@ -84,3 +84,4 @@ export const PACKAGE_MONTHS: Record<string, number | null> = { monthly: 1, quart
 export const PAYMENT_METHOD: Record<string, string> = { bank_transfer: "تحويل بنكي", cash: "نقدي", card: "بطاقة", payment_link: "رابط دفع", other: "أخرى" };
 export const INSTALLMENT_KIND: Record<string, string> = { down_payment: "مقدم", installment: "قسط", full: "دفعة كاملة" };
 export const FILE_KIND: Record<string, string> = { signed_contract: "العقد الموقّع", other: "مستند آخر" };
+export const AUDIENCE: Record<string, string> = { all: "كل الموظفين", tele: "التلي سيلز", sales: "السيلز", finance: "المالية", selected: "موظفين محددين" };
