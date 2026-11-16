@@ -6,7 +6,12 @@ import { dismissReleaseAction } from "@/server/actions";
 export function ReleaseNotice({ id, title, body, sender }: { id: string; title: string; body: string | null; sender?: string | null }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [pending, start] = useTransition();
-  useEffect(() => { if (!ref.current?.open) ref.current?.showModal(); }, []);
+  // the same message can arrive from the page and from the live check: show it once
+  useEffect(() => {
+    const w = window as unknown as { __notices?: Set<string> }; w.__notices ??= new Set();
+    if (w.__notices.has(id)) return; w.__notices.add(id);
+    if (!ref.current?.open) ref.current?.showModal();
+  }, [id]);
   const ok = () => start(async () => { await dismissReleaseAction(id); ref.current?.close(); });
   return (
     <dialog ref={ref} aria-label={title} onCancel={(e) => { e.preventDefault(); ok(); }}

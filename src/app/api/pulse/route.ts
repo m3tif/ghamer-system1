@@ -7,8 +7,11 @@ export async function GET() {
   const s = await getSession();
   if (!s) return Response.json({ ok: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
   try {
-    const p = (await tx(s.userId, (c) => c.query("select app.pulse() p"))).rows[0].p as Record<string, unknown>;
+    const [p, notice] = await tx(s.userId, async (c) => [
+      (await c.query("select app.pulse() p")).rows[0].p as Record<string, unknown>,
+      (await c.query("select id, title, body, sender from app.my_pending_notice()")).rows[0] ?? null]);
     const { now, ...rest } = p;
-    return Response.json({ ok: true, rev: JSON.stringify(rest), at: now }, { headers: { "Cache-Control": "no-store" } });
+    // a new pop-up message travels with the pulse, so it shows up without reloading the page
+    return Response.json({ ok: true, rev: JSON.stringify(rest), at: now, notice }, { headers: { "Cache-Control": "no-store" } });
   } catch { return Response.json({ ok: false }, { status: 503, headers: { "Cache-Control": "no-store" } }); }
 }

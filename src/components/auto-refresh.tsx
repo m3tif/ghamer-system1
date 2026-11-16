@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ReleaseNotice } from "@/components/release-notice";
+
+type Notice = { id: string; title: string; body: string | null; sender: string | null };
 
 const BASE = 15_000, MAX = 120_000;
 
@@ -15,6 +18,7 @@ export function AutoRefresh() {
   const router = useRouter();
   const [updated, setUpdated] = useState<Date | null>(null);
   const [offline, setOffline] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const rev = useRef<string | null>(null), delay = useRef(BASE), timer = useRef<ReturnType<typeof setTimeout> | null>(null), stopped = useRef(false);
 
   useEffect(() => {
@@ -30,6 +34,7 @@ export function AutoRefresh() {
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         delay.current = BASE; setOffline(false);
+        if (j.notice && !typing()) setNotice((cur) => (cur?.id === j.notice.id ? cur : j.notice));   // a new pop-up message: show it now
         if (rev.current === null) rev.current = j.rev;
         else if (j.rev !== rev.current) {
           if (typing() || busy()) return schedule();            // try again next tick, do not disturb typing
@@ -45,9 +50,10 @@ export function AutoRefresh() {
     return () => { stopped.current = true; if (timer.current) clearTimeout(timer.current); document.removeEventListener("visibilitychange", onVisible); };
   }, [router]);
 
-  return (
+  return (<>
+    {notice && <ReleaseNotice key={notice.id} id={notice.id} title={notice.title} body={notice.body} sender={notice.sender} />}
     <div aria-live="off" data-testid="last-update" className="fixed bottom-3 end-3 z-20 rounded-full border border-line bg-white/90 px-3 py-1 text-xs text-ink-500 shadow-sm backdrop-blur">
       {offline ? "تعذّر التحديث — سنعيد المحاولة" : updated ? <>آخر تحديث: <span dir="ltr" className="tabular-nums">{updated.toLocaleTimeString("en-GB")}</span></> : "جارٍ التحديث…"}
     </div>
-  );
+  </>);
 }
