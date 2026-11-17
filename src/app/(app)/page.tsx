@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FinanceDashboard, type FinSP } from "@/components/finance/dashboard";
 import { AdminAttention, AdminOps, AdminSources } from "@/components/admin/extras";
-import { contractList, opsAccountManagers, opsList, taskList } from "@/server/data";
+import { AmWorkspace, TechManagerWorkspace, TechWorkspace } from "@/components/tech/home";
+import { contractList } from "@/server/data";
 import { can, requireSession } from "@/lib/auth";
 import { dailyReport, type DailyRow, addedCounts, assignedLeads, companyOverview, employeeList, listFollowUps, listLeads, myOutcomes, myProgress, salesStats, teleStats } from "@/server/data";
 import { Badge, Card, Empty, PageHeader, Progress, Stat, Table, td } from "@/components/ui";
@@ -30,6 +31,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     }} />
   );
 
+  if (s.role === "operations_manager") return <TechManagerWorkspace uid={s.userId} name={s.fullName} role={s.roleNameAr} />;
+  if (s.role === "account_manager") return <AmWorkspace uid={s.userId} name={s.fullName} role={s.roleNameAr} />;
+  if (TECH_ROLES.includes(s.role)) return <TechWorkspace uid={s.userId} name={s.fullName} role={s.roleNameAr} />;
+
   return (
     <>
       <PageHeader title={`أهلًا ${s.fullName}`} sub={`${s.roleNameAr} · إحصائيات الشهر الحالي`} />
@@ -40,9 +45,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {(s.role === "sales_manager" || isAdmin) && <SalesTeam uid={s.userId} month={month} team={salesTeam} />}
       {isAdmin && <Company uid={s.userId} month={month} />}
       {s.role === "finance_employee" && <FinanceHome uid={s.userId} />}
-      {s.role === "operations_manager" && <TechManagerHome uid={s.userId} />}
-      {s.role === "account_manager" && <AccountManagerHome uid={s.userId} />}
-      {TECH_ROLES.includes(s.role) && <TechHome uid={s.userId} />}
       {!["tele_sales", "sales_rep", "tele_sales_manager", "sales_manager", "super_admin", "general_manager", "finance_manager", "finance_employee"].includes(s.role) && (
         <Empty title="لا توجد لوحة لدورك في هذه المرحلة" hint="وحدات المالية والتشغيل والمهام تُضاف في المراحل القادمة." />
       )}
@@ -53,65 +55,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 /** Finance: what is waiting for them right now (payments and approvals are added in the next steps of Phase 2). */
 const TECH_ROLES = ["seo_specialist", "ui_designer", "developer", "designer", "branding_designer", "content_creator", "media_buyer", "social_media_manager", "technical_employee", "technical_team_leader"];
 
-async function TechManagerHome({ uid }: { uid: string }) {
-  const [waiting, assigned, ams] = await Promise.all([opsList(uid, "new"), opsList(uid, "assigned"), opsAccountManagers(uid)]);
-  return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-lg font-bold">العملاء المعتمدين ماليًا</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat href="/operations" label="مستنيين تحويل لأكاونت مانجر" value={waiting.length} tone={waiting.length ? "bad" : undefined} />
-        <Stat href="/operations?tab=assigned" label="اتحوّلوا" value={assigned.length} />
-      </div>
-      <TaskStats uid={uid} />
-      {ams.length > 0 && (
-        <div className="mt-4"><Card title="العملاء مع كل أكاونت مانجر">
-          <ul className="divide-y divide-line text-sm">{ams.map((a) => <li key={a.id} className="flex justify-between py-2"><span>{a.full_name}</span><span className="font-semibold tabular-nums">{a.clients}</span></li>)}</ul>
-        </Card></div>)}
-    </section>
-  );
-}
 
-async function TechHome({ uid }: { uid: string }) {
-  const t = await taskList(uid, "mine");
-  const n = (f: (x: (typeof t)[number]) => boolean) => t.filter(f).length;
-  const running = t.find((x) => x.running);
-  return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-lg font-bold">تاسكاتي</h2>
-      {running && <Link href={`/tasks/${running.id}`} className="mb-3 block rounded-lg border border-ok/40 bg-ok/5 px-4 py-3 text-sm font-semibold text-ok">● العدّاد شغّال على: {running.title} — {running.client_name}</Link>}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat href="/tasks?f=open" label="شغلي الحالي" value={n((x) => !["approved", "submitted", "client_review"].includes(x.status))} />
-        <Stat href="/tasks?f=open" label="مطلوب تعديل" value={n((x) => x.status === "changes_requested")} tone={n((x) => x.status === "changes_requested") ? "bad" : undefined} />
-        <Stat href="/tasks?f=late" label="متأخر" value={n((x) => x.late)} tone={n((x) => x.late) ? "bad" : undefined} />
-        <Stat href="/tasks?f=done" label="معتمد" value={n((x) => x.status === "approved")} tone="ok" />
-      </div>
-    </section>
-  );
-}
 
-async function TaskStats({ uid }: { uid: string }) {
-  const t = await taskList(uid, "all");
-  const n = (f: (x: (typeof t)[number]) => boolean) => t.filter(f).length;
-  return (
-    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-      <Stat href="/tasks?f=review" label="تاسكات مستنية مراجعة" value={n((x) => x.status === "submitted")} tone={n((x) => x.status === "submitted") ? "bad" : undefined} />
-      <Stat href="/tasks?f=late" label="تاسكات متأخرة" value={n((x) => x.late)} tone={n((x) => x.late) ? "bad" : undefined} />
-      <Stat href="/tasks?f=open" label="تاسكات مفتوحة" value={n((x) => x.status !== "approved")} />
-      <Stat href="/tasks?f=done" label="تاسكات معتمدة" value={n((x) => x.status === "approved")} tone="ok" />
-    </div>
-  );
-}
 
-async function AccountManagerHome({ uid }: { uid: string }) {
-  const mine = await opsList(uid, null);
-  return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-lg font-bold">عملائي</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat href="/operations" label="العملاء المسندين ليك" value={mine.length} /></div>
-      <TaskStats uid={uid} />
-    </section>
-  );
-}
 
 async function FinanceHome({ uid }: { uid: string }) {
   const [waiting, returned, all] = await Promise.all([contractList(uid, { status: "submitted" }), contractList(uid, { status: "returned" }), contractList(uid, {})]);
