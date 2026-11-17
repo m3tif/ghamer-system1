@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OpsClientEdit } from "@/components/ops-client-edit";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
@@ -41,13 +42,13 @@ export default async function Operations({ searchParams }: { searchParams: Promi
           hint={tab === "new" ? "أول ما المالية تعتمد عقد، العميل هيظهر هنا." : undefined} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {rows.map((r) => <ClientCard key={r.id} r={r} ams={ams} assigner={assigner} services={services} />)}
+          {rows.map((r) => <ClientCard key={r.id} uid={s.userId} r={r} ams={ams} assigner={assigner} services={services} />)}
         </div>)}
     </>
   );
 }
 
-function ClientCard({ r, ams, assigner, services }: { r: OpsRow; ams: { id: string; full_name: string; clients: number }[]; assigner: boolean; services: { code: string; name_ar: string }[] }) {
+function ClientCard({ uid, r, ams, assigner, services }: { uid: string; r: OpsRow; ams: { id: string; full_name: string; clients: number }[]; assigner: boolean; services: { code: string; name_ar: string }[] }) {
   const needsPackages = r.is_existing && r.packages.length === 0;
   const row = (k: string, v: ReactNode) => (<div className="flex justify-between gap-3"><dt className="shrink-0 text-ink-500">{k}</dt><dd className="min-w-0 break-words text-end" dir="auto">{v || "—"}</dd></div>);
   return (
@@ -69,7 +70,7 @@ function ClientCard({ r, ams, assigner, services }: { r: OpsRow; ams: { id: stri
         {r.status === "assigned" && row("اتحوّل", `${r.assigned_by_name ?? ""} · ${r.assigned_at ? fmtDateTime(r.assigned_at) : ""}`)}
         {r.assign_note && row("ملاحظة التحويل", r.assign_note)}
       </dl>
-      <div className="mt-4"><Link href={`/operations/${r.id}`} className="inline-flex rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">ملف العميل والتاسكات</Link></div>
+      <div className="mt-4 flex flex-wrap items-center gap-2"><Link href={`/operations/${r.id}`} className="inline-flex rounded-md bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">ملف العميل والتاسكات</Link><OpsClientEdit uid={uid} opsId={r.id} /></div>
       {assigner && r.is_existing && services.length > 0 && (
         <details className="mt-4 border-t border-line pt-4" open={needsPackages}>
           <summary className="cursor-pointer text-sm font-semibold text-burgundy-700">{needsPackages ? "حدّد الباقات ومدة التعاقد" : "تعديل الباقات ومدة التعاقد"}</summary>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OpsClientEdit } from "@/components/ops-client-edit";
 import { notFound } from "next/navigation";
 import { can, requireSession } from "@/lib/auth";
 import { opsSteps } from "@/server/data";
@@ -44,7 +45,7 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
           {onboarding && <OnboardingCards opsId={id} data={onboarding} />}
         </div>
         <div className="min-w-0">
-          <Card title="بيانات العميل">
+          <Card title="بيانات العميل" right={<OpsClientEdit uid={s.userId} opsId={id} label="✎ تعديل" />}>
             <div className="mb-3 flex flex-wrap gap-1.5">{r.packages.map((p) => <span key={p} className="rounded-md border border-burgundy-600/30 bg-burgundy-600/5 px-2 py-0.5 text-xs font-medium">✓ {p}</span>)}</div>
             <dl className="space-y-1.5 text-sm">
               {row("رقم الجوال", r.phone ? <a href={`tel:${r.phone}`} dir="ltr" className="underline">{r.phone}</a> : null)}

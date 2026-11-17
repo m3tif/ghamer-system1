@@ -389,3 +389,8 @@ export async function dailyReportTeam(uid: string, day: string | null) {
 export async function dailyReportMyTasks(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.daily_report_my_tasks()"))).rows;
 }
+
+export async function opsClientGet(uid: string, ops: string) {
+  try { return (await tx(uid, (c) => c.query("select app.ops_client_get($1) r", [ops]))).rows[0].r as { name: string; business_name: string | null; contact_person: string | null; city: string | null; phone: string | null; alt_phone: string | null; whatsapp: string | null; stores: string[] }; }
+  catch { return null; }
+}

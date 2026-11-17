@@ -1007,3 +1007,22 @@ export async function saveDailyReportAction(_: FormState, fd: FormData): Promise
   revalidatePath("/reports");
   return { ok: "تم حفظ تقرير النهارده" };
 }
+
+/** Edit the client's details from the technical side (admins, Technical Manager, the client's Account Manager). */
+export async function opsClientUpdateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id");
+  if (!/^[0-9a-f-]{36}$/.test(ops)) return { error: "عميل غير صالح" };
+  if (!s(fd, "name")) return { values: vals(fd), error: "اكتب اسم العميل" };
+  if (!s(fd, "phone")) return { values: vals(fd), error: "رقم الجوال مطلوب" };
+  const cp = buildContactPayload(fd);
+  if (cp.error) return { values: vals(fd), error: cp.error };
+  const payload = { name: s(fd, "name").slice(0, 200), business_name: s(fd, "business_name").slice(0, 200), contact_person: s(fd, "contact_person").slice(0, 200), city: s(fd, "city").slice(0, 100), ...cp.payload };
+  try {
+    const r = (await tx(sess.userId, (c) => c.query("select app.ops_client_update($1,$2::jsonb) r", [ops, JSON.stringify(payload)]))).rows[0].r;
+    if (r.status === "duplicate")
+      return { values: vals(fd), error: `${r.kind === "store" ? "رابط المتجر" : "الرقم"} ده متسجل على عميل تاني${r.existing_name ? ` «${r.existing_name}»` : ""}${r.owner_name ? ` عند ${r.owner_name}` : ""}. ماتحفظش حاجة.` };
+  } catch (e) { return fail(e, fd); }
+  revalidatePath("/operations"); revalidatePath(`/operations/${ops}`); revalidatePath("/");
+  return { ok: "تم حفظ بيانات العميل" };
+}

@@ -111,4 +111,28 @@ describe("Phase 3 — approved clients go to the Technical Manager, who hands th
     // a normal (tele) registration of the same phone is still a duplicate as before
     expect((await register("tele2", leadPayload({ name: "x", phone: "0572000777" }))).status).toBe("duplicate");
   });
+  it("the client's details can be edited by the admin, the Technical Manager and the client's own Account Manager only", async () => {
+    const r = await register("techmgr", { ...leadPayload({ name: "قبل التعديل", phone: "0572000555" }), mode: "existing", packages: ["seo"] });
+    const op = r.ops_id;
+    const pl = (name: string, phones: string[], store?: string) => JSON.stringify({ name, business_name: "متجر جديد", contact_person: "أبو أحمد", city: "الرياض",
+      identifiers: [...phones.map((v, i) => ({ kind: "phone", value: v, label: i ? "alt_mobile" : "mobile" })), ...(store ? [{ kind: "store", value: store, label: "store" }] : [])],
+      contacts: phones.map((v, i) => ({ label: i ? "alt_mobile" : "mobile", phone: v, is_primary: !i, phone_raw: v, phone_country: "SA" })),
+      stores: store ? [{ url_raw: "https://" + store, url_key: store }] : [] });
+    const upd = (who: string, body: string) => run(who, "select app.ops_client_update($1,$2::jsonb) r", [op, body]).then((x) => x.rows[0].r);
+    expect((await upd("techmgr", pl("بعد التعديل", ["+966572000556", "+966572000557"], "newstore.sa"))).status).toBe("updated");
+    const g = (await run("techmgr", "select app.ops_client_get($1) r", [op])).rows[0].r;
+    expect(g.name).toBe("بعد التعديل"); expect(g.business_name).toBe("متجر جديد"); expect(g.phone).toBe("+966572000556"); expect(g.alt_phone).toBe("+966572000557"); expect(g.stores).toEqual(["https://newstore.sa"]);
+    // the old phone is free again; a phone of ANOTHER client is refused and nothing is saved
+    const d = await upd("super", pl("محاولة", ["+966572000001"]));
+    expect(d.status).toBe("duplicate"); expect(d.existing_name).toBe("متجر الورد");
+    expect((await run("super", "select app.ops_client_get($1) r", [op])).rows[0].r.name).toBe("بعد التعديل");
+    await expect(upd("techmgr", JSON.stringify({ name: "x", identifiers: [] }))).rejects.toThrow(/phone required/);
+    // account manager: only once the client is his
+    await expect(upd("am1", pl("am", ["+966572000556"]))).rejects.toThrow(/no access/);
+    await run("techmgr", "select app.ops_assign($1,$2,null)", [op, ids.am1]);
+    expect((await upd("am1", pl("عدّلها الأكاونت", ["+966572000556"]))).status).toBe("updated");
+    await expect(upd("am2", pl("x", ["+966572000556"]))).rejects.toThrow(/no access/);
+    for (const who of ["sales1", "tele1", "designer", "fin"]) await expect(upd(who, pl("x", ["+966572000556"]))).rejects.toThrow(/no access/);
+    expect((await admin.query("select count(*)::int n from audit_logs where entity_type='clients' and entity_id=$1 and action='UPDATE'", [r.client_id])).rows[0].n).toBeGreaterThanOrEqual(2);
+  });
 });
