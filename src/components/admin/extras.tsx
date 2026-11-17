@@ -30,9 +30,7 @@ export async function AdminAttention({ uid }: { uid: string }) {
       { label: "مستنيين قرار السيلز", v: a.pending_sales, href: "/leads?status=Pending%20Sales%20Review" },
       { label: "رفضهم السيلز ومستنيين متابعة", v: a.rejected_waiting, href: "/leads?status=Rejected%20by%20Sales", hot: a.rejected_waiting > 0 },
       { label: "مراجعات تكرار مفتوحة", v: a.open_reviews, href: "/duplicates", hot: a.open_reviews > 0 },
-      { label: "متابعات فات ميعادها", v: a.followups_overdue, href: "/follow-ups", hot: a.followups_overdue > 0 },
-      { label: "اجتماعات النهارده", v: a.meetings_today, href: "/meetings", hint: `${num(a.meetings_upcoming)} جاية في المجمل` },
-      { label: "اجتماعات فات ميعادها من غير نتيجة", v: a.meetings_no_outcome, href: "/meetings", hot: a.meetings_no_outcome > 0 }] },
+      { label: "متابعات فات ميعادها", v: a.followups_overdue, href: "/follow-ups", hot: a.followups_overdue > 0 }] },
     { title: "المالية", tiles: [
       { label: "عقود مستنية المالية", v: a.contracts_waiting, href: "/?cs=submitted#contracts", hot: a.contracts_late > 0, hint: a.contracts_late ? `${num(a.contracts_late)} منهم أكتر من يومين` : undefined },
       { label: "دفعات مستنية تأكيد", v: a.payments_pending, href: "/contracts", hot: a.payments_pending > 0 },

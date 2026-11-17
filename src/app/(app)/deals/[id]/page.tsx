@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { dealContract, getDeal } from "@/server/data";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ActionForm, CheckGroup, Field, Hidden, SelectField, TextArea } from "@/components/forms";
-import { moveDealAction, saveBriefAction } from "@/server/actions";
+import { ActionForm, CheckGroup, Field, Hidden, TextArea } from "@/components/forms";
+import { saveBriefAction } from "@/server/actions";
+import { DealActions } from "@/components/deal-actions";
 import { fmtDateTime } from "@/lib/format";
-import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, DEAL_STAGE, DEAL_STAGES, FOLLOWUP_STATUS, SERVICES } from "@/lib/labels";
+import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, DEAL_STAGE, FOLLOWUP_STATUS, SERVICES } from "@/lib/labels";
 import { fmtSar } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -43,44 +44,34 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               <Field label="نسبة احتمال التعاقد %" name="win_probability" type="number" min="0" step="5" defaultValue={deal.win_probability ?? ""} />
               <Field label="القرار المتوقع" name="expected_decision" defaultValue={b.expected_decision ?? ""} />
               <div className="md:col-span-2"><CheckGroup label="الخدمات المطلوبة" name="services" defaultValues={b.required_services ?? []} options={Object.entries(SERVICES).map(([value, label]) => ({ value, label }))} /></div>
-              <div className="md:col-span-2"><TextArea label="ملاحظات الاجتماع" name="meeting_notes" defaultValue={b.meeting_notes ?? ""} /></div>
+              <div className="md:col-span-2"><TextArea label="ملاحظات" name="meeting_notes" defaultValue={b.meeting_notes ?? ""} /></div>
             </ActionForm>
           ) : (
             <dl className="space-y-3 text-sm">
-              {([["نوع النشاط", b.business_type], ["الأهداف", b.marketing_goals], ["المشاكل", b.current_problems], ["المنافسون", b.competitors], ["ملاحظات الاجتماع", b.meeting_notes]] as const).map(([k, v]) => (
+              {([["نوع النشاط", b.business_type], ["الأهداف", b.marketing_goals], ["المشاكل", b.current_problems], ["المنافسون", b.competitors], ["ملاحظات", b.meeting_notes]] as const).map(([k, v]) => (
                 <div key={k}><dt className="text-ink-500">{k}</dt><dd className="whitespace-pre-wrap">{v || "—"}</dd></div>))}
             </dl>)}
         </Card>
         <div className="space-y-6">
-          {(contract || canEdit) && (
-            <Card title="العقد">
-              {contract ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-2"><Link href={`/contracts/${contract.id}`} className="font-semibold text-burgundy-700 underline" dir="ltr">{contract.contract_no}</Link>
-                    <Badge tone={CONTRACT_STATUS_TONE[contract.status]}>{CONTRACT_STATUS[contract.status]}</Badge></div>
-                  <p className="text-ink-500">الإجمالي: <span className="tabular-nums">{fmtSar(contract.total_amount)}</span></p>
-                </div>
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <p className="text-ink-500">لما العميل يوافق: اكتب العقد، ارفع النسخة الموقّعة، وابعته للمالية.</p>
-                  <Link href={`/contracts/new?deal=${id}`} className="inline-flex rounded-md bg-burgundy-600 px-4 py-2 font-semibold text-white hover:bg-burgundy-700">إنشاء عقد</Link>
-                </div>)}
-            </Card>)}
           {canEdit && (
-            <Card title="تحديث المرحلة">
-              <ActionForm action={moveDealAction} submit="تحديث المرحلة" className="space-y-3">
-                <Hidden name="deal_id" value={id} />
-                <SelectField label="المرحلة الجديدة" name="to" required defaultValue={deal.stage}
-                  options={DEAL_STAGES.filter((x) => x !== "Financially Approved" && (x !== "Signed / Finance Pending" || deal.stage === x)).map((x) => ({ value: x, label: DEAL_STAGE[x] }))} />
-                <TextArea label="ملاحظة / سبب" name="reason" rows={2} hint="مطلوب عند «خسرناه»" />
-                <Field label="موعد المتابعة" name="followup_at" type="datetime-local" hint="مطلوب عند «مؤجل» و«متابعة»" />
-                <Field label="سبب المتابعة" name="followup_reason" />
-                <p className="text-xs text-ink-500">«تم الاتفاق / التوقيع» بتتم بإرسال العقد للمالية. الاعتماد المالي يتم من قسم المالية فقط.</p>
-              </ActionForm>
+            <Card title="الخطوة الجاية">
+              <div className="space-y-2 text-sm">
+                <DealActions deal={{ id, stage: deal.stage, client_name: deal.client_name }} />
+                <p className="text-xs text-ink-500">«بتابعه»: حدّد هتكلمه إمتى. «اعمل عقد»: لما يوافق. العقد بيتبعت للمالية ولما تعتمد العميل بيتقفل لوحده.</p>
+              </div>
+            </Card>)}
+          {deal.stage === "Lost" && deal.lost_reason && <Card title="سبب الخسارة"><p className="text-sm">{deal.lost_reason}</p></Card>}
+          {contract && (
+            <Card title="العقد">
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-2"><Link href={`/contracts/${contract.id}`} className="font-semibold text-burgundy-700 underline" dir="ltr">{contract.contract_no}</Link>
+                  <Badge tone={CONTRACT_STATUS_TONE[contract.status]}>{CONTRACT_STATUS[contract.status]}</Badge></div>
+                <p className="text-ink-500">الإجمالي: <span className="tabular-nums">{fmtSar(contract.total_amount)}</span></p>
+              </div>
             </Card>)}
           <Card title="سجل المراحل">
             <ol className="space-y-2 text-sm">{history.map((h: any) => (
-              <li key={h.id}><span className="font-medium">{h.from_stage && h.from_stage !== h.to_stage ? `${DEAL_STAGE[h.from_stage]} ← ` : ""}{DEAL_STAGE[h.to_stage]}</span>
+              <li key={h.id}><span className="font-medium">{h.from_stage && DEAL_STAGE[h.from_stage] !== DEAL_STAGE[h.to_stage] ? `${DEAL_STAGE[h.from_stage]} ← ` : ""}{DEAL_STAGE[h.to_stage]}</span>
                 <div className="text-xs text-ink-500">{h.by_name} · {fmtDateTime(h.at)}{h.reason ? ` · ${h.reason}` : ""}</div></li>))}</ol>
           </Card>
           {followUps.length > 0 && (

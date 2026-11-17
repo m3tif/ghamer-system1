@@ -192,3 +192,20 @@ describe("contracts — Sales writes it, uploads the signed file, sends it to Fi
     await expect(save("sales1", d, { ...base, total: 7000, installments: [{ due_date: "2027-03-01", amount: 1000 }] })).rejects.toThrow(/add up/);
   });
 });
+
+describe("simple pipeline — «بتابعه» can be re-scheduled, «خسرناه» closes the open follow-ups", () => {
+  it("a second follow-up on a deal already being followed replaces the open one; Lost cancels it", async () => {
+    const d = await newDeal("tele1", "sales1", "0571000077");
+    const open = () => admin.query("select status, reason from follow_ups where deal_id=$1 order by created_at", [d]).then((r) => r.rows);
+    await expect(run("sales1", "select app.move_deal_stage($1,'Follow-up',null,null,null)", [d])).rejects.toThrow(/follow-up date and reason/);
+    await run("sales1", "select app.move_deal_stage($1,'Follow-up',null,now() + interval '1 day','هيرد بكرة')", [d]);
+    expect(await stage(d)).toBe("Follow-up");
+    await run("sales1", "select app.move_deal_stage($1,'Follow-up',null,now() + interval '3 day','طلب نكلمه الأسبوع الجاي')", [d]);
+    expect((await open()).map((f: any) => f.status)).toEqual(["done", "open"]);
+    expect((await admin.query("select count(*)::int n from deal_stage_history where deal_id=$1 and to_stage='Follow-up'", [d])).rows[0].n).toBe(2);
+    await expect(run("sales2", "select app.move_deal_stage($1,'Follow-up',null,now() + interval '1 day','x')", [d])).rejects.toThrow(/no access/);
+    await run("sales1", "select app.move_deal_stage($1,'Lost','السعر عالي',null,null)", [d]);
+    expect((await open()).map((f: any) => f.status)).toEqual(["done", "cancelled"]);
+    expect((await admin.query("select lost_reason from deals where id=$1", [d])).rows[0].lost_reason).toBe("السعر عالي");
+  });
+});

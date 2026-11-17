@@ -91,7 +91,7 @@ export function HideLead({ leadId, name, hidden, className = "" }: { leadId: str
     <Dialog trigger={hidden ? "إظهار" : "إخفاء"} title={`${hidden ? "إظهار" : "إخفاء"}: ${name}`} triggerClass={className} tone={hidden ? "quiet" : "danger"}>
       <ActionForm action={hideLeadAction} submit={hidden ? "إظهار العميل للموظفين" : "إخفاء العميل عن الموظفين"} className="grid gap-4">
         <Hidden name="lead_id" value={leadId} /><ReturnTo /><Hidden name="hide" value={hidden ? "0" : "1"} />
-        <p className="text-sm text-ink-500">{hidden ? "سيظهر العميل من جديد عند الموظف." : "لن يظهر العميل ولا صفقته واجتماعاته عند الموظفين. لا يُحذف شيء، وتقدر تُظهره في أي وقت، وتبقى المدير والإدارة تشوفه."}</p>
+        <p className="text-sm text-ink-500">{hidden ? "سيظهر العميل من جديد عند الموظف." : "لن يظهر العميل ولا صفقته عند الموظفين. لا يُحذف شيء، وتقدر تُظهره في أي وقت، وتبقى المدير والإدارة تشوفه."}</p>
         {!hidden && <TextArea label="السبب (اختياري)" name="reason" rows={2} />}
       </ActionForm>
     </Dialog>
@@ -115,7 +115,7 @@ export function DeleteLead({ clientId, name, className = "" }: { clientId: strin
     <Dialog trigger="حذف" title={`حذف نهائي: ${name}`} triggerClass={className} tone="danger">
       <ActionForm action={deleteLeadAction} submit="حذف العميل نهائيًا" className="grid gap-4">
         <Hidden name="client_id" value={clientId} /><ReturnTo />
-        <p className="text-sm text-bad">سيُحذف العميل وكل ما يخصه (النشاطات، المتابعات، الاجتماعات، الصفقة، التحويلات) ولا يمكن التراجع. الرقم يتحرر ويمكن تسجيله من جديد. العملية تُسجَّل في سجل التدقيق.</p>
+        <p className="text-sm text-bad">سيُحذف العميل وكل ما يخصه (النشاطات، المتابعات، الصفقة، التحويلات) ولا يمكن التراجع. الرقم يتحرر ويمكن تسجيله من جديد. العملية تُسجَّل في سجل التدقيق.</p>
         <TextArea label="السبب" name="reason" rows={2} required />
         <Field label="اكتب كلمة «حذف» للتأكيد" name="confirm" required />
       </ActionForm>

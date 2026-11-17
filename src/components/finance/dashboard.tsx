@@ -73,7 +73,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
   const tab = (key: string, label: string) => (
     <Link key={key} href={key === "month" ? "/" : `/?p=${key}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${per.key === key ? "bg-[#b8955a] text-[#1b2a41]" : "text-white/80 hover:bg-white/10"}`}>{label}</Link>);
   const funnel = [
-    { label: "عملاء دخلوا", v: n(k.added) }, { label: "اتحوّلوا للسيلز", v: n(k.handed) }, { label: "وصلوا لاجتماع", v: n(k.meeting_leads) },
+    { label: "عملاء دخلوا", v: n(k.added) }, { label: "اتحوّلوا للسيلز", v: n(k.handed) }, { label: "السيلز قبلهم", v: n(k.accepted) },
     { label: "عقود اتسجلت", v: n(k.contracts_new) }, { label: "عقود اتعتمدت", v: n(k.contracts_approved) }];
   const tele = (d.employees as any[]).filter((e) => e.role_code.startsWith("tele")), sales = (d.employees as any[]).filter((e) => e.role_code.startsWith("sales"));
 
@@ -210,7 +210,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
                 </li>))}
             </ol>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 text-sm">
-              <div>عملاء وصلوا لاجتماع<br /><Delta cur={n(k.meeting_leads)} prev={n(k.meeting_leads_prev)} label={prevLabel} /></div>
+              <div>اتحوّلوا للسيلز<br /><Delta cur={n(k.handed)} prev={n(k.handed_prev)} label={prevLabel} /></div>
               <div>عقود اتسجلت<br /><Delta cur={n(k.contracts_new)} prev={n(k.contracts_new_prev)} label={prevLabel} /></div>
               <div>عقود اتعتمدت<br /><Delta cur={n(k.contracts_approved)} prev={n(k.contracts_approved_prev)} label={prevLabel} /></div>
               <div>قيمة المعتمد {fmtSar(k.approved_value)}<br /><Delta cur={n(k.approved_value)} prev={n(k.approved_value_prev)} label={prevLabel} /></div>
@@ -224,11 +224,11 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
   </>);
   const employeesBlock = (<>
       {/* 4. employees */}
-      <Section title="أداء الموظفين" sub="في الفترة المختارة. «ضافهم» = العملاء اللي سجّلهم بنفسه، «استلمهم» = اتوزعوا عليه من غيره — العميل الواحد مابيتعدّش مرتين. الاجتماعات = المنعقدة فعلًا. العقود = اللي هو سيلزها أو التيلي اللي جابها."
+      <Section title="أداء الموظفين" sub="في الفترة المختارة. «ضافهم» = العملاء اللي سجّلهم بنفسه، «استلمهم» = اتوزعوا عليه من غيره — العميل الواحد مابيتعدّش مرتين. العقود = اللي هو سيلزها أو التيلي اللي جابها."
         right={<a href={exportHref("employees")} className="rounded-lg border border-[#b8955a]/60 bg-white px-3 py-1.5 text-sm font-semibold text-[#8a6a35] hover:bg-[#f6efe2]">⬇ تصدير Excel (CSV)</a>}>
         <div className="grid gap-4 xl:grid-cols-2">
           {[["التيلي سيلز", tele], ["السيلز", sales]].map(([title, list]) => (
-            <Panel key={title as string} title={`ترتيب ${title}`} right={<span className="text-[11px] text-ink-500">الترتيب بالنقاط: إضافة 1 · استلام 1 · تحويل 3 · اجتماع 5 · عقد 10</span>}>
+            <Panel key={title as string} title={`ترتيب ${title}`} right={<span className="text-[11px] text-ink-500">الترتيب بالنقاط: إضافة 1 · استلام 1 · تحويل 3 · عقد 10</span>}>
               {(list as any[]).length === 0 ? <p className="text-sm text-ink-500">مفيش موظفين.</p> : (
                 <ol className="space-y-2">{(list as any[]).map((e, i) => (
                   <li key={e.id}>
@@ -239,13 +239,12 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
                         <span className="hidden gap-3 text-center text-xs sm:flex">
                           <span><b className="block text-base tabular-nums text-[#1b2a41]">{e.added + e.received}</b>عملاء</span>
                           <span><b className="block text-base tabular-nums text-[#1b2a41]">{e.handed}</b>تحويل</span>
-                          <span><b className="block text-base tabular-nums text-[#1b2a41]">{e.meetings}</b>اجتماع</span>
                           <span><b className="block text-base tabular-nums text-burgundy-700">{e.contracts}</b>عقد</span>
                         </span>
                         <span aria-hidden className="text-ink-300 transition group-open:rotate-180">⌄</span>
                       </summary>
                       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-line/70 px-4 py-3 text-sm sm:grid-cols-3">
-                        {[["ضافهم بنفسه", e.added], ["استلمهم من التوزيع", e.received], ["حوّلهم للسيلز", e.handed], ["اجتماعات منعقدة", e.meetings], ["عقود اتسجلت", e.contracts], ["عقود اتعتمدت", e.contracts_approved]].map(([l, v]) => (
+                        {[["ضافهم بنفسه", e.added], ["استلمهم من التوزيع", e.received], ["حوّلهم للسيلز", e.handed], ["عقود اتسجلت", e.contracts], ["عقود اتعتمدت", e.contracts_approved]].map(([l, v]) => (
                           <div key={l as string} className="flex justify-between gap-2"><dt className="text-ink-500">{l}</dt><dd className="font-bold tabular-nums">{num(v)}</dd></div>))}
                         <div className="col-span-full pt-1"><Link href={link({ emp: e.id, cs: undefined, pg: undefined }, "#contracts")} className="text-xs font-semibold text-burgundy-700 underline">عقود {e.full_name}</Link></div>
                       </dl>
@@ -267,8 +266,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
             <div className="grid gap-6 md:grid-cols-2">
               <HBars rows={[{ label: `عملاء جدد — ${periodTitle}`, value: n(k.added) }, { label: `عملاء جدد — ${prevLabel}`, value: n(k.added_prev), tone: "gold" },
                 { label: `اتحوّلوا للسيلز — ${periodTitle}`, value: n(k.handed) }, { label: `اتحوّلوا للسيلز — ${prevLabel}`, value: n(k.handed_prev), tone: "gold" }]} />
-              <HBars rows={[{ label: `وصلوا لاجتماع — ${periodTitle}`, value: n(k.meeting_leads) }, { label: `وصلوا لاجتماع — ${prevLabel}`, value: n(k.meeting_leads_prev), tone: "gold" },
-                { label: `عقود — ${periodTitle}`, value: n(k.contracts_new), tone: "wine", href: link({ cf: per.from, ct: per.to, cs: undefined, pg: undefined }, "#contracts") }, { label: `عقود — ${prevLabel}`, value: n(k.contracts_new_prev), tone: "gold" }]} />
+              <HBars rows={[{ label: `عقود — ${periodTitle}`, value: n(k.contracts_new), tone: "wine", href: link({ cf: per.from, ct: per.to, cs: undefined, pg: undefined }, "#contracts") }, { label: `عقود — ${prevLabel}`, value: n(k.contracts_new_prev), tone: "gold" }]} />
             </div>
           </Panel>
         </div>

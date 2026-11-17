@@ -42,10 +42,10 @@ export default async function Archive({ searchParams }: { searchParams: Promise<
       </form>
       {months.length > 0 && (
         <div className="mb-6"><Card title="ملخص الأشهر">
-          <Table head={["الشهر", "عملاء أضيفوا", "حُوّلوا إلى Sales", "استُلموا", "اجتماعات منعقدة", "إنجازات", ""]}>
+          <Table head={["الشهر", "عملاء أضيفوا", "حُوّلوا إلى Sales", "استُلموا", "إنجازات", ""]}>
             {months.map((m: any) => (
               <tr key={String(m.month)}><td className={td + " font-medium"}>{label(m.month)}</td><td className={td}>{m.leads}</td><td className={td}>{m.handed_off}</td>
-                <td className={td}>{m.received}</td><td className={td}>{m.meetings_completed}</td><td className={td}>{m.achievements > 0 ? <Badge tone="brand">★ {m.achievements}</Badge> : "—"}</td>
+                <td className={td}>{m.received}</td><td className={td}>{m.achievements > 0 ? <Badge tone="brand">★ {m.achievements}</Badge> : "—"}</td>
                 <td className={td}><Link className="text-sm text-burgundy-600 underline" href={q({ month: ym(m.month), page: undefined })}>عرض العملاء</Link></td></tr>))}
           </Table></Card></div>)}
       {rows.length === 0 ? <Empty title={sp.q ? `لا توجد نتائج لـ «${sp.q}»` : "لا توجد سجلات"} hint="غيّر كلمة البحث أو الشهر أو الموظف أو الحالة." /> : (

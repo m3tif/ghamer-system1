@@ -53,10 +53,10 @@ export const DEAL_STAGES = [
   "Negotiation", "Follow-up", "Postponed", "Contract Pending", "Signed / Finance Pending", "Financially Approved", "Lost",
 ] as const;
 export const DEAL_STAGE: Record<string, string> = {
-  "New Lead": "عميل جديد", "Contacted": "تم التواصل", "Qualified": "مؤهل", "Meeting Scheduled": "اجتماع محجوز",
-  "Meeting Completed": "تم الاجتماع", "Proposal Preparation": "تجهيز العرض", "Proposal Sent": "تم إرسال العرض",
-  "Negotiation": "تفاوض", "Follow-up": "متابعة", "Postponed": "مؤجل", "Contract Pending": "العقد قيد التوقيع",
-  "Signed / Finance Pending": "تم الاتفاق / التوقيع", "Financially Approved": "معتمد ماليًا", "Lost": "خسرناه",
+  "New Lead": "جديد", "Contacted": "جديد", "Qualified": "جديد", "Meeting Scheduled": "بتابعه",
+  "Meeting Completed": "بتابعه", "Proposal Preparation": "بتابعه", "Proposal Sent": "بتابعه",
+  "Negotiation": "بتابعه", "Follow-up": "بتابعه", "Postponed": "بتابعه", "Contract Pending": "العقد",
+  "Signed / Finance Pending": "العقد عند المالية", "Financially Approved": "اتقفل ✓", "Lost": "خسرناه",
 };
 export const SOURCES: Record<string, string> = {
   cold_call: "اتصال مباشر", meta_ads: "إعلانات ميتا", website: "نموذج الموقع", referral: "ترشيح من عميل",
@@ -93,3 +93,12 @@ export const TASK_PRIORITY: Record<string, string> = { low: "منخفضة", norm
 export const TECH_ROLE: Record<string, string> = { seo_specialist: "SEO", ui_designer: "UI", developer: "مبرمج", designer: "ديزاينر", branding_designer: "براندينج ديزاينر", content_creator: "كونتنت كريتور", media_buyer: "ميديا باير", social_media_manager: "سوشيال ميديا مانجر" };
 export const PAYMENT_STATUS: Record<string, string> = { pending: "مستنية تأكيد", verified: "اتأكدت ✓", rejected: "اترفضت" };
 export const PAYMENT_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { pending: "warn", verified: "ok", rejected: "bad" };
+
+// ───────── the simple sales pipeline: 4 columns (the old detailed stages fall into them) ─────────
+export const PIPE: { key: "new" | "follow" | "contract" | "won"; label: string; hint: string; stages: string[]; bar: string }[] = [
+  { key: "new", label: "جديد", hint: "عملاء قبلتهم من التيلي ولسه ماكلمتهمش", stages: ["New Lead", "Contacted", "Qualified"], bar: "bg-burgundy-200" },
+  { key: "follow", label: "بتابعه", hint: "بتكلمه أو بتتفاوض معاه — بميعاد متابعة", stages: ["Meeting Scheduled", "Meeting Completed", "Proposal Preparation", "Proposal Sent", "Negotiation", "Follow-up", "Postponed"], bar: "bg-warn" },
+  { key: "contract", label: "العقد", hint: "العقد اتعمل أو عند المالية", stages: ["Contract Pending", "Signed / Finance Pending"], bar: "bg-burgundy-600" },
+  { key: "won", label: "اتقفل ✓", hint: "المالية اعتمدت", stages: ["Financially Approved"], bar: "bg-ok" },
+];
+export const pipeOf = (stage: string) => PIPE.find((p) => p.stages.includes(stage))?.key ?? (stage === "Lost" ? "lost" : "new");

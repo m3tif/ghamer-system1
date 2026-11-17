@@ -41,7 +41,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
             <td className={td}>{e.is_active ? <Badge tone="ok">نشط</Badge> : <Badge tone="bad">موقوف</Badge>}</td>
             {manage && (() => { const l = links.get(e.id); return (
               <td className={td + " text-xs leading-6"}>
-                {l ? <>أضاف {l.leads_created} · مسؤول عن {l.leads_owned + l.leads_sales}<br />متابعات {l.open_followups} · اجتماعات {l.upcoming_meetings} · صفقات {l.open_deals}{l.pending_handoffs > 0 && <><br />قرارات معلّقة {l.pending_handoffs}</>}</> : "—"}
+                {l ? <>أضاف {l.leads_created} · مسؤول عن {l.leads_owned + l.leads_sales}<br />متابعات {l.open_followups} · صفقات {l.open_deals}{l.pending_handoffs > 0 && <><br />قرارات معلّقة {l.pending_handoffs}</>}</> : "—"}
               </td>); })()}
             {manage && (
               <td className={td}>
@@ -57,7 +57,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
                         <Hidden name="id" value={e.id} />
                         <SelectField label="إلى الموظف" name="to" required empty="اختر" options={all.filter((x: any) => x.is_active && x.id !== e.id && family(x.role_code) === family(e.role_code)).map((x: any) => ({ value: x.id, label: x.full_name }))} />
                         <TextArea label="السبب" name="reason" required rows={2} />
-                        <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="confirm" value="1" /> أؤكد نقل العملاء والمتابعات والاجتماعات المفتوحة (التاريخ يبقى باسم الموظف الأصلي)</label>
+                        <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="confirm" value="1" /> أؤكد نقل العملاء والمتابعات المفتوحة (التاريخ يبقى باسم الموظف الأصلي)</label>
                       </ActionForm></details>)}
                   <details><summary className="cursor-pointer text-xs text-burgundy-600">الفريق</summary>
                     <ActionForm action={setManagerAction} submit="حفظ" tone="quiet" className="mt-2 w-56 space-y-2">

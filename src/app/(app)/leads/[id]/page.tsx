@@ -4,16 +4,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { DeleteLead, HideLead } from "@/components/leads-cells";
-import { assignable, employeeList, getLead, salesReps } from "@/server/data";
-import { meetingFlags } from "@/server/meeting-rules";
+import { assignable, getLead, salesReps } from "@/server/data";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
 import { Dialog } from "@/components/dialog";
-import { BookMeetingForm } from "@/components/book-meeting-form";
-import { MeetingActions } from "@/components/meeting-actions";
+import { DealActions } from "@/components/deal-actions";
 import { acceptHandoffAction, correctAttributionAction, handoffAction, logCallAction, rejectHandoffAction, setTemperatureAction, transferLeadAction, updateClientAction, updateContactsAction } from "@/server/actions";
-import { fmtDateTime, getTimezone, toLocalInput, tzLabel } from "@/lib/format";
-import { CALL_STATUSES, FOLLOWUP_STATUS, HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TONE, MEETING_STATUS, MEETING_TYPE, OUTCOME, REJECT_REASON, SOURCES, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
+import { fmtDateTime, getTimezone, tzLabel } from "@/lib/format";
+import { CALL_STATUSES, DEAL_STAGE, FOLLOWUP_STATUS, HANDOFF_STATUS, HANDOFF_TONE, LEAD_STATUS, LEAD_STATUS_TONE, REJECT_REASON, SOURCES, TEMPERATURE, TEMPERATURE_TONE } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -23,19 +21,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const data = await getLead(s.userId, id);
   if (!data) notFound();
-  const { lead, contacts, stores, activities, assignments, meetings, followUps, deal, handoff } = data;
+  const { lead, contacts, stores, activities, assignments, followUps, deal, handoff } = data;
   const canEdit = can(s, "leads.edit");
-  const reps = can(s, "meetings.manage") || can(s, "leads.handoff") ? await salesReps(s.userId) : [];
-  const emps = can(s, "employees.view") ? await employeeList(s.userId) : [];
-  const managed = new Set<string>(emps.map((e: any) => e.id));
+  const reps = can(s, "leads.handoff") ? await salesReps(s.userId) : [];
   const targets = can(s, "leads.transfer") ? await assignable(s.userId) : [];
   const tz = tzLabel(getTimezone());
   const phones = contacts.filter((c: any) => c.phone);
   const get = (label: string) => phones.find((c: any) => c.label === label)?.phone ?? "";
-  const activeMeeting = meetings.find((m: any) => ["Scheduled", "Confirmed", "Rescheduled"].includes(m.status));
-  // Sales may arrange a meeting only for a lead he accepted (or one he added himself)
-  const accepted = handoff?.status === "accepted" || (!handoff && lead.original_creator_id === lead.assigned_sales_id);
-  const salesActor = can(s, "meetings.create") && lead.assigned_sales_id && (lead.assigned_sales_id === s.userId || s.role === "super_admin" || (s.role === "sales_manager" && managed.has(lead.assigned_sales_id)));
   const pendingForMe = handoff?.status === "pending_review" && handoff.to_employee_id === s.userId;
   const canSend = can(s, "leads.handoff") && !lead.handed_off_at && !["Not Interested", "Invalid Contact", "Pending Sales Review", "Accepted by Sales", "Meeting Scheduled", "Meeting Completed"].includes(lead.lead_status) && !handoff?.status?.startsWith("pending");
   const needsStatus = !["Interested", "Qualified Lead", "Rejected by Sales"].includes(lead.lead_status);
@@ -170,30 +162,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               </Dialog>)}
           </Card>
 
-          <Card title="الاجتماعات" right={salesActor && accepted && !activeMeeting ? (
-            <Dialog trigger="حجز اجتماع" title={`حجز اجتماع — ${lead.name}`} tone="primary" wide>
-              <BookMeetingForm leadId={id} clientName={lead.name} tz={tz} min={toLocalInput(new Date())} />
-            </Dialog>) : undefined}>
-            {meetings.length === 0 ? (
-              <p className="text-sm text-ink-500">
-                {!accepted && lead.assigned_sales_id ? "لا يُحجز اجتماع قبل أن يقبل السيلز العميل." : salesActor ? "لا توجد اجتماعات. اضغط «حجز اجتماع»." : "لا توجد اجتماعات."}
-              </p>) : (
-              <ul className="space-y-3">
-                {meetings.map((m: any) => (
-                  <li key={m.id} className="rounded-md border border-line p-3 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{m.title}</span>
-                      <Badge tone={m.status === "Completed" ? "ok" : m.status === "Cancelled" || m.status === "No Show" ? "bad" : "brand"}>{MEETING_STATUS[m.status]}</Badge>
-                    </div>
-                    <div className="mt-1 text-ink-500">{fmtDateTime(m.scheduled_at)} · {MEETING_TYPE[m.meeting_type]} · مع {m.rep_name}</div>
-                    {m.outcome && <div className="mt-1">النتيجة: {OUTCOME[m.outcome]}</div>}
-                    <div className="mt-2">
-                      <MeetingActions m={{ id: m.id, title: m.title, meeting_type: m.meeting_type, scheduled_local: toLocalInput(m.scheduled_at), meeting_url: m.meeting_url, booking_notes: m.booking_notes, client_name: lead.name }}
-                        flags={meetingFlags(m, s, managed)} reps={reps} tz={tz} />
-                    </div>
-                  </li>))}
-              </ul>)}
-          </Card>
+          {deal && can(s, "deals.view") && (
+            <Card title="خط المبيعات" right={<Badge tone={deal.stage === "Lost" ? "bad" : deal.stage === "Financially Approved" ? "ok" : "brand"}>{DEAL_STAGE[deal.stage]}</Badge>}>
+              {can(s, "deals.edit") ? <DealActions deal={{ id: deal.id, stage: deal.stage, client_name: lead.name }} /> : <Link href={`/deals/${deal.id}`} className="text-sm text-burgundy-600 underline">فتح الصفقة</Link>}
+            </Card>)}
 
           <Card title="المتابعات">
             {followUps.length === 0 ? <p className="text-sm text-ink-500">لا توجد متابعات.</p> : (

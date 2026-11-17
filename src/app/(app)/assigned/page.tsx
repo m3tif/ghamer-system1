@@ -17,7 +17,7 @@ const TABS = [["pending", "بانتظار قرارك"], ["accepted", "المقب
 
 export default async function Assigned({ searchParams }: { searchParams: Promise<{ tab?: string; ok?: string; error?: string; q?: string }> }) {
   const s = await requireSession();
-  if (!can(s, "deals.view") && !can(s, "meetings.create")) notFound();
+  if (!can(s, "deals.view")) notFound();
   const sp = await searchParams;
   const tab = (TABS.find((t) => t[0] === sp.tab)?.[0] ?? "pending") as "pending" | "accepted" | "rejected";
   const [pending, rows] = await Promise.all([assignedLeads(s.userId, "pending"), tab === "pending" ? null : assignedLeads(s.userId, tab)]);
@@ -25,7 +25,7 @@ export default async function Assigned({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader title="العملاء المسندين إليّ" sub="العميل لا يُعتبر مقبولًا بمجرد إرساله إليك. القرار لك: قبول أو رفض." />
-      {sp.ok === "accepted" && <p role="status" className="mb-4 rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">تم قبول العميل وأصبح ضمن عملائك. يمكنك الآن حجز اجتماع له.</p>}
+      {sp.ok === "accepted" && <p role="status" className="mb-4 rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">تم قبول العميل وأصبح ضمن عملائك. تلاقيه في «خط المبيعات» تحت «جديد».</p>}
       {sp.ok === "rejected" && <p role="status" className="mb-4 rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">تم رفض العميل وإعادته لمن أرسله مع السبب.</p>}
       {sp.error && <p role="alert" className="mb-4 rounded-md border border-bad/30 bg-bad/5 px-3 py-2 text-sm text-bad">{sp.error}</p>}
       <div className="mb-5 flex flex-wrap gap-2" role="tablist">

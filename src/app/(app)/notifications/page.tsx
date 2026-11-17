@@ -14,7 +14,7 @@ export default async function Notifications() {
   return (
     <>
       <PageHeader title="الإشعارات" actions={rows.some((r: any) => !r.read_at) ? <form action={markNotificationsReadAction}><button className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">تحديد الكل كمقروء</button></form> : null} />
-      {rows.length === 0 ? <Empty title="لا توجد إشعارات" hint="ستصلك هنا تنبيهات الاجتماعات والمتابعات والتكرار." /> : (
+      {rows.length === 0 ? <Empty title="لا توجد إشعارات" hint="ستصلك هنا تنبيهات المتابعات والتكرار والعقود." /> : (
         <ul className="divide-y divide-line rounded-lg border border-line bg-white">
           {rows.map((n: any) => (
             <li key={n.id} className={`flex items-start gap-3 px-4 py-3 ${n.read_at ? "" : "bg-burgundy-50"}`}>

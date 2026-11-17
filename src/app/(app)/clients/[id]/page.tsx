@@ -71,12 +71,13 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
                   <span className="flex items-center gap-2">{t.delivery_link && <a href={t.delivery_link} target="_blank" rel="noopener noreferrer" className="text-xs underline">التسليم</a>}<Badge tone={TASK_STATUS_TONE[t.status]}>{TASK_STATUS[t.status]}</Badge></span>
                 </li>))}</ul>)}
           </Card>
-          <Card title="الاجتماعات">
-            {d.meetings.length === 0 ? <p className="text-sm text-ink-500">مفيش اجتماعات.</p> : (
+          {d.meetings.length > 0 && (
+          <Card title="اجتماعات قديمة">
+            {(
               <ul className="divide-y divide-line text-sm">{(d.meetings as any[]).map((m, i) => (
                 <li key={i} className="py-2"><div className="flex justify-between gap-2"><span>{fmtDateTime(m.at)}</span><span className="font-medium">{MEETING_STATUS[m.status] ?? m.status}</span></div>
                   <div className="text-xs text-ink-500">التيلي: {m.tele ?? "—"} · السيلز: {m.sales ?? "—"}</div>{m.notes && <p className="mt-1 whitespace-pre-wrap">{m.notes}</p>}</li>))}</ul>)}
-          </Card>
+          </Card>)}
           <Card title="كل اللي حصل مع العميل (الأحدث فوق)">
             <ol className="space-y-3 text-sm">{(d.timeline as any[]).map((e, i) => { const [t, note] = EVENT(e); return (
               <li key={i} className="border-s-2 border-burgundy-600/30 ps-3"><p className="font-medium">{t}</p>{note && <p className="whitespace-pre-wrap text-ink-500">{note}</p>}

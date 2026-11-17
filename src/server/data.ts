@@ -119,7 +119,7 @@ export async function filterByClientSearch<T extends { client_id?: string; lead_
 export async function listDeals(uid: string) {
   const r = await tx(uid, (c) => c.query(
     `select d.id, d.client_id, d.stage, d.win_probability, d.expected_value, d.updated_at, d.created_at, d.lead_id, c.name client_name, c.business_name,
-            app.emp_name(d.owner_sales_id) owner_name, d.owner_sales_id, l.lead_temperature,
+            app.emp_name(d.owner_sales_id) owner_name, d.owner_sales_id, l.lead_temperature, d.lost_reason,
             (select cc.phone from client_contacts cc where cc.client_id = c.id and cc.phone is not null order by cc.is_primary desc, cc.created_at limit 1) phone,
             (select min(f.due_at) from follow_ups f where f.deal_id = d.id and f.status = 'open') followup_at,
             (select count(*) from follow_ups f where f.deal_id = d.id and f.status = 'open' and f.due_at < now())::int overdue

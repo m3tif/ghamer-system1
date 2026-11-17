@@ -18,8 +18,8 @@ export async function GET(req: Request) {
   try {
     if (g("kind") === "employees") {
       const d = await financeDashboard(s.userId, from, to);
-      lines = [["الموظف", "الدور", "ضافهم بنفسه", "استلمهم من التوزيع", "حوّلهم للسيلز", "اجتماعات منعقدة", "عقود اتسجلت", "عقود اتعتمدت"].join(","),
-        ...(d.employees as any[]).map((e) => [e.full_name, e.role_name, e.added, e.received, e.handed, e.meetings, e.contracts, e.contracts_approved].map(cell).join(","))];
+      lines = [["الموظف", "الدور", "ضافهم بنفسه", "استلمهم من التوزيع", "حوّلهم للسيلز", "عقود اتسجلت", "عقود اتعتمدت"].join(","),
+        ...(d.employees as any[]).map((e) => [e.full_name, e.role_name, e.added, e.received, e.handed, e.contracts, e.contracts_approved].map(cell).join(","))];
     } else {
       const rows = await financeContracts(s.userId, { q: g("q").slice(0, 80), status: g("cs") in CONTRACT_STATUS ? g("cs") : "", emp: UUID.test(g("emp")) ? g("emp") : "",
         from: D.test(g("cf")) ? g("cf") : "", to: D.test(g("ct")) ? g("ct") : "", limit: 5000, offset: 0 });

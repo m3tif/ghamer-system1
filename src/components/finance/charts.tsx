@@ -4,10 +4,10 @@ const NAVY = "#1b2a41", GOLD = "#b8955a", WINE = "#8b1e34";
 const fmtDay = (d: string) => { const [, m, day] = d.split("-"); return `${Number(day)}/${Number(m)}`; };
 
 /** Day-by-day chart: bars = clients added, gold line = sent to Sales, wine dots = contracts. Hover shows the day's numbers; a day with contracts opens them. */
-export function DailyChart({ rows, contractsHref }: { rows: { d: string; added: number; handed: number; meetings: number; contracts: number }[]; contractsHref: (day: string) => string }) {
+export function DailyChart({ rows, contractsHref }: { rows: { d: string; added: number; handed: number; meetings?: number; contracts: number }[]; contractsHref: (day: string) => string }) {
   if (rows.length === 0) return null;
   const W = 760, H = 230, L = 34, B = 26, T = 12, w = (W - L - 8) / rows.length;
-  const max = Math.max(1, ...rows.map((r) => Math.max(r.added, r.handed, r.meetings, r.contracts)));
+  const max = Math.max(1, ...rows.map((r) => Math.max(r.added, r.handed, r.contracts)));
   const y = (v: number) => T + (H - T - B) * (1 - v / max);
   const step = Math.max(1, Math.ceil(rows.length / 12));
   const line = rows.map((r, i) => `${L + i * w + w / 2},${y(r.handed)}`).join(" ");
@@ -19,7 +19,7 @@ export function DailyChart({ rows, contractsHref }: { rows: { d: string; added: 
         {rows.map((r, i) => {
           const x = L + i * w, bw = Math.max(2, w * 0.62);
           const bar = (<g>
-            <title>{`${r.d}\nعملاء جدد: ${r.added}\nاتحوّلوا للسيلز: ${r.handed}\nعملاء وصلوا لاجتماع: ${r.meetings}\nعقود: ${r.contracts}`}</title>
+            <title>{`${r.d}\nعملاء جدد: ${r.added}\nاتحوّلوا للسيلز: ${r.handed}\nعقود: ${r.contracts}`}</title>
             <rect x={x} y={T} width={w} height={H - T - B} fill="transparent" />
             <rect x={x + (w - bw) / 2} y={y(r.added)} width={bw} height={Math.max(0, H - B - y(r.added))} rx={Math.min(3, bw / 3)} fill={NAVY} opacity={0.85} />
             {r.contracts > 0 && <circle cx={x + w / 2} cy={y(r.contracts)} r={4.5} fill={WINE} stroke="#fff" strokeWidth="1.5" />}
