@@ -378,3 +378,14 @@ export async function adminAttention(uid: string) {
 export async function broadcastRecipients(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.broadcast_recipients()"))).rows as { id: string; full_name: string; role_name: string }[];
 }
+
+// ───────── daily reports (technical team) ─────────
+export async function dailyReports(uid: string, from: string | null, to: string | null, emp: string | null) {
+  return (await tx(uid, (c) => c.query("select id, employee_id, full_name, role_name, report_date::text report_date, body, links, created_at, updated_at from app.daily_report_list($1,$2,$3)", [from, to, emp]))).rows;
+}
+export async function dailyReportTeam(uid: string, day: string | null) {
+  return (await tx(uid, (c) => c.query("select * from app.daily_report_team($1)", [day]))).rows;
+}
+export async function dailyReportMyTasks(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.daily_report_my_tasks()"))).rows;
+}

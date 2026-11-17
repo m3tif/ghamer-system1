@@ -852,8 +852,10 @@ export async function addTaskTimeAction(_: FormState, fd: FormData): Promise<For
   if (!why) return "اكتب سبب إضافة الوقت يدوي";
   return [m, why]; }); }
 export async function submitTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_submit($1,$2,$3)", "تم تسليم التاسك للمراجعة", (fd) => {
-  const link = s(fd, "link");
-  if (link && !/^https?:\/\/\S+$/i.test(link)) return "الرابط لازم يبدأ بـ https://";
+  // any link is fine (Drive, Figma, Canva, the client's site…); "www.x.com" without https:// gets it added
+  let link = s(fd, "link").replace(/\s+/g, "");
+  if (link && !/^[a-z][a-z0-9+.-]*:\/\//i.test(link)) link = "https://" + link;
+  if (link && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(link) && !/^https?:\/\/localhost/i.test(link)) return "اكتب الرابط كامل، مثال: figma.com/file/... أو drive.google.com/...";
   return [link, s(fd, "note") || null]; }); }
 export async function approveTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,true,$2)", "تم اعتماد التاسك", (fd) => [s(fd, "note") || null]); }
 export async function rejectTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,false,$2)", "تم إرجاع التاسك للموظف للتعديل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل المطلوب"; }); }
@@ -993,4 +995,14 @@ export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<F
   catch (e) { return fail(e, fd); }
   revalidatePath("/messages");
   return { ok: `تم إرسال الرسالة إلى ${n} موظف. هتظهرلهم أول ما يفتحوا السيستم.` };
+}
+
+export async function saveDailyReportAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const body = s(fd, "body"), links = s(fd, "links");
+  if (!body) return { values: vals(fd), error: "اكتب اللي عملته النهارده" };
+  try { await tx(sess.userId, (c) => c.query("select app.daily_report_save($1,$2)", [body, links || null])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/reports");
+  return { ok: "تم حفظ تقرير النهارده" };
 }
