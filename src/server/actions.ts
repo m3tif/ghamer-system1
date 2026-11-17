@@ -106,8 +106,9 @@ export async function createLeadAction(_: FormState, fd: FormData): Promise<Form
     return { values: vals(fd), dup: { existing_name: res.existing_name, existing_status: res.existing_status, existing_added_at: res.existing_added_at, owner_name: res.owner_name, existing_client_id: res.existing_client_id, matched_kinds: res.matched_kinds, ambiguous: res.ambiguous,
       attempted: { name: s(fd, "name"), business_name: s(fd, "business_name"), phone: s(fd, "phone"), store: s(fd, "store_url") } } };
   }
+  if (res.status === "ops_exists") return { values: vals(fd), error: `العميل ده${res.existing_name ? ` «${res.existing_name}»` : ""} موجود بالفعل عند التيم التقني (في «العملاء المعتمدين»).` };
   revalidatePath("/leads");
-  if (legacy) redirect("/operations?added=1");
+  if (legacy) redirect(res.matched ? `/operations?added=1&owner=${encodeURIComponent(res.owner_name ?? "")}` : "/operations?added=1");
   if (s(fd, "intent") === "open") redirect(`/leads/${res.lead_id}`);
   const count: number = res.month_count ?? 0, goal: number | null = res.goal == null ? null : Number(res.goal), ach: string[] = res.new_achievements ?? [];
   const e = encourage(count, goal, ach);

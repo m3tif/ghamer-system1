@@ -85,8 +85,8 @@ describe("Phase 3 — approved clients go to the Technical Manager, who hands th
     // a client with a contract cannot get packages this way
     const op = (await run("techmgr", "select id from app.ops_list(null) where not is_existing")).rows[0].id;
     await expect(run("techmgr", "select app.ops_set_packages($1,$2,null,null)", [op, ["seo"]])).rejects.toThrow(/come from the contract/);
-    // the same phone cannot be added again
-    expect((await register("super", { ...leadPayload({ name: "تكرار", phone: "0572000099" }), mode: "existing" })).status).toBe("duplicate");
+    // the same phone cannot be added twice to the technical queue
+    expect((await register("super", { ...leadPayload({ name: "تكرار", phone: "0572000099" }), mode: "existing" })).status).toBe("ops_exists");
   });
   it("the Technical Manager can add an existing client herself; an Account Manager cannot", async () => {
     await expect(register("am1", { ...leadPayload({ name: "x", phone: "0572000088" }), mode: "existing" })).rejects.toThrow(/not allowed/);
@@ -95,5 +95,20 @@ describe("Phase 3 — approved clients go to the Technical Manager, who hands th
     const q = (await run("techmgr", "select * from app.ops_list('new')")).rows.find((x: any) => x.client_name === "قائم من التقني");
     expect(q.is_existing).toBe(true); expect(q.packages).toEqual(["باقة سيو"]);
     await run("techmgr", "select app.ops_assign($1,$2,null)", [q.id, ids.am1]);
+  });
+  it("an existing client already in the CRM goes to the technical queue on the SAME record; the lead, its owner and notes stay as they are; the owner is told", async () => {
+    const r0 = await register("tele1", leadPayload({ name: "", phone: "0572000777" }));
+    const before = (await admin.query("select l.id, l.current_owner_id, l.lead_status, c.name, c.status from leads l join clients c on c.id=l.client_id where l.id=$1", [r0.lead_id])).rows[0];
+    const r = await register("techmgr", { ...leadPayload({ name: "عميل قديم بجد", phone: "0572000777" }), mode: "existing", packages: ["seo"], call_notes: "شغالين معاه من سنة" });
+    expect(r.status).toBe("created"); expect(r.matched).toBe(true); expect(r.client_id).toBe(r0.client_id); expect(r.owner_name).toBeTruthy();
+    const after = (await admin.query("select l.id, l.current_owner_id, l.lead_status, c.name, c.status from leads l join clients c on c.id=l.client_id where l.id=$1", [r0.lead_id])).rows[0];
+    expect({ ...after, name: before.name }).toEqual(before); expect(after.name).toBe("عميل قديم بجد");   // only the blank name got filled
+    expect((await admin.query("select count(*)::int n from clients c join client_identifiers ci on ci.client_id=c.id where ci.value like '%572000777'")).rows[0].n).toBe(1);
+    const q = (await run("techmgr", "select * from app.ops_list('new')")).rows.find((x: any) => x.id === r.ops_id);
+    expect(q.is_existing).toBe(true); expect(q.packages).toEqual(["باقة سيو"]);
+    expect((await admin.query("select count(*)::int n from notifications where user_id=$1 and title='عميلك طلع عميل قائم عندنا'", [ids.tele1])).rows[0].n).toBe(1);
+    expect((await register("techmgr", { ...leadPayload({ name: "x", phone: "0572000777" }), mode: "existing" })).status).toBe("ops_exists");
+    // a normal (tele) registration of the same phone is still a duplicate as before
+    expect((await register("tele2", leadPayload({ name: "x", phone: "0572000777" }))).status).toBe("duplicate");
   });
 });

@@ -51,6 +51,7 @@ export function LeadForm({ legacy = false, tz = "", packages = [] }: { legacy?: 
             التطابق في: {state.dup.matched_kinds.map((k) => KIND_AR[k] ?? k).join("، ")}. لم يتم إنشاء سجل جديد.
             {state.dup.ambiguous && " تم العثور على أكثر من عميل مطابق، يلزم مراجعة المدير."}
           </p>
+          {legacy ? <p className="mt-3 border-t border-warn/20 pt-3 text-sm">الرقم ده متسجل على أكتر من عميل. كلّم مدير النظام يحدّد العميل الصح.</p> : (
           <div className="mt-3 border-t border-warn/20 pt-3">
             <p className="mb-2 text-sm font-medium">ترى أن العميل يخصك؟ اطلب مراجعة من المدير:</p>
             <ActionForm action={requestReviewAction} submit="إرسال طلب المراجعة" tone="quiet" hiddenOnOk>
@@ -58,7 +59,7 @@ export function LeadForm({ legacy = false, tz = "", packages = [] }: { legacy?: 
               <Hidden name="attempted" value={JSON.stringify(state.dup.attempted)} />
               <Field label="سبب الطلب" name="reason" required placeholder="مثال: تواصلت مع العميل بتاريخ …" />
             </ActionForm>
-          </div>
+          </div>)}
         </div>
       )}
       <form key={formKey} action={action} className="space-y-4">

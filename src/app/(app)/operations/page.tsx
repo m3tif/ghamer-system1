@@ -13,7 +13,7 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
 export const metadata = { title: "العملاء المعتمدين" };
 export const dynamic = "force-dynamic";
 
-export default async function Operations({ searchParams }: { searchParams: Promise<{ tab?: string; added?: string }> }) {
+export default async function Operations({ searchParams }: { searchParams: Promise<{ tab?: string; added?: string; owner?: string }> }) {
   const s = await requireSession();
   if (!can(s, "ops.view")) notFound();
   const assigner = can(s, "ops.assign");
@@ -28,7 +28,7 @@ export default async function Operations({ searchParams }: { searchParams: Promi
     <>
       <PageHeader title={assigner ? "العملاء المعتمدين ماليًا" : "عملائي"}
         sub={assigner ? "كل عميل المالية اعتمدته بيوصل هنا. حوّله لأكاونت مانجر يستلمه." : "العملاء اللي المدير التقني حوّلهم ليك."} />
-      {sp.added && <div className="mb-5 rounded-md border border-ok/30 bg-ok/5 px-4 py-3 text-sm text-ok">تم إضافة العميل القائم وظهر هنا عند المدير التقني.</div>}
+      {sp.added && <div className="mb-5 rounded-md border border-ok/30 bg-ok/5 px-4 py-3 text-sm text-ok">تم إضافة العميل القائم وظهر هنا عند المدير التقني.{sp.owner !== undefined && <> الرقم كان متسجل في السيستم{sp.owner ? <> عند <b>{sp.owner.slice(0, 60)}</b></> : null}، فاستخدمنا نفس السجل من غير تكرار، ومحدش اتغيّر عنده حاجة.</>}</div>}
       {assigner && (
         <div className="mb-5 flex flex-wrap gap-2">
           <Link href="/operations" className={tabCls(tab === "new")}>مستني تحويل ({waiting.length})</Link>
