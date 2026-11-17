@@ -44,7 +44,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
     const person = emp ? team.find((t: any) => t.employee_id === emp)?.full_name ?? rows[0]?.full_name : null;
     return (
       <>
-        <PageHeader title="التقارير اليومية" sub="تيم التكنيكال بيكتب كل يوم اللي عمله. التقرير مش إجباري." />
+        <PageHeader title="التقارير اليومية" sub="تيم التكنيكال بيكتب كل يوم اللي عمله." />
         <form className="mb-4 flex flex-wrap items-center gap-2" action="/reports">
           <input type="date" name="day" defaultValue={day} max={today} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm" aria-label="اختار اليوم" />
           <button className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">عرض</button>
@@ -76,7 +76,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const past = mine.filter((r: any) => r.report_date !== today);
   return (
     <>
-      <PageHeader title="التقرير اليومي" sub="اكتب باختصار اللي عملته النهارده. مش إجباري، بس بيساعد مديرك يشوف شغلك." />
+      <PageHeader title="التقرير اليومي" sub="اكتب باختصار اللي عملته النهارده، عشان مديرك يشوف شغلك." />
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         <Card title={`تقرير النهارده — ${dayName(today)}`} right={todayReport ? <Badge tone="ok">اتبعت · تقدر تعدّله لحد آخر اليوم</Badge> : undefined}>
           <ActionForm action={saveDailyReportAction} submit={todayReport ? "حفظ التعديل" : "إرسال التقرير"} className="space-y-3">

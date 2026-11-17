@@ -109,7 +109,7 @@ async function ReportNudge({ uid }: { uid: string }) {
   const sent = mine[0];
   const minutes = worked.reduce((a: number, w: any) => a + Number(w.minutes), 0);
   return (
-    <Panel title="التقرير اليومي" right={<span className="text-[11px] text-ink-500">مش إجباري</span>}>
+    <Panel title="التقرير اليومي">
       {sent ? (
         <div className="rounded-xl bg-ok/5 p-3 ring-1 ring-ok/20">
           <p className="text-sm font-bold text-ok">✓ بعت تقرير النهارده</p>
