@@ -56,6 +56,22 @@ describe("duplicate prevention", () => {
     expect(l.rows[0].current_owner_id).toBe(ids.tele2);
     expect(l.rows[0].original_creator_id).toBe(ids.tele1); // original creator is preserved
   });
+  it("a transferred client that was hidden becomes visible to its new owner; the log keeps the previous owner", async () => {
+    const own = await register("tele1", leadPayload({ name: "", phone: "0501239999" }));
+    await admin.query("update leads set hidden_at = now(), hidden_by = $2, hidden_reason = 'إخفاء شهر' where id = $1", [own.lead_id, ids.super]);
+    const d = await register("tele2", leadPayload({ name: "ابو صالح", phone: "0501239999" }));
+    expect(d.status).toBe("duplicate");
+    const rv = await run("tele2", "select app.request_ownership_review($1, $2, $3::jsonb) id", [d.existing_client_id, "كلمته الأول", "{}"]);
+    expect((await run("tele2", "select count(*)::int n from leads where id = $1", [own.lead_id])).rows[0].n).toBe(0);
+    await run("telemgr", "select app.resolve_duplicate_review($1, 'transfer', 'اي خدمه')", [rv.rows[0].id]);
+    const l = (await admin.query("select current_owner_id, hidden_at from leads where id = $1", [own.lead_id])).rows[0];
+    expect(l.current_owner_id).toBe(ids.tele2); expect(l.hidden_at).toBeNull();
+    expect((await run("tele2", "select count(*)::int n from leads where id = $1", [own.lead_id])).rows[0].n).toBe(1);
+    const a = (await admin.query("select from_employee_id, to_employee_id from lead_assignments where lead_id = $1 and kind = 'owner' order by created_at desc limit 1", [own.lead_id])).rows[0];
+    expect(a.from_employee_id).toBe(ids.tele1); expect(a.to_employee_id).toBe(ids.tele2);
+    const n = (await admin.query("select link from notifications where user_id = $1 and kind = 'ownership_review_result' order by created_at desc limit 1", [ids.tele2])).rows[0];
+    expect(n.link).toBe(`/leads/${own.lead_id}`);
+  });
 });
 
 describe("data isolation & no-delete rules", () => {
