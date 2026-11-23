@@ -1026,3 +1026,15 @@ export async function opsClientUpdateAction(_: FormState, fd: FormData): Promise
   revalidatePath("/operations"); revalidatePath(`/operations/${ops}`); revalidatePath("/");
   return { ok: "تم حفظ بيانات العميل" };
 }
+
+/** Super admin: change an employee's role (and his direct manager) — permissions apply on his next page load. */
+export async function setEmployeeRoleAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const role = s(fd, "role"), reason = s(fd, "reason");
+  if (!role) return { values: vals(fd), error: "اختار الدور الجديد" };
+  if (!reason) return { values: vals(fd), error: "اكتب سبب التغيير" };
+  try { await tx(sess.userId, (c) => c.query("select app.set_employee_role($1,$2,$3,$4)", [s(fd, "id"), role, s(fd, "manager") || null, reason])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/employees");
+  return { ok: "تم تغيير الدور. هيبان عند الموظف من أول صفحة يفتحها." };
+}

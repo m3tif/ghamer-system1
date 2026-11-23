@@ -72,6 +72,22 @@ describe("duplicate prevention", () => {
     const n = (await admin.query("select link from notifications where user_id = $1 and kind = 'ownership_review_result' order by created_at desc limit 1", [ids.tele2])).rows[0];
     expect(n.link).toBe(`/leads/${own.lead_id}`);
   });
+  it("the super admin can change an employee's role (tele → sales); his clients stay with him; others can't", async () => {
+    const own = await register("tele2", leadPayload({ name: "", phone: "0501238888" }));
+    await expect(run("telemgr", "select app.set_employee_role($1,'sales_rep',null,'x')", [ids.tele2])).rejects.toThrow(/not allowed/);
+    await expect(run("super", "select app.set_employee_role($1,'sales_rep',null,' ')", [ids.tele2])).rejects.toThrow(/reason required/);
+    await expect(run("super", "select app.set_employee_role($1,'sales_rep',null,'x')", [ids.super])).rejects.toThrow(/own role/);
+    await expect(run("super", "select app.set_employee_role($1,'super_admin',null,'x')", [ids.tele2])).rejects.toThrow(/unknown role/);
+    await run("super", "select app.set_employee_role($1,'sales_rep',$2,'اتنقلت للسيلز')", [ids.tele2, ids.salesmgr]);
+    const u = (await admin.query("select r.code, e.department_id = r.department_id same_dept from users u join roles r on r.id = u.role_id join employees e on e.id = u.id where u.id = $1", [ids.tele2])).rows[0];
+    expect(u.code).toBe("sales_rep"); expect(u.same_dept).toBe(true);
+    expect((await admin.query("select manager_id from team_memberships where member_id = $1", [ids.tele2])).rows.map((r: any) => r.manager_id)).toEqual([ids.salesmgr]);
+    expect((await admin.query("select current_owner_id from leads where id = $1", [own.lead_id])).rows[0].current_owner_id).toBe(ids.tele2);
+    expect((await run("tele2", "select count(*)::int n from leads where id = $1", [own.lead_id])).rows[0].n).toBe(1);
+    expect((await run("tele2", "select app.has_perm('deals.view') p")).rows[0].p).toBe(true);
+    expect((await admin.query("select count(*)::int n from notifications where user_id = $1 and kind = 'role_changed'", [ids.tele2])).rows[0].n).toBe(1);
+    await run("super", "select app.set_employee_role($1,'tele_sales',$2,'رجوع')", [ids.tele2, ids.telemgr]);   // put it back for later tests
+  });
 });
 
 describe("data isolation & no-delete rules", () => {

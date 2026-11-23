@@ -1,7 +1,7 @@
 import { can, requirePerm, requireSession } from "@/lib/auth";
 import { employeeLinks, employeeList, employeeNameHistory } from "@/server/data";
 import Link from "next/link";
-import { createEmployeeAction, reassignEmployeeAction, renameEmployeeAction, deleteEmployeeAction, resetPasswordAction, setActiveAction, setManagerAction } from "@/server/actions";
+import { createEmployeeAction, reassignEmployeeAction, renameEmployeeAction, deleteEmployeeAction, resetPasswordAction, setActiveAction, setManagerAction, setEmployeeRoleAction } from "@/server/actions";
 import { Badge, Card, PageHeader, Table, td } from "@/components/ui";
 import { ActionForm, Field, Hidden, SelectField, TextArea } from "@/components/forms";
 import { tx } from "@/lib/db";
@@ -58,6 +58,15 @@ export default async function Employees({ searchParams }: { searchParams: Promis
                         <SelectField label="إلى الموظف" name="to" required empty="اختر" options={all.filter((x: any) => x.is_active && x.id !== e.id && family(x.role_code) === family(e.role_code)).map((x: any) => ({ value: x.id, label: x.full_name }))} />
                         <TextArea label="السبب" name="reason" required rows={2} />
                         <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="confirm" value="1" /> أؤكد نقل العملاء والمتابعات المفتوحة (التاريخ يبقى باسم الموظف الأصلي)</label>
+                      </ActionForm></details>)}
+                  {s.role === "super_admin" && e.id !== s.userId && e.role_code !== "super_admin" && (
+                    <details><summary className="cursor-pointer text-xs text-burgundy-600">تغيير الدور</summary>
+                      <ActionForm action={setEmployeeRoleAction} submit="تغيير الدور" tone="quiet" className="mt-2 w-60 space-y-2">
+                        <Hidden name="id" value={e.id} />
+                        <SelectField label="الدور الجديد" name="role" required defaultValue={e.role_code} options={roles.filter((r: any) => r.code !== "super_admin").map((r: any) => ({ value: r.code, label: r.name_ar }))} />
+                        <SelectField label="المدير المباشر" name="manager" defaultValue={e.manager_id ?? ""} empty="بدون مدير" options={managers.filter((m) => m.id !== e.id).map((m) => ({ value: m.id, label: m.full_name }))} />
+                        <TextArea label="السبب" name="reason" required rows={2} />
+                        <p className="text-[11px] leading-5 text-ink-500">صلاحياته الجديدة بتشتغل من أول صفحة يفتحها. عملاؤه ومتابعاته وتاريخه بيفضلوا معاه؛ لو عاوز تنقلهم لحد تاني استخدم «نقل العمل المفتوح».</p>
                       </ActionForm></details>)}
                   <details><summary className="cursor-pointer text-xs text-burgundy-600">الفريق</summary>
                     <ActionForm action={setManagerAction} submit="حفظ" tone="quiet" className="mt-2 w-56 space-y-2">
