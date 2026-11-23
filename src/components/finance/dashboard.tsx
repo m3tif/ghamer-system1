@@ -57,7 +57,8 @@ function Kpi({ label, value, icon, delta, href, accent, note }: { label: string;
 /* ───────── the dashboard ───────── */
 export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode; tech?: ReactNode };
 export async function FinanceDashboard({ uid, name, sp, variant = "finance", extra }: { uid: string; name: string; sp: FinSP; variant?: "finance" | "admin"; extra?: AdminExtras }) {
-  const per = readPeriod(sp);
+  const defPeriod = variant === "admin" ? "today" : "month";
+  const per = readPeriod(sp, defPeriod);
   const q = (sp.q ?? "").slice(0, 80), cs = sp.cs && sp.cs in CONTRACT_STATUS ? sp.cs : "", emp = UUID.test(sp.emp ?? "") ? sp.emp! : "";
   const cf = D.test(sp.cf ?? "") ? sp.cf! : "", ct = D.test(sp.ct ?? "") ? sp.ct! : "", pg = Math.max(1, Number(sp.pg) || 1), size = 15;
   const [d, rows, emps, money] = await Promise.all([financeDashboard(uid, per.from, per.to),
@@ -65,7 +66,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
   const k = d.kpi, c = d.contracts, total = n(rows[0]?.total);
   const prevLabel = per.key === "today" ? "امبارح" : per.key === "month" ? "نفس الفترة اللي قبلها" : "الفترة اللي قبلها";
   const view = variant === "admin" ? (ADMIN_TABS.find(([k]) => k === sp.tab)?.[0] ?? "team") : "";
-  const keep = { tab: view && view !== "team" ? view : undefined, p: per.key === "month" ? undefined : per.key, from: per.key === "custom" ? per.from : undefined, to: per.key === "custom" ? per.to : undefined };
+  const keep = { tab: view && view !== "team" ? view : undefined, p: per.key === defPeriod ? undefined : per.key, from: per.key === "custom" ? per.from : undefined, to: per.key === "custom" ? per.to : undefined };
   const link = (o: Record<string, string | undefined>, hash = "") => {
     // the contracts list lives in the «المالية» tab of the admin home: a link to it opens that tab
     const all = { ...keep, ...(view && hash === "#contracts" ? { tab: "money" } : {}), q: q || undefined, cs: cs || undefined, emp: emp || undefined, cf: cf || undefined, ct: ct || undefined, ...o };
@@ -75,7 +76,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
   const exportHref = (kind: string) => `/api/finance/export?${new URLSearchParams(Object.entries({ kind, from: per.from, to: per.to, q, cs, emp, cf, ct }).filter(([, v]) => v) as [string, string][]).toString()}`;
   const periodTitle = per.key === "today" ? "النهارده" : per.key === "week" ? "آخر 7 أيام" : per.key === "month" ? "الشهر الحالي" : "فترة مخصصة";
   const tab = (key: string, label: string) => (
-    <Link key={key} href={link({ p: key === "month" ? undefined : key, from: undefined, to: undefined, pg: undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${per.key === key ? "bg-[#b8955a] text-[#1b2a41]" : "text-white/80 hover:bg-white/10"}`}>{label}</Link>);
+    <Link key={key} href={link({ p: key === defPeriod ? undefined : key, from: undefined, to: undefined, pg: undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${per.key === key ? "bg-[#b8955a] text-[#1b2a41]" : "text-white/80 hover:bg-white/10"}`}>{label}</Link>);
   const funnel = [
     { label: "عملاء دخلوا", v: n(k.added) }, { label: "اتحوّلوا للسيلز", v: n(k.handed) }, { label: "السيلز قبلهم", v: n(k.accepted) },
     { label: "عقود اتسجلت", v: n(k.contracts_new) }, { label: "عقود اتعتمدت", v: n(k.contracts_approved) }];
