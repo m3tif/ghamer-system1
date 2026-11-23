@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FinanceDashboard, type FinSP } from "@/components/finance/dashboard";
-import { AdminAttention, AdminOps, AdminSources } from "@/components/admin/extras";
+import { AdminAttention, AdminOps, AdminSources, AdminTechPerf } from "@/components/admin/extras";
 import { AmWorkspace, TechManagerWorkspace, TechWorkspace } from "@/components/tech/home";
 import { contractList } from "@/server/data";
 import { can, requireSession } from "@/lib/auth";
@@ -25,6 +25,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <FinanceDashboard uid={s.userId} name={s.fullName} sp={sp} variant="admin" extra={{
       attention: <AdminAttention uid={s.userId} />,
       ops: <AdminOps uid={s.userId} />,
+      tech: <AdminTechPerf uid={s.userId} />,
       daily: (<section className="space-y-8"><Daily uid={s.userId} day={/^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") ? sp.day! : null} />
         <TeleTeam uid={s.userId} month={month} team={teleTeam} /><SalesTeam uid={s.userId} month={month} team={salesTeam} /></section>),
       analytics: <AdminSources uid={s.userId} />,

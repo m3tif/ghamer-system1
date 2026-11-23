@@ -7,7 +7,9 @@ import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, INSTALLMENT_KIND, LEAD_STATUS } 
 import { Badge } from "@/components/ui";
 import { DailyChart, HBars, MonthChart } from "@/components/finance/charts";
 
-export type FinSP = { p?: string; from?: string; to?: string; q?: string; cs?: string; emp?: string; cf?: string; ct?: string; pg?: string };
+export type FinSP = { p?: string; from?: string; to?: string; q?: string; cs?: string; emp?: string; cf?: string; ct?: string; pg?: string; tab?: string };
+/** the admin home is split into tabs; the first one opens by default */
+export const ADMIN_TABS = [["team", "أداء الموظفين"], ["attention", "محتاج تدخلك"], ["summary", "الملخص"], ["money", "المالية"], ["ops", "التشغيل"], ["analytics", "التحليلات"]] as const;
 const UUID = /^[0-9a-f-]{36}$/, D = /^\d{4}-\d{2}-\d{2}$/;
 const n = (v: unknown) => Number(v ?? 0);
 const num = (v: unknown) => n(v).toLocaleString("en");
@@ -53,7 +55,7 @@ function Kpi({ label, value, icon, delta, href, accent, note }: { label: string;
 }
 
 /* ───────── the dashboard ───────── */
-export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode };
+export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode; tech?: ReactNode };
 export async function FinanceDashboard({ uid, name, sp, variant = "finance", extra }: { uid: string; name: string; sp: FinSP; variant?: "finance" | "admin"; extra?: AdminExtras }) {
   const per = readPeriod(sp);
   const q = (sp.q ?? "").slice(0, 80), cs = sp.cs && sp.cs in CONTRACT_STATUS ? sp.cs : "", emp = UUID.test(sp.emp ?? "") ? sp.emp! : "";
@@ -62,16 +64,18 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
     financeContracts(uid, { q, status: cs, emp, from: cf, to: ct, limit: size, offset: (pg - 1) * size }), financeEmployees(uid), financeClients(uid)]);
   const k = d.kpi, c = d.contracts, total = n(rows[0]?.total);
   const prevLabel = per.key === "today" ? "امبارح" : per.key === "month" ? "نفس الفترة اللي قبلها" : "الفترة اللي قبلها";
-  const keep = { p: per.key === "month" ? undefined : per.key, from: per.key === "custom" ? per.from : undefined, to: per.key === "custom" ? per.to : undefined };
+  const view = variant === "admin" ? (ADMIN_TABS.find(([k]) => k === sp.tab)?.[0] ?? "team") : "";
+  const keep = { tab: view && view !== "team" ? view : undefined, p: per.key === "month" ? undefined : per.key, from: per.key === "custom" ? per.from : undefined, to: per.key === "custom" ? per.to : undefined };
   const link = (o: Record<string, string | undefined>, hash = "") => {
-    const all = { ...keep, q: q || undefined, cs: cs || undefined, emp: emp || undefined, cf: cf || undefined, ct: ct || undefined, ...o };
+    // the contracts list lives in the «المالية» tab of the admin home: a link to it opens that tab
+    const all = { ...keep, ...(view && hash === "#contracts" ? { tab: "money" } : {}), q: q || undefined, cs: cs || undefined, emp: emp || undefined, cf: cf || undefined, ct: ct || undefined, ...o };
     const qs = new URLSearchParams(Object.entries(all).filter(([, v]) => v) as [string, string][]).toString();
     return `/${qs ? "?" + qs : ""}${hash}`;
   };
   const exportHref = (kind: string) => `/api/finance/export?${new URLSearchParams(Object.entries({ kind, from: per.from, to: per.to, q, cs, emp, cf, ct }).filter(([, v]) => v) as [string, string][]).toString()}`;
   const periodTitle = per.key === "today" ? "النهارده" : per.key === "week" ? "آخر 7 أيام" : per.key === "month" ? "الشهر الحالي" : "فترة مخصصة";
   const tab = (key: string, label: string) => (
-    <Link key={key} href={key === "month" ? "/" : `/?p=${key}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${per.key === key ? "bg-[#b8955a] text-[#1b2a41]" : "text-white/80 hover:bg-white/10"}`}>{label}</Link>);
+    <Link key={key} href={link({ p: key === "month" ? undefined : key, from: undefined, to: undefined, pg: undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${per.key === key ? "bg-[#b8955a] text-[#1b2a41]" : "text-white/80 hover:bg-white/10"}`}>{label}</Link>);
   const funnel = [
     { label: "عملاء دخلوا", v: n(k.added) }, { label: "اتحوّلوا للسيلز", v: n(k.handed) }, { label: "السيلز قبلهم", v: n(k.accepted) },
     { label: "عقود اتسجلت", v: n(k.contracts_new) }, { label: "عقود اتعتمدت", v: n(k.contracts_approved) }];
@@ -91,6 +95,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
             <nav aria-label="الفترة" className="flex flex-wrap gap-1 rounded-xl bg-white/5 p-1 ring-1 ring-white/10">{tab("today", "اليوم")}{tab("week", "أسبوع")}{tab("month", "الشهر")}</nav>
             <form action="/" className="flex flex-wrap items-center gap-2 text-sm">
               <input type="hidden" name="p" value="custom" />
+              {view && view !== "team" && <input type="hidden" name="tab" value={view} />}
               <label className="sr-only" htmlFor="from">من</label><input id="from" name="from" type="date" defaultValue={per.key === "custom" ? per.from : ""} required className="rounded-lg border-0 bg-white/10 px-2 py-1.5 text-white [color-scheme:dark]" />
               <label className="sr-only" htmlFor="to">إلى</label><input id="to" name="to" type="date" defaultValue={per.key === "custom" ? per.to : ""} required className="rounded-lg border-0 bg-white/10 px-2 py-1.5 text-white [color-scheme:dark]" />
               <button className={`rounded-lg px-3 py-1.5 font-semibold ${per.key === "custom" ? "bg-[#b8955a] text-[#1b2a41]" : "bg-white/10 hover:bg-white/20"}`}>فترة مخصصة</button>
@@ -146,7 +151,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
               <Link key={String(key)} href={link({ cs: String(key) || undefined, pg: undefined }, "#contracts")} className={`rounded-full px-3 py-1 text-sm font-medium ${cs === key ? "bg-[#1b2a41] text-white" : "bg-cream text-charcoal hover:bg-cream-dark"}`}>{label} <span className="tabular-nums opacity-70">{num(cnt)}</span></Link>))}
           </div>
           <form action="/#contracts" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_auto_auto_auto]">
-            {keep.p && <input type="hidden" name="p" value={keep.p} />}{keep.from && <input type="hidden" name="from" value={keep.from} />}{keep.to && <input type="hidden" name="to" value={keep.to} />}{cs && <input type="hidden" name="cs" value={cs} />}
+            {view && <input type="hidden" name="tab" value="money" />}{keep.p && <input type="hidden" name="p" value={keep.p} />}{keep.from && <input type="hidden" name="from" value={keep.from} />}{keep.to && <input type="hidden" name="to" value={keep.to} />}{cs && <input type="hidden" name="cs" value={cs} />}
             <input name="q" defaultValue={q} placeholder="اسم العميل أو رقم الجوال أو رقم العقد" aria-label="بحث" className="rounded-lg border border-line px-3 py-2 text-sm" />
             <select name="emp" defaultValue={emp} aria-label="الموظف" className="rounded-lg border border-line px-3 py-2 text-sm"><option value="">كل الموظفين</option>{emps.map((e) => <option key={e.id} value={e.id}>{e.full_name} — {e.role_name}</option>)}</select>
             <input name="cf" type="date" defaultValue={cf} aria-label="من تاريخ" className="rounded-lg border border-line px-3 py-2 text-sm" />
@@ -278,17 +283,22 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
     <div className="space-y-8 overflow-x-clip">
       {headerBlock}
       {isAdmin ? (<>
-        {extra?.attention}
-        {summaryBlock}
-        {moneyBlock}
-        {achievementsBlock}
-        {extra?.ops}
-        {attentionBlock}
-        {contractsBlock}
-        {employeesBlock}
-        {extra?.daily}
-        {analyticsBlock}
-        {extra?.analytics}
+        <nav aria-label="أقسام اللوحة" className="sticky top-0 z-20 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-[#e7dfcf] bg-white/95 p-1.5 shadow-[0_8px_24px_-18px_rgba(27,42,65,.5)] backdrop-blur">
+          {ADMIN_TABS.map(([k, label]) => {
+            const badge = k === "money" ? n(c.submitted) + n(c.payments_pending) : 0;
+            return (
+              <Link key={k} href={link({ tab: k === "team" ? undefined : k, pg: undefined })} aria-current={view === k ? "page" : undefined}
+                className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === k ? "bg-[#1b2a41] text-white shadow" : "text-[#1b2a41] hover:bg-[#f6efe2]"}`}>
+                {label}{badge > 0 && <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${view === k ? "bg-[#b8955a] text-[#1b2a41]" : "bg-bad text-white"}`}>{badge}</span>}
+              </Link>);
+          })}
+        </nav>
+        {view === "team" && (<>{employeesBlock}{extra?.tech}{extra?.daily}</>)}
+        {view === "attention" && extra?.attention}
+        {view === "summary" && (<>{summaryBlock}{achievementsBlock}</>)}
+        {view === "money" && (<>{moneyBlock}{attentionBlock}{contractsBlock}</>)}
+        {view === "ops" && extra?.ops}
+        {view === "analytics" && (<>{analyticsBlock}{extra?.analytics}</>)}
       </>) : (<>
         {moneyBlock}
         {attentionBlock}
