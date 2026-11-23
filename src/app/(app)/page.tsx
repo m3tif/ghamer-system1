@@ -294,7 +294,7 @@ async function Daily({ uid, day }: { uid: string; day: string | null }) {
         <Stat label="قبلهم السيلز" value={sum("sales", "accepted")} tone="ok" />
         <Stat label="رفضهم السيلز" value={sum("sales", "rejected")} tone={sum("sales", "rejected") ? "bad" : undefined} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">{block("tele", "التيلي سيلز — حسب الموظف")}{block("sales", "السيلز — حسب الموظف")}</div>
+      <div className="grid gap-4 min-[1700px]:grid-cols-[3fr_2fr]">{block("tele", "التيلي سيلز — حسب الموظف")}{block("sales", "السيلز — حسب الموظف")}</div>
       <p className="mt-2 text-xs text-ink-500">الأرقام من وقت الحدث الفعلي بتوقيت الشركة. ترتيب الموظفين في الفترة المختارة والتقارير الشهرية تحت.</p>
     </section>
   );
