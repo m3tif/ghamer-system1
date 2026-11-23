@@ -26,8 +26,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       attention: <AdminAttention uid={s.userId} />,
       ops: <AdminOps uid={s.userId} />,
       tech: <AdminTechPerf uid={s.userId} />,
-      daily: (<section className="space-y-8"><Daily uid={s.userId} day={/^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") ? sp.day! : null} />
-        <TeleTeam uid={s.userId} month={month} team={teleTeam} /><SalesTeam uid={s.userId} month={month} team={salesTeam} /></section>),
+      today: <Daily uid={s.userId} day={/^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") ? sp.day! : null} />,
+      daily: (<section className="space-y-8"><TeleTeam uid={s.userId} month={month} team={teleTeam} /><SalesTeam uid={s.userId} month={month} team={salesTeam} /></section>),
       analytics: <AdminSources uid={s.userId} />,
     }} />
   );
@@ -294,8 +294,8 @@ async function Daily({ uid, day }: { uid: string; day: string | null }) {
         <Stat label="قبلهم السيلز" value={sum("sales", "accepted")} tone="ok" />
         <Stat label="رفضهم السيلز" value={sum("sales", "rejected")} tone={sum("sales", "rejected") ? "bad" : undefined} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">{block("tele", "التيلي سيلز — حسب الموظف")}{block("sales", "السيلز — حسب الموظف")}</div>
-      <p className="mt-2 text-xs text-ink-500">الأرقام من وقت الحدث الفعلي بتوقيت الشركة. التقارير الشهرية في الأسفل كما هي.</p>
+      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">{block("tele", "التيلي سيلز — حسب الموظف")}{block("sales", "السيلز — حسب الموظف")}</div>
+      <p className="mt-2 text-xs text-ink-500">الأرقام من وقت الحدث الفعلي بتوقيت الشركة. ترتيب الموظفين في الفترة المختارة والتقارير الشهرية تحت.</p>
     </section>
   );
 }

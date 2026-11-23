@@ -55,7 +55,7 @@ function Kpi({ label, value, icon, delta, href, accent, note }: { label: string;
 }
 
 /* ───────── the dashboard ───────── */
-export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode; tech?: ReactNode };
+export type AdminExtras = { attention?: ReactNode; ops?: ReactNode; daily?: ReactNode; analytics?: ReactNode; tech?: ReactNode; today?: ReactNode };
 export async function FinanceDashboard({ uid, name, sp, variant = "finance", extra }: { uid: string; name: string; sp: FinSP; variant?: "finance" | "admin"; extra?: AdminExtras }) {
   const defPeriod = variant === "admin" ? "today" : "month";
   const per = readPeriod(sp, defPeriod);
@@ -294,7 +294,7 @@ export async function FinanceDashboard({ uid, name, sp, variant = "finance", ext
               </Link>);
           })}
         </nav>
-        {view === "team" && (<>{employeesBlock}{extra?.tech}{extra?.daily}</>)}
+        {view === "team" && (<>{extra?.today}{employeesBlock}{extra?.tech}{extra?.daily}</>)}
         {view === "attention" && extra?.attention}
         {view === "summary" && (<>{summaryBlock}{achievementsBlock}</>)}
         {view === "money" && (<>{moneyBlock}{attentionBlock}{contractsBlock}</>)}
