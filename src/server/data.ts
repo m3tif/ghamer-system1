@@ -300,6 +300,11 @@ export async function broadcastReplies(uid: string, id: string) {
 export async function myReplyable(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.my_replyable()"))).rows as { notification_id: string; broadcast_id: string; my_replies: { body: string; at: string }[] }[];
 }
+export async function broadcastPeople(uid: string, ids: string[]) {
+  if (!ids.length) return [] as any[];
+  return (await tx(uid, (c) => c.query("select * from app.broadcast_people($1::uuid[])", [ids]))).rows as any[];
+}
+
 export async function broadcastList(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.broadcast_list()"))).rows as any[];
 }

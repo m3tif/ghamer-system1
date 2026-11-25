@@ -100,4 +100,24 @@ describe("admin messages to employees", () => {
     await run("techmgr", "select app.broadcast_send('للفريق','x','tech',null,$1)", [own]);
     expect((await run("techmgr", "select app.broadcast_recall($1) n", [own])).rows[0].n).toBeGreaterThan(0);
   });
+  it("«تراجع» from chosen employees: only they lose it; the rest keep it and can still reply", async () => {
+    const id = "00000000-0000-4000-8000-000000000064";
+    await run("super", "select app.broadcast_send('لبعض الناس','x','tele',null,$1,true)", [id]);
+    const t1 = ids.tele1;
+    const n = (await run("super", "select app.broadcast_recall($1, $2::uuid[]) n", [id, [t1]])).rows[0].n;
+    expect(n).toBe(1);
+    expect((await run("tele1", "select count(*)::int c from app.my_pending_notice() where broadcast_id = $1", [id])).rows[0].c).toBe(0);
+    await expect(run("tele1", "select app.broadcast_reply($1,'x')", [id])).rejects.toThrow(/no access/);
+    expect((await run("tele2", "select app.broadcast_reply($1,'لسه عندي')", [id])).rows.length).toBe(1);
+    const l = (await run("super", "select * from app.broadcast_list() where id = $1", [id])).rows[0];
+    expect(l.recalled_at).toBeNull(); expect(l.recalled_count).toBe(1);
+    const ppl = (await run("super", "select * from app.broadcast_people(array[$1]::uuid[])", [id])).rows;
+    expect(ppl.find((r: any) => r.user_id === t1).recalled_at).toBeTruthy();
+    expect(ppl.filter((r: any) => !r.recalled_at).length).toBeGreaterThan(0);
+    await expect(run("tele2", "select * from app.broadcast_people(array[$1]::uuid[])", [id])).resolves.toHaveProperty("rows.length", 0);
+    // withdrawing from everyone left closes the message as a whole
+    const rest = ppl.filter((r: any) => !r.recalled_at).map((r: any) => r.user_id);
+    await run("super", "select app.broadcast_recall($1, $2::uuid[])", [id, rest]);
+    expect((await run("super", "select recalled_at from app.broadcast_list() where id = $1", [id])).rows[0].recalled_at).toBeTruthy();
+  });
 });

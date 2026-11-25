@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { broadcastList, broadcastRecipients, broadcastReplies } from "@/server/data";
+import { broadcastList, broadcastPeople, broadcastRecipients, broadcastReplies } from "@/server/data";
+import { RecallPicker } from "@/components/recall-picker";
 import { Card, Empty, PageHeader, Table, td } from "@/components/ui";
 import { BroadcastForm } from "@/components/broadcast-form";
 import { Dialog } from "@/components/dialog";
@@ -20,6 +21,11 @@ export default async function Messages({ searchParams }: { searchParams: Promise
   const [sent, emps] = await Promise.all([broadcastList(s.userId), broadcastRecipients(s.userId)]);
   const withReplies = sent.filter((b: any) => b.allow_reply || b.replies > 0);   // a withdrawn message keeps the replies it got
   const replies = new Map(await Promise.all(withReplies.map(async (b: any) => [b.id, b.replies > 0 ? await broadcastReplies(s.userId, b.id) : []] as const)));
+  const people = new Map<string, any[]>();
+  for (const r of await broadcastPeople(s.userId, sent.filter((b: any) => !b.recalled_at).map((b: any) => b.id))) {
+    if (!people.has(r.broadcast_id)) people.set(r.broadcast_id, []);
+    people.get(r.broadcast_id)!.push(r);
+  }
   const active = emps.map((e) => ({ id: e.id, full_name: e.full_name, role: e.role_name }));
   return (
     <>
@@ -33,16 +39,17 @@ export default async function Messages({ searchParams }: { searchParams: Promise
                 <tr key={b.id}>
                   <td className={td}><span className="font-medium">{b.title}</span><span className="mt-0.5 block max-w-md whitespace-pre-wrap text-xs text-ink-500">{b.body}</span></td>
                   <td className={td + " whitespace-nowrap"}>{AUDIENCE[b.audience]}</td>
-                  <td className={td + " whitespace-nowrap tabular-nums"}>{b.recalled_at ? <span className="text-ink-500">—</span> : <>{b.seen} من {b.recipients}</>}</td>
+                  <td className={td + " whitespace-nowrap tabular-nums"}>{b.recalled_at ? <span className="text-ink-500">—</span> : <>{b.seen} من {b.recipients - b.recalled_count}{b.recalled_count > 0 && <span className="mt-0.5 block text-xs text-ink-500">اتسحبت من {b.recalled_count}</span>}</>}</td>
                   <td className={td + " whitespace-nowrap tabular-nums"}>{b.allow_reply || b.replies > 0 ? (b.replies > 0 ? <a href={`#r-${b.id}`} className="font-semibold text-burgundy-700 underline">{b.replies} رد</a> : "لسه مفيش") : "—"}</td>
                   <td className={td + " whitespace-nowrap text-ink-500"}>{fmtDateTime(b.sent_at)}</td>
                   <td className={td + " whitespace-nowrap"}>{b.recalled_at
                     ? <span className="rounded-full bg-cream px-2.5 py-1 text-xs text-ink-500" title={`${b.recalled_by ?? ""} · ${fmtDateTime(b.recalled_at)}`}>اتسحبت · {b.recalled_by}</span>
                     : (admin || b.mine) && (
-                      <Dialog trigger="تراجع" title={`تراجع عن الرسالة «${b.title}»؟`} tone="danger">
-                        <ActionForm action={recallBroadcastAction} submit="أيوه، اسحبها" className="space-y-3 whitespace-normal">
+                      <Dialog trigger="تراجع" title={`تراجع عن الرسالة «${b.title}»`} tone="danger">
+                        <ActionForm action={recallBroadcastAction} submit="اسحبها من اللي اخترتهم" className="space-y-3 whitespace-normal">
                           <Hidden name="id" value={b.id} />
-                          <p className="whitespace-normal text-sm leading-7">الرسالة هتختفي من عند الـ {b.recipients} موظف: من شاشتهم لو مفتوحة، ومن إشعاراتهم، ومش هتقبل ردود تانية.{b.replies > 0 ? ` الردود اللي وصلت (${b.replies}) هتفضل عندك.` : ""} والرسالة هتفضل في القايمة دي مكتوب عليها «اتسحبت».</p>
+                          <RecallPicker people={people.get(b.id) ?? []} />
+                          {b.replies > 0 && <p className="text-xs text-ink-500">الردود اللي وصلت ({b.replies}) هتفضل عندك.</p>}
                         </ActionForm>
                       </Dialog>)}</td>
                 </tr>))}

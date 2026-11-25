@@ -1003,10 +1003,13 @@ export async function recallBroadcastAction(_: FormState, fd: FormData): Promise
   const sess = await requireSession();
   const id = s(fd, "id");
   if (!UUID.test(id)) return { error: "رسالة غير صالحة" };
-  try { await tx(sess.userId, (c) => c.query("select app.broadcast_recall($1) n", [id])); }
+  const users = fd.getAll("users").map(String).filter((u) => UUID.test(u));
+  if (!users.length) return { error: "اختار الموظفين اللي عاوز تسحب منهم الرسالة" };
+  let n = 0;
+  try { n = (await tx(sess.userId, (c) => c.query("select app.broadcast_recall($1, $2::uuid[]) n", [id, users]))).rows[0].n; }
   catch (e) { return fail(e, fd); }
   revalidatePath("/messages");
-  return { ok: "اتسحبت الرسالة من عند الموظفين" };
+  return { ok: `اتسحبت الرسالة من ${n} موظف` };
 }
 
 /** An employee answers a message that asks for replies (from the pop-up or the notifications page). */
