@@ -267,7 +267,7 @@ export async function hasManualOrder(uid: string): Promise<boolean> {
 /** The newest unread "what's new" notice for the signed-in user (one-time pop-up). */
 export async function pendingRelease(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.my_pending_notice()"))).rows[0] as
-    { id: string; title: string; body: string | null; link: string | null; sender: string | null } | undefined;
+    { id: string; title: string; body: string | null; link: string | null; sender: string | null; broadcast_id: string | null; allow_reply: boolean } | undefined;
 }
 
 // ───────── Phase 2: contracts ─────────
@@ -294,6 +294,12 @@ export async function attachmentGet(uid: string, id: string) {
 }
 
 // ───────── admin messages to employees ─────────
+export async function broadcastReplies(uid: string, id: string) {
+  return (await tx(uid, (c) => c.query("select * from app.broadcast_replies($1)", [id]))).rows as { id: string; employee: string; role_name: string; body: string; created_at: string }[];
+}
+export async function myReplyable(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.my_replyable()"))).rows as { notification_id: string; broadcast_id: string; my_replies: { body: string; at: string }[] }[];
+}
 export async function broadcastList(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.broadcast_list()"))).rows as any[];
 }

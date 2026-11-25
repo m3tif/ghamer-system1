@@ -57,4 +57,27 @@ describe("admin messages to employees", () => {
     await run("super", "select app.broadcast_send('من الإدارة','x','tech',null,null)");
     expect((await notice("designer")).sender).toBeNull();
   });
+  it("a message that asks for replies: tele sales write back, the admin sees who wrote what", async () => {
+    const id = "00000000-0000-4000-8000-000000000061";
+    const n = (await run("super", "select app.broadcast_send('شكل الداتا','ابعتولي شكل الداتا اللي انتوا عاوزينها','tele',null,$1,true) n", [id])).rows[0].n;
+    expect(n).toBeGreaterThan(0);
+    const pop = (await run("tele1", "select * from app.my_pending_notice()")).rows[0];
+    expect(pop.broadcast_id).toBe(id); expect(pop.allow_reply).toBe(true);
+    await run("tele1", "select app.broadcast_reply($1,'عاوزين أرقام متاجر سلة بس')", [id]);
+    await run("tele2", "select app.broadcast_reply($1,'بالمدينة لو ينفع')", [id]);
+    await expect(run("tele1", "select app.broadcast_reply($1,'  ')", [id])).rejects.toThrow(/reply text required/);
+    await expect(run("sales1", "select app.broadcast_reply($1,'x')", [id])).rejects.toThrow(/no access/);   // the message did not reach him
+    expect((await run("tele1", "select count(*)::int c from app.my_pending_notice() where id = $1", [pop.id])).rows[0].c).toBe(0);   // replying closes the pop-up
+    const rs = (await run("super", "select * from app.broadcast_replies($1)", [id])).rows;
+    expect(rs.map((r: any) => r.body)).toEqual(["عاوزين أرقام متاجر سلة بس", "بالمدينة لو ينفع"]); expect(rs[0].employee).toBeTruthy();
+    expect((await run("tele1", "select * from app.broadcast_replies($1)", [id])).rows.length).toBe(0);   // employees can't read each other's replies
+    const l = (await run("super", "select * from app.broadcast_list() where id = $1", [id])).rows[0];
+    expect(l.allow_reply).toBe(true); expect(l.replies).toBe(2);
+    expect((await run("tele1", "select my_replies from app.my_replyable() where broadcast_id = $1", [id])).rows[0].my_replies.length).toBe(1);
+    expect((await admin.query("select count(*)::int c from notifications where user_id = $1 and kind = 'broadcast_reply'", [ids.super])).rows[0].c).toBe(2);
+    // a plain message has no reply box
+    await run("super", "select app.broadcast_send('عادي','x','tele',null,null)");
+    const plain = (await admin.query("select id from broadcasts where title = 'عادي'")).rows[0].id;
+    await expect(run("tele1", "select app.broadcast_reply($1,'x')", [plain])).rejects.toThrow(/replies closed/);
+  });
 });

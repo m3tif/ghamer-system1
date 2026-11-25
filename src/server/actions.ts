@@ -985,17 +985,33 @@ export async function decidePaymentAction(_: FormState, fd: FormData): Promise<F
 export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
   const sess = await requireSession();
   if (!["super_admin", "operations_manager", "account_manager"].includes(sess.role)) return { error: "مش مسموح لك تبعت رسائل" };
-  const title = s(fd, "title"), body = s(fd, "body"), audience = s(fd, "audience") || "all", req = s(fd, "request_id");
+  const title = s(fd, "title"), body = s(fd, "body"), audience = s(fd, "audience") || "all", req = s(fd, "request_id"), allowReply = fd.get("allow_reply") === "1";
   const picked = fd.getAll("employees").map(String).filter((x) => UUID.test(x));
   if (!title) return { error: "اكتب عنوان الرسالة", values: vals(fd) };
   if (!body) return { error: "اكتب نص الرسالة", values: vals(fd) };
   if (title.length > 120 || body.length > 2000) return { error: "الرسالة طويلة: العنوان لحد 120 حرف والنص لحد 2000", values: vals(fd) };
   if (audience === "selected" && picked.length === 0) return { error: "اختر موظف واحد على الأقل", values: vals(fd) };
   let n: number;
-  try { n = (await tx(sess.userId, (c) => c.query("select app.broadcast_send($1,$2,$3,$4::uuid[],$5) n", [title, body, audience, picked, UUID.test(req) ? req : null]))).rows[0].n; }
+  try { n = (await tx(sess.userId, (c) => c.query("select app.broadcast_send($1,$2,$3,$4::uuid[],$5,$6) n", [title, body, audience, picked, UUID.test(req) ? req : null, allowReply]))).rows[0].n; }
   catch (e) { return fail(e, fd); }
   revalidatePath("/messages");
-  return { ok: `تم إرسال الرسالة إلى ${n} موظف. هتظهرلهم أول ما يفتحوا السيستم.` };
+  return { ok: `تم إرسال الرسالة إلى ${n} موظف. هتظهرلهم في نفس اللحظة${allowReply ? "، وردودهم هتوصلك هنا" : ""}.` };
+}
+
+/** An employee answers a message that asks for replies (from the pop-up or the notifications page). */
+export async function replyBroadcastAction(broadcastId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  const sess = await requireSession();
+  const body = String(text ?? "").trim().slice(0, 2000);
+  if (!UUID.test(broadcastId)) return { error: "رسالة غير صالحة" };
+  if (!body) return { error: "اكتب ردك الأول" };
+  try { await tx(sess.userId, (c) => c.query("select app.broadcast_reply($1,$2)", [broadcastId, body])); }
+  catch (e) { const m = String((e as Error).message); return { error: /replies closed/.test(m) ? "الرسالة دي مش بتستقبل ردود" : "ماقدرناش نبعت الرد، جرّب تاني" }; }
+  revalidatePath("/notifications"); revalidatePath("/", "layout");
+  return { ok: true };
+}
+export async function replyBroadcastFormAction(_: FormState, fd: FormData): Promise<FormState> {
+  const r = await replyBroadcastAction(s(fd, "broadcast_id"), s(fd, "body"));
+  return r.error ? { error: r.error, values: vals(fd) } : { ok: "اتبعت ردك ✓" };
 }
 
 export async function saveDailyReportAction(_: FormState, fd: FormData): Promise<FormState> {

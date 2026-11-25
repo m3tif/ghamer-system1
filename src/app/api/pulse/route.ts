@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const [p, notice] = await tx(s.userId, async (c) => [
       (await c.query("select app.pulse() p")).rows[0].p as Record<string, unknown>,
-      (await c.query("select id, title, body, sender from app.my_pending_notice()")).rows[0] ?? null]);
+      (await c.query("select id, title, body, sender, broadcast_id, allow_reply from app.my_pending_notice()")).rows[0] ?? null]);
     const { now, ...rest } = p;
     // a new pop-up message travels with the pulse, so it shows up without reloading the page
     return Response.json({ ok: true, rev: JSON.stringify(rest), at: now, notice }, { headers: { "Cache-Control": "no-store" } });

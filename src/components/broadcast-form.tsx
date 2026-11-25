@@ -32,6 +32,10 @@ export function BroadcastForm({ employees, audiences }: { employees: { id: strin
           <div className="grid gap-2 sm:grid-cols-2">{employees.map((e) => (
             <label key={e.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="employees" value={e.id} /> {e.full_name} <span className="text-xs text-ink-500">({e.role})</span></label>))}</div>
         </div>)}
+      <label className="flex items-start gap-2 rounded-md border border-line bg-white p-3 text-sm">
+        <input type="checkbox" name="allow_reply" value="1" className="mt-1" />
+        <span><b>يسمح بالرد</b><span className="block text-xs text-ink-500">هيظهرلهم تحت الرسالة خانة يكتبوا فيها ردهم، وتشوف هنا كل رد ومين اللي بعته.</span></span>
+      </label>
       {(title || body) && (
         <div className="rounded-xl border border-line bg-cream/50 p-4" aria-label="معاينة">
           <p className="mb-1 text-xs font-semibold text-burgundy-700">📣 معاينة الرسالة</p>

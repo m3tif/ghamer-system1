@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ReleaseNotice } from "@/components/release-notice";
 
-type Notice = { id: string; title: string; body: string | null; sender: string | null };
+type Notice = { id: string; title: string; body: string | null; sender: string | null; broadcast_id?: string | null; allow_reply?: boolean };
 
 const BASE = 15_000, MAX = 120_000;
 
@@ -51,7 +51,7 @@ export function AutoRefresh() {
   }, [router]);
 
   return (<>
-    {notice && <ReleaseNotice key={notice.id} id={notice.id} title={notice.title} body={notice.body} sender={notice.sender} />}
+    {notice && <ReleaseNotice key={notice.id} id={notice.id} title={notice.title} body={notice.body} sender={notice.sender} broadcastId={notice.allow_reply ? notice.broadcast_id : null} />}
     <div aria-live="off" data-testid="last-update" className="fixed bottom-3 end-3 z-20 rounded-full border border-line bg-white/90 px-3 py-1 text-xs text-ink-500 shadow-sm backdrop-blur">
       {offline ? "تعذّر التحديث — سنعيد المحاولة" : updated ? <>آخر تحديث: <span dir="ltr" className="tabular-nums">{updated.toLocaleTimeString("en-GB")}</span></> : "جارٍ التحديث…"}
     </div>

@@ -69,7 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <nav aria-label="القائمة الرئيسية" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">{nav}</nav>
         <div className="mt-3 shrink-0 border-t border-white/10 px-3 pt-4">{who}</div>
       </aside>
-      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><div className="mx-auto w-full max-w-[1760px]"><Flash />{children}</div><AutoRefresh />{release && <ReleaseNotice key={release.id} id={release.id} title={release.title} body={release.body} sender={release.sender} />}</main>
+      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><div className="mx-auto w-full max-w-[1760px]"><Flash />{children}</div><AutoRefresh />{release && <ReleaseNotice key={release.id} id={release.id} title={release.title} body={release.body} sender={release.sender} broadcastId={release.allow_reply ? release.broadcast_id : null} />}</main>
     </div>
   );
 }
