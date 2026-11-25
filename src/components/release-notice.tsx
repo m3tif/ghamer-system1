@@ -18,6 +18,12 @@ export function ReleaseNotice({ id, title, body, sender, broadcastId }: { id: st
     if (w.__notices.has(id)) return; w.__notices.add(id);
     if (!ref.current?.open) ref.current?.showModal();
   }, [id]);
+  // the live check sends the pop-ups still waiting: one that is gone (withdrawn by its sender) closes
+  useEffect(() => {
+    const on = (e: Event) => { const open = (e as CustomEvent<string[]>).detail; if (!sent && !open.includes(id) && ref.current?.open) ref.current.close(); };
+    window.addEventListener("ghamer:open-notices", on);
+    return () => window.removeEventListener("ghamer:open-notices", on);
+  }, [id, sent]);
   const ok = () => start(async () => { await dismissReleaseAction(id); ref.current?.close(); });
   const send = () => start(async () => {
     setErr(null);

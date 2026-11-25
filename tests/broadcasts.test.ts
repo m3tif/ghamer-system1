@@ -80,4 +80,24 @@ describe("admin messages to employees", () => {
     const plain = (await admin.query("select id from broadcasts where title = 'عادي'")).rows[0].id;
     await expect(run("tele1", "select app.broadcast_reply($1,'x')", [plain])).rejects.toThrow(/replies closed/);
   });
+  it("«تراجع»: the sender withdraws a message; it leaves every screen, takes no replies, keeps its record and replies", async () => {
+    const id = "00000000-0000-4000-8000-000000000062";
+    await run("super", "select app.broadcast_send('غلط','...','tele',null,$1,true)", [id]);
+    await run("tele1", "select app.broadcast_reply($1,'رد قبل السحب')", [id]);
+    expect((await run("tele2", "select app.my_open_notices() ids")).rows[0].ids.length).toBeGreaterThan(0);
+    await expect(run("tele1", "select app.broadcast_recall($1)", [id])).rejects.toThrow(/not allowed/);
+    await expect(run("am1", "select app.broadcast_recall($1)", [id])).rejects.toThrow(/not allowed/);
+    const removed = (await run("super", "select app.broadcast_recall($1) n", [id])).rows[0].n;
+    expect(removed).toBeGreaterThan(0);
+    expect((await admin.query("select count(*)::int c from notifications where dedupe_key = $1", ["release:msg:" + id])).rows[0].c).toBe(0);
+    expect((await run("tele2", "select count(*)::int c from app.my_pending_notice() where broadcast_id = $1", [id])).rows[0].c).toBe(0);
+    await expect(run("tele2", "select app.broadcast_reply($1,'x')", [id])).rejects.toThrow(/no access|replies closed/);
+    const l = (await run("super", "select * from app.broadcast_list() where id = $1", [id])).rows[0];
+    expect(l.recalled_at).toBeTruthy(); expect(l.recalled_by).toBeTruthy(); expect(l.replies).toBe(1);
+    expect((await run("super", "select app.broadcast_recall($1) n", [id])).rows[0].n).toBe(0);   // twice is harmless
+    // a manager can withdraw his own message, not the admin's
+    const own = "00000000-0000-4000-8000-000000000063";
+    await run("techmgr", "select app.broadcast_send('للفريق','x','tech',null,$1)", [own]);
+    expect((await run("techmgr", "select app.broadcast_recall($1) n", [own])).rows[0].n).toBeGreaterThan(0);
+  });
 });

@@ -998,6 +998,17 @@ export async function sendBroadcastAction(_: FormState, fd: FormData): Promise<F
   return { ok: `تم إرسال الرسالة إلى ${n} موظف. هتظهرلهم في نفس اللحظة${allowReply ? "، وردودهم هتوصلك هنا" : ""}.` };
 }
 
+/** «تراجع عن الرسالة»: the sender (or the admin) withdraws a message from every employee's screen. */
+export async function recallBroadcastAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "id");
+  if (!UUID.test(id)) return { error: "رسالة غير صالحة" };
+  try { await tx(sess.userId, (c) => c.query("select app.broadcast_recall($1) n", [id])); }
+  catch (e) { return fail(e, fd); }
+  revalidatePath("/messages");
+  return { ok: "اتسحبت الرسالة من عند الموظفين" };
+}
+
 /** An employee answers a message that asks for replies (from the pop-up or the notifications page). */
 export async function replyBroadcastAction(broadcastId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
   const sess = await requireSession();

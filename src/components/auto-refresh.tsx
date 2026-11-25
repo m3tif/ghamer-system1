@@ -34,6 +34,8 @@ export function AutoRefresh() {
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         delay.current = BASE; setOffline(false);
+        // pop-ups that are no longer waiting (e.g. the sender withdrew the message) close themselves
+        if (Array.isArray(j.open)) window.dispatchEvent(new CustomEvent("ghamer:open-notices", { detail: j.open }));
         if (j.notice && !typing()) setNotice((cur) => (cur?.id === j.notice.id ? cur : j.notice));   // a new pop-up message: show it now
         if (rev.current === null) rev.current = j.rev;
         else if (j.rev !== rev.current) {
