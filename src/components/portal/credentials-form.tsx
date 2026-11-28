@@ -11,7 +11,7 @@ export function CredentialsForm({ action, submit, children, tone = "primary", co
   const [copied, setCopied] = useState(false);
   const v = state.values;
   if (state.ok && v?.password) {
-    const msg = `أهلًا بيك في بوابة عملاء غامر 👋\nتقدر تتابع مشروعك من هنا: \u2066${v.url}\u2069\nرقم الدخول: \u2066${v.phone}\u2069\nكلمة المرور المؤقتة: \u2066${v.password}\u2069\nأول ما تدخل هتختار كلمة مرور خاصة بيك.`;
+    const msg = `أهلًا بيك في بوابة عملاء غامر 👋\nتقدر تتابع مشروعك من هنا:\n${v.url}\nرقم الدخول: \u2066${v.phone}\u2069\nكلمة المرور المؤقتة: ${v.password}\nأول ما تدخل هتختار كلمة مرور خاصة بيك.`;
     return (
       <div data-hold-refresh className="space-y-3 rounded-xl border border-ok/30 bg-ok/5 p-4">
         <p className="font-semibold text-ok">{state.ok} ✓</p>

@@ -10,6 +10,9 @@ import type { FormState } from "@/lib/form";
 
 /** Everything a client can do in the portal. Each action runs as the signed-in client only (app.portal_id). */
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+// text copied from WhatsApp or from our own message can carry invisible direction marks; they are never part of a phone or password
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const secret = (fd: FormData, k: string) => String(fd.get(k) ?? "").replace(INVISIBLE, "").trim();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const KINDS = ["ticket", "update", "task", "request"];
 const PORTAL_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp",
@@ -25,7 +28,7 @@ async function readFile(fd: FormData): Promise<{ name: string; type: string; byt
 }
 
 export async function portalLoginAction(_: FormState, fd: FormData): Promise<FormState> {
-  const phone = s(fd, "phone"), password = String(fd.get("password") ?? "");
+  const phone = secret(fd, "phone"), password = secret(fd, "password");
   if (!phone || !password) return { error: "اكتب رقم الجوال وكلمة المرور", values: { phone } };
   const h = await headers();
   const r = await portalLogin(phone, password, h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "", h.get("user-agent") ?? "");
@@ -36,7 +39,7 @@ export async function portalLogoutAction() { await portalLogout(); redirect("/po
 
 export async function portalPasswordAction(_: FormState, fd: FormData): Promise<FormState> {
   const ps = await requirePortal({ allowPasswordChange: true });
-  const cur = String(fd.get("current") ?? ""), next = String(fd.get("password") ?? ""), again = String(fd.get("confirm") ?? "");
+  const cur = secret(fd, "current"), next = secret(fd, "password"), again = secret(fd, "confirm");
   const weak = validatePasswordStrength(next);
   if (weak) return { error: weak };
   if (next !== again) return { error: "كلمتين المرور مش زي بعض" };
