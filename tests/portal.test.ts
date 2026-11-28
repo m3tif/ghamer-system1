@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract } from "./helpers";
+import { setupDb, teardown, run, ids, admin, leadPayload, sendAccepted, contractPayload, signContract, register } from "./helpers";
 
 const p = async (acc: string, sql: string, params: unknown[] = []) => { const { ptx } = await import("../src/lib/db"); return ptx(acc, (c) => c.query(sql, params)); };
 const dealOf = async (lead: string) => (await admin.query("select id from deals where lead_id=$1", [lead])).rows[0].id as string;
@@ -192,5 +192,18 @@ describe("Client Portal — accounts, isolation, project follow-up, approvals, r
     expect((await p(accA, "select count(*)::int n from app.portal_notifications() where read_at is null")).rows[0].n).toBe(mineN - (await p(accA, "select count(*)::int n from app.portal_notifications() where read_at is not null")).rows[0].n);
     await p(accA, "select app.portal_notifications_read(null)");
     expect((await p(accA, "select count(*)::int n from app.portal_notifications() where read_at is null")).rows[0].n).toBe(0);
+  });
+  it("an existing client («عميل قائم», no contract in the system) gets the portal too, with his packages and dates", async () => {
+    await register("super", { ...leadPayload({ name: "عميل قائم", phone: "0574000009" }), mode: "existing" });
+    const q = (await run("techmgr", "select * from app.ops_list('new')")).rows.find((x: any) => x.client_name === "عميل قائم");
+    await run("techmgr", "select app.ops_set_packages($1,$2,'2026-01-01','2026-12-31')", [q.id, ["seo"]]);
+    await run("techmgr", "select app.ops_assign($1,$2,null)", [q.id, ids.am1]);
+    const st = await staff("super", q.id);
+    expect(st).not.toBeNull(); expect(st.contract_approved).toBe(true); expect(st.project).toBeNull();
+    expect((await run("am1", "select app.portal_enable($1,'+966574000009','hashC','') n", [q.id])).rows[0].n).toBe(true);
+    const acc = (await admin.query("select id from portal_accounts where phone='+966574000009'")).rows[0].id;
+    const j = await project(acc, q.id);
+    expect(j.services).toEqual(["باقة سيو"]); expect(String(j.start_date)).toContain("2026-01-01"); expect(String(j.expected_end)).toContain("2026-12-31");
+    expect(await project(acc, A)).toBeNull();
   });
 });
