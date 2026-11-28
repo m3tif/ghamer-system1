@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { client360 } from "@/server/data";
+import { client360, opsClientGet } from "@/server/data";
+import { OpsContract } from "@/components/ops-contract";
 import { Badge, Card, PageHeader, Stat } from "@/components/ui";
 import { fmtDate, fmtDateTime, fmtMins, fmtSar } from "@/lib/format";
 import { CONTRACT_STATUS, CONTRACT_STATUS_TONE, DEAL_STAGE, LEAD_STATUS, MEETING_STATUS, PAYMENT_METHOD, SOURCES, TASK_STATUS, TASK_STATUS_TONE } from "@/lib/labels";
@@ -52,7 +53,8 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
               {ops.start_date && <p className="mt-2 text-sm text-ink-500">{fmtDate(ops.start_date)} ← {ops.end_date ? fmtDate(ops.end_date) : "—"}</p>}
             </Card>)}
           <Card title="العقود">
-            {d.contracts.length === 0 ? <p className="text-sm text-ink-500">مفيش عقود.</p> : (
+            {ops && <div className={d.contracts.length ? "mb-4 border-b border-line pb-4" : ""}><p className="mb-2 text-xs font-semibold text-ink-500">العقد المرفوع</p><OpsContract uid={s.userId} opsId={ops.id} canUpload={!!(await opsClientGet(s.userId, ops.id))} /></div>}
+            {d.contracts.length === 0 ? (ops ? null : <p className="text-sm text-ink-500">مفيش عقود.</p>) : (
               <ul className="space-y-3 text-sm">{(d.contracts as any[]).map((k) => (
                 <li key={k.id} className="rounded-md border border-line p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">

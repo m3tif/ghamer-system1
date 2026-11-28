@@ -206,4 +206,29 @@ describe("Client Portal — accounts, isolation, project follow-up, approvals, r
     expect(j.services).toEqual(["باقة سيو"]); expect(String(j.start_date)).toContain("2026-01-01"); expect(String(j.expected_end)).toContain("2026-12-31");
     expect(await project(acc, A)).toBeNull();
   });
+  it("client dates and contract upload: the Account Manager / Technical Manager / admin set the dates and upload the contract", async () => {
+    const before = (await admin.query("select c.start_date, c.end_date from contracts c join client_operations o on o.contract_id = c.id where o.id = $1", [A])).rows[0];
+    const payload = (x: any) => JSON.stringify({ name: "متجر أ", identifiers: [{ kind: "phone", value: "+966574000001", label: "mobile" }], phones: [{ label: "mobile", raw: "0574000001", value: "+966574000001" }], ...x });
+    await expect(run("am2", "select app.ops_client_update($1,$2::jsonb)", [A, payload({ start_date: "2027-02-01", end_date: "2027-08-01" })])).rejects.toThrow(/no access/);
+    await expect(run("am1", "select app.ops_client_update($1,$2::jsonb)", [A, payload({ start_date: "2027-08-01", end_date: "2027-02-01" })])).rejects.toThrow(/end date is before/);
+    await run("am1", "select app.ops_client_update($1,$2::jsonb)", [A, payload({ start_date: "2027-02-01", end_date: "2027-08-01" })]);
+    const g = (await run("techmgr", "select app.ops_client_get($1) j", [A])).rows[0].j;
+    expect(g.start_date).toBe("2027-02-01"); expect(g.end_date).toBe("2027-08-01"); expect(g.has_contract).toBe(true);
+    const row = (await run("am1", "select * from app.ops_list(null) where id = $1", [A])).rows[0];
+    expect(String(row.end_date)).toContain(new Date("2027-08-01").getFullYear().toString());
+    const after = (await admin.query("select c.start_date, c.end_date from contracts c join client_operations o on o.contract_id = c.id where o.id = $1", [A])).rows[0];
+    expect(after).toEqual(before);   // the Finance contract itself is untouched
+    // the contract file
+    const pdf = Buffer.from("%PDF-1.4 contract");
+    for (const w of ["sales1", "am2", "designer", "fin"]) await expect(run(w, "select app.ops_contract_attach($1,'عقد.pdf','application/pdf',$2)", [A, pdf])).rejects.toThrow(/not allowed/);
+    await expect(run("am1", "select app.ops_contract_attach($1,'x.pdf','application/pdf',$2)", [A, Buffer.from("not a pdf")])).rejects.toThrow(/unsupported/);
+    const f = (await run("am1", "select app.ops_contract_attach($1,'عقد لولوه.pdf','application/pdf',$2) id", [A, pdf])).rows[0].id;
+    expect((await run("techmgr", "select * from app.ops_contract_files($1)", [A])).rows.map((r: any) => r.filename)).toEqual(["عقد لولوه.pdf"]);
+    expect((await run("techmgr", "select * from app.attachment_get($1)", [f])).rows[0].content.toString()).toBe("%PDF-1.4 contract");
+    expect((await run("am2", "select * from app.attachment_get($1)", [f])).rows.length).toBe(0);
+    expect((await run("am2", "select * from app.ops_contract_files($1)", [A])).rows.length).toBe(0);
+    await expect(run("techmgr", "select app.ops_contract_delete($1)", [f])).rejects.toThrow(/not allowed/);
+    await run("am1", "select app.ops_contract_delete($1)", [f]);
+    expect((await run("am1", "select * from app.ops_contract_files($1)", [A])).rows.length).toBe(0);
+  });
 });

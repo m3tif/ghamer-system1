@@ -402,7 +402,7 @@ export async function dailyReportMyTasks(uid: string) {
 }
 
 export async function opsClientGet(uid: string, ops: string) {
-  try { return (await tx(uid, (c) => c.query("select app.ops_client_get($1) r", [ops]))).rows[0].r as { name: string; business_name: string | null; contact_person: string | null; city: string | null; phone: string | null; alt_phone: string | null; whatsapp: string | null; stores: string[] }; }
+  try { return (await tx(uid, (c) => c.query("select app.ops_client_get($1) r", [ops]))).rows[0].r as { name: string; business_name: string | null; contact_person: string | null; city: string | null; phone: string | null; alt_phone: string | null; whatsapp: string | null; stores: string[]; start_date: string | null; end_date: string | null; has_contract: boolean }; }
   catch { return null; }
 }
 
@@ -412,4 +412,9 @@ export async function portalStaffGet(uid: string, ops: string) {
 }
 export async function portalStageDefaults(uid: string) {
   return (await tx(uid, (c) => c.query("select * from app.portal_stage_defaults_list()"))).rows as { id: string; name: string; sort: number; is_active: boolean }[];
+}
+
+export async function opsContractFiles(uid: string, ops: string) {
+  try { return (await tx(uid, (c) => c.query("select * from app.ops_contract_files($1)", [ops]))).rows as { id: string; filename: string; size_bytes: number; by_name: string | null; created_at: string; can_delete: boolean }[]; }
+  catch { return []; }
 }

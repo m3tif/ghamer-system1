@@ -1049,14 +1049,41 @@ export async function opsClientUpdateAction(_: FormState, fd: FormData): Promise
   if (!s(fd, "phone")) return { values: vals(fd), error: "رقم الجوال مطلوب" };
   const cp = buildContactPayload(fd);
   if (cp.error) return { values: vals(fd), error: cp.error };
-  const payload = { name: s(fd, "name").slice(0, 200), business_name: s(fd, "business_name").slice(0, 200), contact_person: s(fd, "contact_person").slice(0, 200), city: s(fd, "city").slice(0, 100), ...cp.payload };
+  const sd = s(fd, "start_date"), ed = s(fd, "end_date");
+  if ((sd && !DATE.test(sd)) || (ed && !DATE.test(ed))) return { values: vals(fd), error: "تاريخ غير صالح" };
+  if (sd && ed && ed < sd) return { values: vals(fd), error: "تاريخ النهاية قبل تاريخ البداية" };
+  const payload = { name: s(fd, "name").slice(0, 200), business_name: s(fd, "business_name").slice(0, 200), contact_person: s(fd, "contact_person").slice(0, 200), city: s(fd, "city").slice(0, 100), ...cp.payload,
+    ...(fd.has("start_date") ? { start_date: sd, end_date: ed } : {}) };
   try {
     const r = (await tx(sess.userId, (c) => c.query("select app.ops_client_update($1,$2::jsonb) r", [ops, JSON.stringify(payload)]))).rows[0].r;
     if (r.status === "duplicate")
       return { values: vals(fd), error: `${r.kind === "store" ? "رابط المتجر" : "الرقم"} ده متسجل على عميل تاني${r.existing_name ? ` «${r.existing_name}»` : ""}${r.owner_name ? ` عند ${r.owner_name}` : ""}. ماتحفظش حاجة.` };
   } catch (e) { return fail(e, fd); }
-  revalidatePath("/operations"); revalidatePath(`/operations/${ops}`); revalidatePath("/");
+  revalidatePath("/operations"); revalidatePath(`/operations/${ops}`); revalidatePath("/"); revalidatePath("/clients", "layout");
   return { ok: "تم حفظ بيانات العميل" };
+}
+
+/** Upload the client's signed contract (Account Manager of the client, Technical Manager, admin). */
+export async function uploadOpsContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const ops = s(fd, "ops_id"), f = fd.get("file");
+  if (!UUID.test(ops)) return { error: "عميل غير صالح" };
+  if (!(f instanceof File) || f.size === 0) return { error: "اختار ملف العقد الأول" };
+  if (f.size > 4 * 1024 * 1024) return { error: "الملف أكبر من 4 ميجا" };
+  if (!FILE_TYPES.includes(f.type)) return { error: "نوع الملف غير مدعوم. المسموح: PDF أو صورة (JPG / PNG / WEBP)" };
+  try { await tx(sess.userId, async (c) => c.query("select app.ops_contract_attach($1,$2,$3,$4)", [ops, f.name, f.type, Buffer.from(await f.arrayBuffer())])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath("/operations", "layout"); revalidatePath("/clients", "layout");
+  return { ok: "اترفع العقد ✓" };
+}
+export async function deleteOpsContractAction(_: FormState, fd: FormData): Promise<FormState> {
+  const sess = await requireSession();
+  const id = s(fd, "file_id");
+  if (!UUID.test(id)) return { error: "ملف غير صالح" };
+  try { await tx(sess.userId, (c) => c.query("select app.ops_contract_delete($1)", [id])); }
+  catch (e) { return { error: mapError(e) }; }
+  revalidatePath("/operations", "layout"); revalidatePath("/clients", "layout");
+  return { ok: "اتمسح الملف" };
 }
 
 /** Super admin: change an employee's role (and his direct manager) — permissions apply on his next page load. */

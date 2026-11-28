@@ -3,6 +3,7 @@ import { ActionForm, Field, Hidden, TextArea } from "@/components/forms";
 import { PhoneField } from "@/components/phone-field";
 import { opsClientUpdateAction } from "@/server/actions";
 import { opsClientGet } from "@/server/data";
+import { OpsContract } from "@/components/ops-contract";
 
 const Lbl = ({ children, req }: { children: string; req?: boolean }) => <span className="mb-1 block text-sm font-medium">{children}{req && <span className="text-burgundy-600"> *</span>}</span>;
 
@@ -22,8 +23,15 @@ export async function OpsClientEdit({ uid, opsId, label = "✎ تعديل بيا
         <Field label="الشخص المسؤول" name="contact_person" defaultValue={c.contact_person ?? ""} />
         <Field label="المدينة" name="city" defaultValue={c.city ?? ""} />
         <div className="sm:col-span-2"><TextArea label="رابط المتجر / الموقع (كل رابط في سطر)" name="store_url" rows={2} defaultValue={(c.stores ?? []).join("\n")} /></div>
+        <Field label="بداية التعاقد" name="start_date" type="date" defaultValue={c.start_date ?? ""} />
+        <Field label="نهاية التعاقد" name="end_date" type="date" defaultValue={c.end_date ?? ""} />
+        {c.has_contract && <p className="-mt-2 text-xs text-ink-500 sm:col-span-2">العميل ده ليه عقد عند المالية. التواريخ اللي هنا هي اللي هتظهر للعميل وللفريق، والعقد نفسه مش هيتغير.</p>}
         <p className="text-xs text-ink-500 sm:col-span-2">لو الرقم أو الرابط متسجل على عميل تاني، مش هيتحفظ وهيقولك هو عند مين.</p>
       </ActionForm>
+      <div className="mt-6 border-t border-line pt-4">
+        <h3 className="mb-3 text-sm font-bold">العقد</h3>
+        <OpsContract uid={uid} opsId={opsId} canUpload />
+      </div>
     </Dialog>
   );
 }
