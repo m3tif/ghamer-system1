@@ -121,3 +121,17 @@ describe("«الداتا المنقولة»: leads moved from another employee",
   });
 });
 
+describe("search finds what she wrote", () => {
+  it("matches the notes column and her activity notes, with Arabic letter variants, only on leads she can see", async () => {
+    const a = (await register("tele1", leadPayload({ name: "عميل الملاحظة", phone: "0557770101" }))).lead_id;
+    const b = (await register("tele1", leadPayload({ name: "عميل النشاط", phone: "0557770102" }))).lead_id;
+    const other = (await register("tele2", leadPayload({ name: "مش بتاعتها", phone: "0557770103" }))).lead_id;
+    await admin.query("update leads set call_notes = 'قال كلموني بعد صلاة الجمعة' where id = any($1)", [[a, other]]);
+    await admin.query("insert into lead_activities(lead_id, kind, note, created_by) values ($1,'note','عايز عرض أسعار للباقة الكاملة',$2)", [b, ids.tele1]);
+    const q = (text: string) => run("tele1", "select * from app.list_leads($1,null,null,null,null,null,null,'created','desc',100,0,'visible',null)", [text]).then((r) => r.rows.map((x: any) => x.id));
+    expect(await q("صلاه الجمعه")).toEqual([a]);            // ة/ه variant, and never someone else's lead
+    expect(await q("عرض اسعار")).toEqual([b]);              // أ/ا variant, from the activity log
+    expect(await q("كلمة مش موجودة خالص")).toEqual([]);
+  });
+});
+

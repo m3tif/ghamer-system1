@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { inputCls } from "@/components/forms";
 
 /** Live search: waits 350ms after typing, then updates ?q= (keeping every other filter and sort, back to page 1). */
-export function SearchBox({ placeholder = "ابحث بالاسم أو رقم الهاتف أو رابط المتجر", className = "" }: { placeholder?: string; className?: string }) {
+export function SearchBox({ placeholder = "ابحث بالاسم أو الرقم أو رابط المتجر أو الملاحظات", className = "" }: { placeholder?: string; className?: string }) {
   const router = useRouter(), path = usePathname(), params = useSearchParams();
   const current = params.get("q") ?? "";
   const [val, setVal] = useState(current);
