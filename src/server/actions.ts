@@ -862,6 +862,8 @@ export async function approveTaskAction(_: FormState, fd: FormData): Promise<For
 export async function rejectTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_review($1,false,$2)", "تم إرجاع التاسك للموظف للتعديل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل المطلوب"; }); }
 export async function clientOkTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_client($1,true,$2)", "تم تسجيل موافقة العميل", (fd) => [s(fd, "note") || null]); }
 export async function clientNoTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_client($1,false,$2)", "تم إرجاع التاسك للموظف بتعديل العميل", (fd) => { const why = s(fd, "note"); return why ? [why] : "اكتب التعديل اللي العميل طلبه"; }); }
+export async function doneTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_mark_done($1,$2)", "التاسك اتقفل إنه تمت ✓", (fd) => [s(fd, "note") || null]); }
+export async function cancelTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_cancel($1,$2)", "التاسك اتلغى", (fd) => { const why = s(fd, "note"); return why ? [why.slice(0, 500)] : "اكتب سبب الإلغاء"; }); }
 export async function commentTaskAction(_: FormState, fd: FormData): Promise<FormState> { return taskStep(fd, "select app.task_comment($1,$2)", "تم إضافة التعليق", (fd) => { const b = s(fd, "body"); return b ? [b.slice(0, 2000)] : "اكتب التعليق"; }); }
 
 

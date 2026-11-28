@@ -204,4 +204,34 @@ describe("Phase 3 — tasks, timer, delivery and review", () => {
     expect(g.status).toBe("submitted"); expect(g.delivery_link).toBeNull(); expect(g.delivery_note).toBe("سلّمت الملف في المرفقات");
     await run("am1", "select app.task_review($1,true,null)", [t]);
   });
+  it("«تمت» by the Account Manager / Technical Manager; «إلغاء» by whoever sent the task — nobody else", async () => {
+    // done: the employee forgot to press anything
+    const a = await save("am1", ops, null, { title: "تاسك اتعمل ونسيه", assignee: ids.designer });
+    await run("designer", "select app.task_start($1)", [a]);
+    for (const w of ["designer", "seo", "am2", "sales1"]) await expect(run(w, "select app.task_mark_done($1,null)", [a])).rejects.toThrow(/not allowed/);
+    expect((await get("am1", a)).can_mark_done).toBe(true); expect((await get("designer", a)).can_mark_done).toBe(false);
+    await run("techmgr", "select app.task_mark_done($1,'اتسلم على الواتس')", [a]);
+    let g = await get("designer", a);
+    expect(g.status).toBe("approved"); expect(g.closed_by_manager).toBe(true); expect(g.running_since).toBeNull(); expect(g.review_note).toBe("اتسلم على الواتس");
+    await run("am1", "select app.task_mark_done($1,null)", [a]);   // twice is harmless
+    expect((await admin.query("select count(*)::int n from notifications where kind='task_approved' and dedupe_key=$1", ["taskdone:" + a])).rows[0].n).toBe(1);
+    // cancel: only the sender (or the admin), with a reason
+    const b = await save("am1", ops, null, { title: "تاسك اتبعت غلط", assignee: ids.designer, due_date: "2020-01-01" });
+    await run("designer", "select app.task_start($1)", [b]);
+    expect((await get("am1", b)).can_cancel).toBe(true); expect((await get("techmgr", b)).can_cancel).toBe(false);
+    for (const w of ["designer", "techmgr", "am2"]) await expect(run(w, "select app.task_cancel($1,'x')", [b])).rejects.toThrow(/not allowed/);
+    await expect(run("am1", "select app.task_cancel($1,' ')", [b])).rejects.toThrow(/reason required/);
+    await run("am1", "select app.task_cancel($1,'اتبعت للعميل الغلط')", [b]);
+    g = await get("designer", b);
+    expect(g.status).toBe("cancelled"); expect(g.cancel_reason).toBe("اتبعت للعميل الغلط"); expect(g.late).toBe(false); expect(g.running_since).toBeNull();
+    // closed: no more work on it, and it is not counted as open
+    await expect(run("designer", "select app.task_start($1)", [b])).rejects.toThrow(/cannot be started/);
+    await expect(run("designer", "select app.task_submit($1,'',null)", [b])).rejects.toThrow(/closed/);
+    await expect(run("am1", "select app.task_mark_done($1,null)", [b])).rejects.toThrow(/closed/);
+    await expect(run("am1", "select app.task_cancel($1,'x')", [a])).rejects.toThrow(/closed/);
+    expect((await list("designer", "mine")).find((r: any) => r.id === b).late).toBe(false);
+    const att = (await run("super", "select app.admin_attention() j")).rows[0].j;
+    const open = (await admin.query("select count(*)::int n from tasks where status not in ('approved','cancelled')")).rows[0].n;
+    expect(att.tasks_open ?? att.tasks?.open ?? open).toBe(open);
+  });
 });

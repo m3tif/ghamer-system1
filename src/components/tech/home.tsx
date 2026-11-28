@@ -20,6 +20,7 @@ const dayTitle = () => new Intl.DateTimeFormat("ar-EG", { weekday: "long", day: 
 
 function due(t: TaskRow, today: string): { text: string; tone: "bad" | "warn" | "muted" | "ok" } {
   if (t.status === "approved") return { text: "اتعمد", tone: "ok" };
+  if (t.status === "cancelled") return { text: "اتلغى", tone: "muted" };
   if (t.status === "submitted") return { text: "اتسلّم", tone: "muted" };
   if (t.status === "client_review") return { text: "عند العميل", tone: "muted" };
   if (!t.due_date) return { text: "من غير ميعاد", tone: "muted" };
@@ -43,7 +44,7 @@ function rank(t: TaskRow, today: string) {
   if (["in_progress", "paused"].includes(t.status)) return 4;
   return 5 + Math.min(d, 90) / 100;
 }
-const OPEN = (t: TaskRow) => !["submitted", "client_review", "approved"].includes(t.status);
+const OPEN = (t: TaskRow) => !["submitted", "client_review", "approved", "cancelled"].includes(t.status);
 const service = (t: TaskRow) => t.service_name ?? "";
 
 function Hero({ kicker, title, sub, aside, stats }: { kicker: string; title: string; sub: string; aside?: ReactNode; stats: { label: string; value: ReactNode; href?: string; hot?: boolean }[] }) {
@@ -237,7 +238,7 @@ export async function AmWorkspace({ uid, name, role }: { uid: string; name: stri
   const review = ts.filter((t) => t.status === "submitted").sort((a, b) => String(a.submitted_at ?? "").localeCompare(String(b.submitted_at ?? "")));
   const atClient = ts.filter((t) => t.status === "client_review");
   const late = ts.filter((t) => OPEN(t) && t.late).sort((a, b) => rank(a, today) - rank(b, today));
-  const by = (id: string) => ts.filter((t) => t.ops_id === id);
+  const by = (id: string) => ts.filter((t) => t.ops_id === id && t.status !== "cancelled");
   return (
     <div className="space-y-6">
       <Hero kicker={`${role} · ${dayTitle()}`} title={`${greet()} يا ${first(name)}`}

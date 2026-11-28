@@ -87,8 +87,8 @@ export const FILE_KIND: Record<string, string> = { signed_contract: "العقد 
 export const AUDIENCE: Record<string, string> = { all: "كل الموظفين", tele: "التلي سيلز", sales: "السيلز", finance: "المالية", tech: "الفريق التقني", ops: "الأكاونت مانجر والمدير التقني", selected: "موظفين محددين" };
 
 // ───────── Phase 3: tasks ─────────
-export const TASK_STATUS: Record<string, string> = { todo: "لسه مابدأش", in_progress: "شغّال عليه", paused: "متوقف", submitted: "مستني مراجعة", changes_requested: "مطلوب تعديل", client_review: "مستني موافقة العميل", approved: "معتمد ✓" };
-export const TASK_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { todo: "neutral", in_progress: "brand", paused: "neutral", submitted: "warn", changes_requested: "bad", client_review: "warn", approved: "ok" };
+export const TASK_STATUS: Record<string, string> = { todo: "لسه مابدأش", in_progress: "شغّال عليه", paused: "متوقف", submitted: "مستني مراجعة", changes_requested: "مطلوب تعديل", client_review: "مستني موافقة العميل", approved: "معتمد ✓", cancelled: "اتلغى" };
+export const TASK_STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "brand"> = { todo: "neutral", in_progress: "brand", paused: "neutral", submitted: "warn", changes_requested: "bad", client_review: "warn", approved: "ok", cancelled: "neutral" };
 export const TASK_PRIORITY: Record<string, string> = { low: "منخفضة", normal: "عادية", high: "مهمة", urgent: "عاجلة" };
 export const TECH_ROLE: Record<string, string> = { seo_specialist: "SEO", ui_designer: "UI", developer: "مبرمج", designer: "ديزاينر", branding_designer: "براندينج ديزاينر", content_creator: "كونتنت كريتور", media_buyer: "ميديا باير", social_media_manager: "سوشيال ميديا مانجر" };
 export const PAYMENT_STATUS: Record<string, string> = { pending: "مستنية تأكيد", verified: "اتأكدت ✓", rejected: "اترفضت" };

@@ -55,7 +55,7 @@ const MAP: [RegExp, string][] = [
   [/task title required/i, "اكتب عنوان التاسك"],
   [/invalid assignee/i, "اختار موظف من الفريق التقني (لازم يكون حسابه شغّال)"],
   [/due date is before start date/i, "تاريخ التسليم قبل تاريخ البداية"],
-  [/task is closed/i, "التاسك معتمد ومقفول"],
+  [/task is closed/i, "التاسك مقفول (تمت أو اتلغى)"],
   [/task cannot be started now/i, "التاسك عند المراجعة أو معتمد، مينفعش تشتغل عليه دلوقتي"],
   [/phone required/i, "رقم الجوال مطلوب"],
   [/cannot change own role/i, "مينفعش تغيّر دورك إنت"],

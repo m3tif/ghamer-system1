@@ -11,7 +11,8 @@ import { DeleteFile } from "@/components/delete-file";
 import { BRIEF_FIELDS } from "@/components/onboarding-card";
 import { inputCls } from "@/components/forms";
 import { clientNoTaskAction, clientOkTaskAction } from "@/server/actions";
-import { addTaskTimeAction, approveTaskAction, commentTaskAction, pauseTaskAction, rejectTaskAction, startTaskAction, submitTaskAction } from "@/server/actions";
+import { Dialog } from "@/components/dialog";
+import { addTaskTimeAction, approveTaskAction, cancelTaskAction, doneTaskAction, commentTaskAction, pauseTaskAction, rejectTaskAction, startTaskAction, submitTaskAction } from "@/server/actions";
 import { fmtDate, fmtDateTime, fmtMins } from "@/lib/format";
 import { TASK_PRIORITY, TASK_STATUS, TASK_STATUS_TONE } from "@/lib/labels";
 
@@ -24,8 +25,9 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const t = await taskGet(s.userId, id);
   if (!t) notFound();
-  const mine = t.is_assignee, workable = mine && !["submitted", "client_review", "approved"].includes(t.status), running = !!t.running_since;
-  const editable = t.can_manage && t.status !== "approved";
+  const closed = ["approved", "cancelled"].includes(t.status);
+  const mine = t.is_assignee, workable = mine && !["submitted", "client_review"].includes(t.status) && !closed, running = !!t.running_since;
+  const editable = t.can_manage && !closed;
   const [assignees, services] = editable ? await Promise.all([taskAssignees(s.userId), servicesList(s.userId)]) : [[], []];
   const closedSeconds = (t.logs as any[]).filter((l) => l.ended_at).reduce((a, l) => a + Math.round((new Date(l.ended_at).getTime() - new Date(l.started_at).getTime()) / 1000), 0);
   const row = (k: string, v: React.ReactNode) => (<div className="flex justify-between gap-3"><dt className="shrink-0 text-ink-500">{k}</dt><dd className="min-w-0 break-words text-end" dir="auto">{v || "—"}</dd></div>);
@@ -33,15 +35,32 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
     <>
       <PageHeader title={t.title} sub={`${t.client_name}${t.service_name ? " · " + t.service_name : ""}`}
         actions={<><Badge tone={TASK_STATUS_TONE[t.status]}>{TASK_STATUS[t.status]}</Badge>{t.late && <Badge tone="bad">متأخر</Badge>}
+          {t.can_mark_done && (
+            <Dialog trigger="✓ تمت" tone="primary" title={`تقفل «${t.title}» إنها تمت؟`}>
+              <ActionForm action={doneTaskAction} submit="أيوه، تمت" className="space-y-3 whitespace-normal">
+                <Hidden name="task_id" value={id} />
+                <p className="text-sm leading-7">استخدمها لما الشغل يكون اتعمل والموظف نسي يسلّم. التاسك هيتقفل معتمد{running ? "، والعدّاد اللي شغّال هيقف" : ""}، و{t.assignee_name} هيوصله إشعار.</p>
+                <TextArea label="ملاحظة (اختياري)" name="note" rows={2} placeholder="مثال: اتسلّم على الواتساب" />
+              </ActionForm>
+            </Dialog>)}
+          {t.can_cancel && (
+            <Dialog trigger="إلغاء التاسك" tone="danger" title={`إلغاء «${t.title}»؟`}>
+              <ActionForm action={cancelTaskAction} submit="أيوه، الغيه" className="space-y-3 whitespace-normal">
+                <Hidden name="task_id" value={id} />
+                <p className="text-sm leading-7">التاسك هيختفي من شغل {t.assignee_name} المفتوح ومش هيتحسب متأخر{running ? "، والعدّاد اللي شغّال هيقف" : ""}. هيفضل متسجل «اتلغى» بالسبب ومين لغاه، والوقت اللي اتشغل عليه محفوظ.</p>
+                <TextArea label="سبب الإلغاء" name="note" rows={2} required />
+              </ActionForm>
+            </Dialog>)}
           <Link href={t.can_manage ? `/operations/${t.ops_id}` : "/tasks"} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">رجوع</Link></>} />
       {t.status === "changes_requested" && <div className="mb-4"><Alert kind="error">مطلوب تعديل: {t.review_note} — {t.reviewed_by_name} · {fmtDateTime(t.reviewed_at)}</Alert></div>}
-      {t.status === "approved" && <div className="mb-4"><Alert kind="ok">التاسك معتمد — {t.reviewed_by_name} · {fmtDateTime(t.reviewed_at)}{t.review_note ? ` — ${t.review_note}` : ""}</Alert></div>}
+      {t.status === "cancelled" && <div className="mb-4"><Alert kind="error">التاسك اتلغى — {t.cancelled_by_name} · {fmtDateTime(t.cancelled_at)} — {t.cancel_reason}</Alert></div>}
+      {t.status === "approved" && <div className="mb-4"><Alert kind="ok">{t.closed_by_manager ? "التاسك اتقفل إنه تمت" : "التاسك معتمد"} — {t.reviewed_by_name} · {fmtDateTime(t.reviewed_at)}{t.review_note ? ` — ${t.review_note}` : ""}</Alert></div>}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
           {t.description && <Card title="المطلوب"><p className="whitespace-pre-wrap text-sm leading-7">{t.description}</p></Card>}
 
-          {mine && t.status !== "approved" && (
+          {mine && !closed && (
             <Card title="وقت الشغل">
               <div className="flex flex-wrap items-center gap-4">
                 {running ? <TaskTimer since={t.running_since} baseSeconds={closedSeconds} /> : <span className="text-2xl font-bold tabular-nums">{fmtMins(t.minutes)}</span>}
@@ -91,7 +110,7 @@ export default async function Task({ params }: { params: Promise<{ id: string }>
             {t.files.length > 0 && <ul className="mb-4 divide-y divide-line text-sm">{(t.files as any[]).map((f) => (
               <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><a href={`/files/${f.id}`} target="_blank" rel="noopener noreferrer" className="font-medium text-burgundy-700 underline">{f.filename}</a>
                 <span className="flex items-center gap-3 text-xs text-ink-500"><span>{Math.max(1, Math.round(Number(f.size_bytes) / 1024))} ك.ب · {f.by} · {fmtDateTime(f.at)}</span>{f.can_delete && <DeleteFile taskId={id} fileId={f.id} name={f.filename} />}</span></li>))}</ul>}
-            {(mine || t.can_manage) && t.status !== "approved" ? (
+            {(mine || t.can_manage) && !closed ? (
               <ActionForm action={uploadTaskFileAction} submit="رفع الملف" tone="quiet" className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                 <Hidden name="task_id" value={id} />
                 <div><label htmlFor="file" className="mb-1 block text-sm font-medium">ملف (مرجع أو تسليم)</label>

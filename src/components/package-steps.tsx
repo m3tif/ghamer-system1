@@ -26,7 +26,7 @@ export function PackageSteps({ opsId, steps, assignees, manage }: { opsId: strin
                     {s.description && !s.task_id && <p className="mt-1 text-sm text-ink-500">{s.description}</p>}</div>
                   {s.task_status ? <Badge tone={TASK_STATUS_TONE[s.task_status]}>{TASK_STATUS[s.task_status]}</Badge> : <Badge tone="neutral">لسه ماتبعتتش</Badge>}
                 </div>
-                {manage && !s.task_id && list.length > 0 && (
+                {manage && (!s.task_id || s.task_status === "cancelled") && list.length > 0 && (
                   <details className="mt-3"><summary className="inline-flex cursor-pointer rounded-md bg-burgundy-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-burgundy-700">ابعت الخطوة دي</summary>
                     <div className="mt-3"><ActionForm action={saveTaskAction} submit="ابعت للموظف" className="grid gap-3 md:grid-cols-[1fr_11rem_auto] md:items-end">
                       <Hidden name="ops_id" value={opsId} /><Hidden name="template" value={s.template_id} /><Hidden name="title" value={s.title} /><Hidden name="description" value={s.description ?? ""} />

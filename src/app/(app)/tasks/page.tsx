@@ -15,8 +15,8 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<{ 
   const all = await taskList(s.userId, manager ? "all" : "mine");
   const f = (await searchParams).f ?? "open";
   const filters: [string, string, (t: (typeof all)[number]) => boolean][] = manager
-    ? [["review", "مستني مراجعتي", (t) => t.status === "submitted"], ["client", "مستني العميل", (t) => t.status === "client_review"], ["late", "متأخر", (t) => t.late], ["open", "كل المفتوح", (t) => t.status !== "approved"], ["done", "معتمد", (t) => t.status === "approved"]]
-    : [["open", "شغلي الحالي", (t) => !["approved", "submitted", "client_review"].includes(t.status)], ["review", "سلّمته ومستني مراجعة", (t) => ["submitted", "client_review"].includes(t.status)], ["late", "متأخر", (t) => t.late], ["done", "معتمد", (t) => t.status === "approved"]];
+    ? [["review", "مستني مراجعتي", (t) => t.status === "submitted"], ["client", "مستني العميل", (t) => t.status === "client_review"], ["late", "متأخر", (t) => t.late], ["open", "كل المفتوح", (t) => !["approved", "cancelled"].includes(t.status)], ["done", "معتمد", (t) => t.status === "approved"], ["cancelled", "اتلغى", (t) => t.status === "cancelled"]]
+    : [["open", "شغلي الحالي", (t) => !["approved", "cancelled", "submitted", "client_review"].includes(t.status)], ["review", "سلّمته ومستني مراجعة", (t) => ["submitted", "client_review"].includes(t.status)], ["late", "متأخر", (t) => t.late], ["done", "معتمد", (t) => t.status === "approved"]];
   const cur = filters.find((x) => x[0] === f) ?? filters[0];
   const rows = all.filter(cur[2]);
   return (
