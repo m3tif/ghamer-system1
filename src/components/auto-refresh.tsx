@@ -23,7 +23,7 @@ export function AutoRefresh() {
 
   useEffect(() => {
     stopped.current = false;
-    const busy = () => !!document.querySelector("#leads-table.paint-mode") || !!document.querySelector("dialog[open]");   // colouring, or a form is open (rows loaded while scrolling now refresh themselves) batch: a refresh would reset them
+    const busy = () => !!document.querySelector("#leads-table.paint-mode") || !!document.querySelector("dialog[open]") || !!document.querySelector("[data-hold-refresh]");   // [data-hold-refresh]: something shown once (a temporary password) must not be wiped   // colouring, or a form is open (rows loaded while scrolling now refresh themselves) batch: a refresh would reset them
     const typing = () => { const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === "TEXTAREA" || a.tagName === "SELECT" || (a.tagName === "INPUT" && (a as HTMLInputElement).type !== "search" && (a as HTMLInputElement).type !== "checkbox" && (a as HTMLInputElement).type !== "radio")) && !!(a as HTMLInputElement).value; };
     const schedule = () => { if (!stopped.current) timer.current = setTimeout(tick, delay.current); };
     const tick = async () => {

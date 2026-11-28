@@ -31,6 +31,7 @@ export default async function OpsClient({ params }: { params: Promise<{ id: stri
     <>
       <PageHeader title={r.client_name} sub={r.business_name ?? undefined}
         actions={<>{r.status === "new" ? <Badge tone="warn">مستني تحويل</Badge> : <Badge tone="ok">مع {r.account_manager_name}</Badge>}
+          {r.status !== "new" && <Link href={`/operations/${id}/portal`} className="rounded-md bg-burgundy-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-burgundy-700">بوابة العميل</Link>}
           <Link href={`/clients/${r.client_id}`} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">الملف الكامل 360°</Link>
           <Link href="/operations" className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-cream">رجوع</Link></>} />
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">

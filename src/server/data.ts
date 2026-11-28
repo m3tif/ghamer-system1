@@ -405,3 +405,11 @@ export async function opsClientGet(uid: string, ops: string) {
   try { return (await tx(uid, (c) => c.query("select app.ops_client_get($1) r", [ops]))).rows[0].r as { name: string; business_name: string | null; contact_person: string | null; city: string | null; phone: string | null; alt_phone: string | null; whatsapp: string | null; stores: string[] }; }
   catch { return null; }
 }
+
+// ───────── Client Portal (staff side) ─────────
+export async function portalStaffGet(uid: string, ops: string) {
+  return (await tx(uid, (c) => c.query("select app.portal_staff_get($1) j", [ops]))).rows[0]?.j as any | null;
+}
+export async function portalStageDefaults(uid: string) {
+  return (await tx(uid, (c) => c.query("select * from app.portal_stage_defaults_list()"))).rows as { id: string; name: string; sort: number; is_active: boolean }[];
+}

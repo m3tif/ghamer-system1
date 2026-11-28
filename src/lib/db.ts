@@ -50,3 +50,24 @@ export async function closePool() {
   await g.__ghamerPool?.end();
   g.__ghamerPool = undefined;
 }
+
+/**
+ * A client-portal request: runs with ONLY the portal account set (app.portal_id) — never an employee identity —
+ * so every staff function sees nobody, and the app.portal_* functions scope everything to this client.
+ */
+export async function ptx<T>(accountId: string | null, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  const c = await getPool().connect();
+  try {
+    if (accountId && !/^[0-9a-f-]{36}$/i.test(accountId)) throw new Error("invalid account id");
+    await c.query(accountId ? `begin; select set_config('app.portal_id', '${accountId}', true)` : "begin");
+    await assertRestrictedRole(c);
+    const out = await fn(c);
+    await c.query("commit");
+    return out;
+  } catch (e) {
+    await c.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
