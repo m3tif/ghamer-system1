@@ -30,14 +30,17 @@ export default async function Messages({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader title="رسائل للموظفين" sub={admin ? "اكتب رسالة تظهر للموظف في نافذة أول ما يفتح السيستم، ولحد ما يدوس الزرار. وبتفضل في إشعاراته." : "ابعت رسالة للفريق التقني أو الأكاونت مانجر — بتظهرلهم في نافذة أول ما يفتحوا السيستم، وباسمك."} />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,460px)_1fr]">
+      <div className="grid items-start gap-6 min-[1500px]:grid-cols-[420px_minmax(0,1fr)]">
         <Card title="رسالة جديدة"><BroadcastForm employees={active} audiences={admin ? undefined : ["tech", "ops", "selected"]} /></Card>
         <Card title="الرسائل المرسلة">
           {sent.length === 0 ? <Empty title="لم ترسل أي رسالة من هنا بعد" /> : (
             <Table head={["الرسالة", "لمين", "شافوها", "الردود", "وقت الإرسال", ""]}>
               {sent.map((b: any) => (
                 <tr key={b.id}>
-                  <td className={td}><span className="font-medium">{b.title}</span><span className="mt-0.5 block max-w-md whitespace-pre-wrap text-xs text-ink-500">{b.body}</span></td>
+                  <td className={td + " min-w-[14rem] max-w-md"}><span className="font-medium">{b.title}</span>
+                    {b.body.length > 140 || b.body.split("\n").length > 3
+                      ? <details className="group mt-0.5 text-xs text-ink-500"><summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span className="line-clamp-2 whitespace-pre-wrap group-open:hidden">{b.body}</span><span className="font-medium text-burgundy-700 underline"><span className="group-open:hidden">اقرأ الرسالة كلها</span><span className="hidden group-open:inline">اقفل</span></span></summary><p className="mt-1 whitespace-pre-wrap leading-6">{b.body}</p></details>
+                      : <span className="mt-0.5 block whitespace-pre-wrap text-xs text-ink-500">{b.body}</span>}</td>
                   <td className={td + " whitespace-nowrap"}>{AUDIENCE[b.audience]}</td>
                   <td className={td + " whitespace-nowrap tabular-nums"}>{b.recalled_at ? <span className="text-ink-500">—</span> : <>{b.seen} من {b.recipients - b.recalled_count}{b.recalled_count > 0 && <span className="mt-0.5 block text-xs text-ink-500">اتسحبت من {b.recalled_count}</span>}</>}</td>
                   <td className={td + " whitespace-nowrap tabular-nums"}>{b.allow_reply || b.replies > 0 ? (b.replies > 0 ? <a href={`#r-${b.id}`} className="font-semibold text-burgundy-700 underline">{b.replies} رد</a> : "لسه مفيش") : "—"}</td>
