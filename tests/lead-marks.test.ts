@@ -71,3 +71,19 @@ describe("new leads appear on top while 'my order' is active", () => {
     expect(r.rows.map((z: any) => z.id).slice(0, 3)).toEqual([n, y, x]);
   });
 });
+
+describe("«ترتيبي» never buries leads: new data on top, then my order, then the rest", () => {
+  it("older leads I never arranged come after my order; new data after arranging comes first", async () => {
+    const old1 = (await register("tele2", leadPayload({ name: "قديم1", phone: "0559880001" }))).lead_id;
+    const old2 = (await register("tele2", leadPayload({ name: "قديم2", phone: "0559880002" }))).lead_id;
+    const a1 = (await register("tele2", leadPayload({ name: "رتبته1", phone: "0559880003" }))).lead_id;
+    const a2 = (await register("tele2", leadPayload({ name: "رتبته2", phone: "0559880004" }))).lead_id;
+    await run("tele2", "select app.reorder_leads($1::uuid[])", [[a2, a1]]);   // only these two were on screen
+    const fresh = (await register("tele2", leadPayload({ name: "جديد", phone: "0559880005" }))).lead_id;
+    const r = await run("tele2", "select * from app.list_leads(null,null,null,null,null,null,null,'manual','asc',100,0,null)");
+    const mine = [fresh, a2, a1, old2, old1];
+    expect(r.rows.map((z: any) => z.id).filter((x: string) => mine.includes(x))).toEqual(mine);
+    expect(r.rows.slice(0, 3).map((z: any) => z.id)).toEqual([fresh, a2, a1]);
+  });
+});
+
