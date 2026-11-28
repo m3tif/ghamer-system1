@@ -29,7 +29,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const f = normalizeLeadQuery(s, sp, manualOrder);
   const { employee, wide, canHide, month, creator, sales: salesF, temp, status, sort, dir, hidden: hiddenF } = f;
   const isTele = s.role === "tele_sales";
-  const tab = sp.tab === "handed" && can(s, "leads.handoff") ? "handed" : sp.tab === "received" && isTele ? "received" : "mine";
+  const tab = sp.tab === "handed" && can(s, "leads.handoff") ? "handed" : sp.tab === "received" && isTele ? "received" : sp.tab === "transferred" && isTele ? "transferred" : "mine";
   const inList = tab !== "handed";
   const emps = wide ? (await employeeList(s.userId)).filter((e: any) => ["tele_sales", "sales_rep", "tele_sales_manager", "sales_manager"].includes(e.role_code)) : [];
   const canHand = can(s, "leads.handoff");
@@ -41,25 +41,26 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   ]);
   const { rows, total } = list;
   const tz = tzLabel(getTimezone());
-  const q = { q: f.q, status, month: sp.month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF, tab: tab === "received" ? "received" : undefined };
+  const q = { q: f.q, status, month: sp.month, creator, sales: salesF, temp, sort, dir, hidden: hiddenF, tab: tab === "received" || tab === "transferred" ? tab : undefined };
   const filtered = !!(sp.q || status || sp.month || temp || creator || salesF || hiddenF);
   const tabCls = (on: boolean) => `rounded-md px-3.5 py-2 text-sm ${on ? "bg-burgundy-600 font-semibold text-white" : "border border-line bg-white hover:bg-cream"}`;
   return (
     <>
-      <PageHeader title={tab === "received" ? "الداتا المستلمة" : employee ? "العملاء اللي ضفتهم" : "العملاء"}
-        sub={tab !== "received" && counts && employee ? `أضفت ${counts.total} عميل · ${counts.this_month} هذا الشهر · حوّلت ${counts.handed_off} (قُبل ${counts.accepted}، رُفض ${counts.rejected})` : tab === "received" ? `${total} عميل وصلوك من الإدارة عن طريق توزيع الداتا (منفصلين عن اللي ضفتهم بنفسك)` : tab === "mine" ? `${total} سجل ضمن صلاحياتك` : undefined}
+      <PageHeader title={tab === "received" ? "الداتا المستلمة" : tab === "transferred" ? "الداتا المنقولة" : employee ? "العملاء اللي ضفتهم" : "العملاء"}
+        sub={tab === "transferred" ? `${total} عميل اتنقلوا ليك من موظف تاني` : tab !== "received" && counts && employee ? `أضفت ${counts.total} عميل · ${counts.this_month} هذا الشهر · حوّلت ${counts.handed_off} (قُبل ${counts.accepted}، رُفض ${counts.rejected})` : tab === "received" ? `${total} عميل وصلوك من الإدارة عن طريق توزيع الداتا (منفصلين عن اللي ضفتهم بنفسك)` : tab === "mine" ? `${total} سجل ضمن صلاحياتك` : undefined}
         actions={can(s, "leads.create") ? <ButtonLink href="/leads/new">+ تسجيل عميل جديد</ButtonLink> : null} />
       {sp.handed && <p role="status" className="mb-4 rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">تم إرسال العميل إلى السيلز. لا يُعتبر مقبولًا حتى يقرر السيلز، وستصلك نتيجة القرار في الإشعارات.</p>}
       {(canHand || isTele) && (
         <div className="mb-4 flex gap-2" role="tablist">
           <Link href="/leads" role="tab" aria-selected={tab === "mine"} className={tabCls(tab === "mine")}>{isTele ? "العملاء اللي ضفتهم" : "عملائي الحاليون"}</Link>
           {isTele && <Link href="/leads?tab=received" role="tab" aria-selected={tab === "received"} className={tabCls(tab === "received")}>الداتا المستلمة</Link>}
+          {isTele && <Link href="/leads?tab=transferred" role="tab" aria-selected={tab === "transferred"} className={tabCls(tab === "transferred")}>الداتا المنقولة</Link>}
           <Link href="/leads?tab=handed" role="tab" aria-selected={tab === "handed"} className={tabCls(tab === "handed")}>تم تحويلها إلى السيلز</Link>
         </div>)}
       {inList ? (<>
         {tab === "mine" && can(s, "leads.create") && <QuickAdd today={fmtDate(new Date())} />}
         <form className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" role="search">
-          {tab === "received" && <input type="hidden" name="tab" value="received" />}
+          {(tab === "received" || tab === "transferred") && <input type="hidden" name="tab" value={tab} />}
           <SearchBox className="col-span-2 sm:min-w-64 sm:max-w-md sm:flex-1" />
           <select name="status" defaultValue={status ?? ""} className={inputCls + " w-full sm:w-auto"} aria-label="الحالة">
             <option value="">كل الحالات</option>{Object.entries(LEAD_STATUS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}

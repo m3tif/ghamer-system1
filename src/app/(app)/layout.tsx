@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/", label: "لوحة التحكم", show: true },
     { href: "/leads", label: employee ? "العملاء اللي ضفتهم" : "العملاء", show: can(s, "leads.view") },
     { href: "/leads?tab=received", label: "الداتا المستلمة", show: s.role === "tele_sales" && can(s, "leads.view") },
+    { href: "/leads?tab=transferred", label: "الداتا المنقولة", show: s.role === "tele_sales" && can(s, "leads.view") },
     { href: "/assigned", label: "العملاء المسندين إليّ", show: isSales && can(s, "deals.view"), badge: s.pendingReview },
     { href: "/pipeline", label: "خط المبيعات", show: can(s, "deals.view") },
     { href: "/operations", label: s.role === "account_manager" ? "عملائي" : "العملاء المعتمدين", show: can(s, "ops.view") },

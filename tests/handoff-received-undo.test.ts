@@ -94,3 +94,30 @@ describe("undo a whole distribution", () => {
     await expect(run("super", "select app.dist_undo($1,'')", [batch])).rejects.toThrow(/reason|worked on/);
   });
 });
+
+describe("«الداتا المنقولة»: leads moved from another employee", () => {
+  it("a hidden month moved to another tele becomes visible to her, in its own tab, not in «المستلمة»", async () => {
+    const own2 = (await register("tele2", leadPayload({ name: "بتاعة تيلي2", phone: "0557770091" }))).lead_id;
+    const dist2 = await distribute(2, ids.tele2);
+    const distIds = (await list("tele2", "received")).map((r: any) => r.id);
+    // the admin hides tele2's data for this month, then moves all her work to tele1
+    const month = (await admin.query("select date_trunc('month', created_at at time zone 'Africa/Cairo')::date m from leads where id = $1", [own2])).rows[0].m;
+    await run("super", "select app.hide_period('month',$1,$2,true,'مراجعة')", [month, ids.tele2]);
+    expect((await admin.query("select count(*)::int n from leads where current_owner_id=$1 and hidden_at is not null", [ids.tele2])).rows[0].n).toBeGreaterThan(0);
+    await run("super", "select app.reassign_employee($1,$2,'وصلك')", [ids.tele2, ids.tele1]);
+    const moved = [own2, ...distIds];
+    expect((await admin.query("select count(*)::int n from leads where id = any($1) and (hidden_at is not null or current_owner_id <> $2)", [moved, ids.tele1])).rows[0].n).toBe(0);
+    const transferred = await list("tele1", "transferred"), received = await list("tele1", "received");
+    for (const id of moved) { expect(has(transferred, id)).toBe(true); expect(has(received, id)).toBe(false); }
+    // her own distributed data stays in «المستلمة»
+    expect(received.length).toBeGreaterThan(0);
+    expect(received.every((r: any) => !moved.includes(r.id))).toBe(true);
+    // a single transfer also un-hides and lands in «المنقولة»
+    const one = (await register("tele2", leadPayload({ name: "واحد", phone: "0557770092" }))).lead_id;
+    await admin.query("update leads set hidden_at = now(), hidden_reason = 'x' where id = $1", [one]);
+    await run("super", "select app.transfer_lead($1,$2,'owner','نقل')", [one, ids.tele1]);
+    expect(has(await list("tele1", "transferred"), one)).toBe(true);
+    void dist2;
+  });
+});
+
